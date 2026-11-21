@@ -478,3 +478,10 @@ POST,/oauth2/mock/login/{id},unmapped,,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 # non-api
 GET,/oauth2/authorization/twitch,,,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 GET,/swagger-ui.html,,,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+# public enrichment detail, version 3 and later (a request naming no version is served version 2, where they do not
+# exist)
+GET,/api/games/hltb/{igdbId},igdbId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/protondb/{appId},appId=990000;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/steamdeck/{appId},appId=990000;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/steamgriddb/{sgdbGameId},sgdbGameId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/pcgamingwiki/{pageId},pageId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401

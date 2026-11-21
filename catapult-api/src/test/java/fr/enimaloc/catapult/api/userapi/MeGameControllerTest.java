@@ -7,6 +7,10 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.ApiSecurityConfig;
 import fr.enimaloc.catapult.service.account.ApiTokenOwner;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
+import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
+import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
+import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
+import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +28,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -144,6 +149,101 @@ class MeGameControllerTest {
         mvc.perform(withToken(get("/api/me/game/summary")).param("f", "xbox.name"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(""));
+    }
+
+    private void playingPortalV3() {
+        GameInfoResponse.XboxObject xbox = new GameInfoResponse.XboxObject("9NBLGGH2JHXJ", "Portal", "Portal desc",
+                "Valve", "Valve", "https://cover", "https://store/portal", "http://localhost/more");
+        GameInfoResponse base = new GameInfoResponse(true, null, null, xbox, null, null, "Portal");
+        GameEnrichment enrichment = new GameEnrichment(new TimeToBeat(3600L, 7200L, 10800L, 42),
+                new ProtonDbSummary("platinum", "gold", "platinum", "strong", 0.9, 120,
+                        "https://www.protondb.com/app/400"),
+                null, new SteamDeckCompatibility(SteamDeckCompatibility.Category.VERIFIED, List.of()), null,
+                new GameEnrichment.Trailer(GameEnrichment.Trailer.YOUTUBE, "https://www.youtube.com/watch?v=x"),
+                "400");
+        when(games.gameInfoV3(eq(user), any(Locale.class))).thenReturn(GameInfoV3Response.of(base, enrichment,
+                new MoreLinks("http://localhost", GameInfoAssembler.LinkStyle.CURRENT), Optional.of("1942")));
+    }
+
+    @Test
+    void meGame_v3_hasEnrichmentObjects() throws Exception {
+        playingPortalV3();
+
+        mvc.perform(withToken(get("/api/me/game")).header(ApiV2.VERSION_HEADER, "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.inGame").value(true))
+                .andExpect(jsonPath("$.xbox.productId").value("9NBLGGH2JHXJ"))
+                .andExpect(jsonPath("$.hltb.normally").value(7200))
+                .andExpect(jsonPath("$.hltb.more").value("http://localhost/api/games/hltb/1942"))
+                .andExpect(jsonPath("$.protondb.tier").value("platinum"))
+                .andExpect(jsonPath("$.steamDeck.category").value("verified"))
+                .andExpect(jsonPath("$.name").value("Portal"));
+
+        verify(games).gameInfoV3(user, Locale.ENGLISH);
+        verify(games, never()).gameInfo(any(UserAccount.class), any());
+    }
+
+    @Test
+    void meGame_v3_field_returnsPlainText() throws Exception {
+        playingPortalV3();
+
+        mvc.perform(withToken(get("/api/me/game")).queryParam("version", "3").param("f", "protondb.tier"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "text/plain;charset=UTF-8"))
+                .andExpect(content().string("platinum"));
+    }
+
+    @Test
+    void meGame_v2_unchanged() throws Exception {
+        playingHalo();
+
+        mvc.perform(withToken(get("/api/me/game")).header(ApiV2.VERSION_HEADER, "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Halo"))
+                .andExpect(jsonPath("$.hltb").doesNotExist())
+                .andExpect(jsonPath("$.protondb").doesNotExist());
+
+        verify(games, never()).gameInfoV3(any(UserAccount.class), any());
+    }
+
+    @Test
+    void meGameSummary_v3_hasTimeToBeatAndTrailer() throws Exception {
+        playingPortalV3();
+
+        mvc.perform(withToken(get("/api/me/game/summary")).header(ApiV2.VERSION_HEADER, "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.inGame").value(true))
+                .andExpect(jsonPath("$.name").value("Portal"))
+                .andExpect(jsonPath("$.timeToBeat").value(7200))
+                .andExpect(jsonPath("$.protonTier").value("platinum"))
+                .andExpect(jsonPath("$.deckStatus").value("verified"))
+                .andExpect(jsonPath("$.trailer.kind").value("youtube"))
+                .andExpect(jsonPath("$.trailer.url").value("https://www.youtube.com/watch?v=x"))
+                .andExpect(jsonPath("$.hltb").doesNotExist())
+                .andExpect(jsonPath("$.xbox").doesNotExist());
+    }
+
+    @Test
+    void meGameSummary_v3_field_returnsPlainText() throws Exception {
+        playingPortalV3();
+
+        mvc.perform(withToken(get("/api/me/game/summary")).header(ApiV2.VERSION_HEADER, "3").param("f", "timeToBeat"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("7200"));
+        // Outside the summary view: empty
+        mvc.perform(withToken(get("/api/me/game/summary")).header(ApiV2.VERSION_HEADER, "3").param("f", "hltb.count"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(""));
+    }
+
+    @Test
+    void meGameSummary_v2_hasNoEnrichmentField() throws Exception {
+        playingHalo();
+
+        mvc.perform(withToken(get("/api/me/game/summary")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.timeToBeat").doesNotExist())
+                .andExpect(jsonPath("$.trailer").doesNotExist());
     }
 
     @Test

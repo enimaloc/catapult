@@ -55,7 +55,12 @@ class ExternalRouteSetTest {
             "GET /api/games/igdb/{igdbId}",
             "GET /api/games/steam/{appId}",
             "GET /api/games/xbox/{productId}",
-            "GET /api/games/dtdd/{dtddId}");
+            "GET /api/games/dtdd/{dtddId}",
+            "GET /api/games/hltb/{igdbId}",
+            "GET /api/games/protondb/{appId}",
+            "GET /api/games/steamdeck/{appId}",
+            "GET /api/games/steamgriddb/{sgdbGameId}",
+            "GET /api/games/pcgamingwiki/{pageId}");
 
     private static final String[] PREFIXES = {
         "/api/game/", "/api/user/", "/api/v1/", "/api/v2/", "/api/twitchat/widget/", "/api/twitchat/actions/",

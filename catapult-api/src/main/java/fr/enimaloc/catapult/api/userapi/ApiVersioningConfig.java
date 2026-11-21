@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.api.userapi;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.cors.CorsUtils;
 import org.springframework.web.servlet.config.annotation.ApiVersionConfigurer;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -13,7 +14,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * experiment ({@link ExperimentDefaultVersionResolver}) — the resolvers are tried in declaration
  * order, so the header wins over the parameter, and both win over the experiment.
  * There is no "latest" alias path to keep in sync; when no resolver answers, the request falls back
- * to {@link ApiV2#VERSION} via {@link ApiVersionConfigurer#setDefaultVersion}.
+ * to {@link ApiV2#VERSION}, by a last resolver rather than {@link ApiVersionConfigurer#setDefaultVersion}: a CORS
+ * preflight then resolves no version at all and finds the CORS configuration of a route of any version (a
+ * {@code "3+"} route would otherwise refuse every browser page of another origin).
  *
  * <p>Versions 2 and 3 are supported. A route unchanged since version 2 is mapped at
  * {@link ApiV2#BASELINE} ("2+") and answers both; a response that changes in version 3 gets a
@@ -39,9 +42,12 @@ public class ApiVersioningConfig implements WebMvcConfigurer {
     public void configureApiVersioning(ApiVersionConfigurer configurer) {
         configurer.useRequestHeader(ApiV2.VERSION_HEADER)
                 .useQueryParam(ApiV2.VERSION_PARAM);
-        defaultVersionResolver.ifAvailable(resolver -> configurer.useVersionResolver(resolver::resolveVersion));
-        configurer.addSupportedVersions(ApiV2.VERSION, ApiV2.VERSION_3)
-                .setDefaultVersion(ApiV2.VERSION)
+        defaultVersionResolver.ifAvailable(resolver -> configurer.useVersionResolver(
+                request -> CorsUtils.isPreFlightRequest(request) ? null : resolver.resolveVersion(request)));
+        // The default, as a last resolver rather than setDefaultVersion: a CORS preflight names no version (a browser
+        // never sends the header's value with it) and must match a route of any version, "3+" ones included.
+        configurer.useVersionResolver(request -> CorsUtils.isPreFlightRequest(request) ? null : ApiV2.VERSION)
+                .addSupportedVersions(ApiV2.VERSION, ApiV2.VERSION_3)
                 .setVersionRequired(false);
     }
 }

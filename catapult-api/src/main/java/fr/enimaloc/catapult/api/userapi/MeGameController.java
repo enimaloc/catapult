@@ -27,7 +27,8 @@ import static fr.enimaloc.catapult.api.userapi.RequestLocale.LANG_DESCRIPTION;
 /**
  * The game the token owner's channel plays now, aggregated across every platform, or its summary: for overlays and
  * chat bots, authenticated by the personal API token (the read-only one opens it, from {@code ?token=} too). With
- * {@code f}, one field of the answer as plain text.
+ * {@code f}, one field of the answer as plain text. Version 3 adds the enrichment sources (see
+ * {@link GameInfoV3Response}); the version 2 answers are unchanged.
  */
 @RestController
 @RequestMapping(path = ApiV2.ME_GAME_PATH, version = ApiV2.BASELINE)
@@ -43,7 +44,9 @@ public class MeGameController {
     @Operation(summary = "Get your channel's currently-detected game, fully aggregated",
             description = "Every platform object that could be resolved for the game your channel plays now "
                     + "(igdb/steam/xbox/dtdd/catapult, each null if unavailable), each carrying a \"more\" link "
-                    + "to its own detail route.")
+                    + "to its own detail route. Version 3 adds the enrichment objects hltb, protondb, steamgriddb, "
+                    + "steamDeck and pcgamingwiki (each null if unavailable or too slow to answer, each with its "
+                    + "\"more\" link) and the trailer.")
     @ApiResponse(responseCode = "200", description = "inGame=false with every platform object null while no "
             + "game is detected; otherwise the aggregated game info.")
     @GetMapping
@@ -62,7 +65,9 @@ public class MeGameController {
     @Operation(summary = "Get a compact summary of your channel's currently-detected game",
             description = "Same aggregation as GET /api/me/game, but only inGame plus the cross-platform derived "
                     + "fields (name, description, tws, releaseDate — the first non-null value found across "
-                    + "igdb/steam/xbox/dtdd/catapult, in that priority order), not the per-platform objects.")
+                    + "igdb/steam/xbox/dtdd/catapult, in that priority order), not the per-platform objects. Version 3 adds "
+                    + "timeToBeat (HowLongToBeat's normal duration, in seconds), protonTier, deckStatus, coverUrl "
+                    + "(SteamGridDB grid, else IGDB cover) and trailer ({kind: mp4|youtube, url}).")
     @ApiResponse(responseCode = "200", description = "inGame=false while no game is detected; otherwise the "
             + "summarized game info.")
     @GetMapping("/summary")
@@ -80,8 +85,38 @@ public class MeGameController {
                 GameInfoResponse.Summary.class, field);
     }
 
+    // The version 3 variants. Hidden: springdoc merges both versions of a path into one operation, whose text would
+    // then depend on which method it reads last; the version 2 operation tells what version 3 adds.
+
+    @Operation(hidden = true)
+    @GetMapping(version = ApiV2.VERSION_3)
+    public ResponseEntity<?> gameInfoV3(
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam(name = "lang", required = false) String lang,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @RequestParam(name = "f", required = false) String field) {
+        return FieldSelector.answer(jsonMapper, gameInfoV3(userId, lang, acceptLanguage), null, field);
+    }
+
+    @Operation(hidden = true)
+    @GetMapping(path = "/summary", version = ApiV2.VERSION_3)
+    @JsonView(GameInfoResponse.Summary.class)
+    public ResponseEntity<?> summaryV3(
+            @AuthenticationPrincipal UUID userId,
+            @RequestParam(name = "lang", required = false) String lang,
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage,
+            @RequestParam(name = "f", required = false) String field) {
+        return FieldSelector.answer(jsonMapper, gameInfoV3(userId, lang, acceptLanguage),
+                GameInfoResponse.Summary.class, field);
+    }
+
     private ResponseEntity<GameInfoResponse> gameInfo(UUID userId, String lang, String acceptLanguage) {
         return ResponseEntity.ok(gameInfoAssembler.gameInfo(userResolver.tokenOwner(userId),
+                RequestLocale.parse(lang, acceptLanguage)));
+    }
+
+    private ResponseEntity<GameInfoV3Response> gameInfoV3(UUID userId, String lang, String acceptLanguage) {
+        return ResponseEntity.ok(gameInfoAssembler.gameInfoV3(userResolver.tokenOwner(userId),
                 RequestLocale.parse(lang, acceptLanguage)));
     }
 }
