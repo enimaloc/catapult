@@ -948,7 +948,9 @@ class ChannelVisibilityRenderingTest {
         assertThat(openingTagForId(html, "speedrun-username-input")).contains("placeholder=\"speedrun.com username\"")
                 .contains("value=\"n1\"");
         assertThat(openingTagForId(html, "speedrun-key-input")).contains("type=\"password\"")
-                .contains("placeholder=\"speedrun.com API key (optional)\"").doesNotContain("hidden");
+                .contains("placeholder=\"speedrun.com API key (optional)\"").contains("autocomplete=\"new-password\"")
+                .doesNotContain("hidden");
+        assertThat(openingTagForId(html, "speedrun-username-input")).doesNotContain("autocomplete");
         assertThat(openingTagForId(html, "speedrun-key-delete-btn")).contains("hidden");
         assertThat(openingTagForId(html, "speedrun-username-delete-btn")).doesNotContain("hidden");
     }

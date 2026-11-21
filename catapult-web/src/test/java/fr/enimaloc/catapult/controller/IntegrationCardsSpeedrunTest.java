@@ -120,6 +120,7 @@ class IntegrationCardsSpeedrunTest {
         List<IntegrationNode> none = nodes(data(null, false, false, null, null));
 
         assertThat(((Input) byId(none, "speedrun-key-input")).inputType()).isEqualTo("password");
+        assertThat(((Input) byId(none, "speedrun-key-input")).autocomplete()).isEqualTo("new-password");
         assertThat(((Input) byId(none, "speedrun-key-input")).value()).isNull();
         assertThat(shown(byId(none, "speedrun-key-input"))).isTrue();
         assertThat(shown(byId(none, "speedrun-key-save-btn"))).isTrue();

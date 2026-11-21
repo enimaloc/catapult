@@ -377,7 +377,7 @@ public final class IntegrationCards {
                 new Text(Attrs.cls("speedrun-key-saved").withState(hasKeyState), false,
                         key(PREFIX + "speedrun.key.saved")),
                 new Input(Attrs.id("speedrun-key-input").withState(noKeyState), "password",
-                        key(PREFIX + "speedrun.key.placeholder"), null, null, null, null),
+                        key(PREFIX + "speedrun.key.placeholder"), null, null, null, null, "new-password"),
                 new Container(Attrs.id("speedrun-key-actions").withClass("card-actions"),
                         Container.Kind.SEGMENTED_GROUP, List.of(
                         segmented(Attrs.id("speedrun-key-save-btn").withState(noKeyState),

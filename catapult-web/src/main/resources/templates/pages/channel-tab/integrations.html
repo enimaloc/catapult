@@ -45,7 +45,7 @@
            th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
            th:placeholder="${text}"
            th:aria-label="${n.ariaLabel().isKey() ? #messages.msgWithParams(n.ariaLabel().key(), n.ariaLabel().argsArray()) : n.ariaLabel().literal()}"
-           th:value="${n.value()}" th:min="${n.min()}" th:max="${n.max()}"/>
+           th:value="${n.value()}" th:min="${n.min()}" th:max="${n.max()}" th:autocomplete="${n.autocomplete()}"/>
     <label th:case="'switch'">
         <mdui-switch th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}" th:classappend="${n.attrs().className()}"
                      spa:state="${n.attrs().state()}" th:checked="${n.checked()}"></mdui-switch>
