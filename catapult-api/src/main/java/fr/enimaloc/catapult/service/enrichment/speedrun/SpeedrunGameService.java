@@ -27,6 +27,9 @@ public class SpeedrunGameService {
 
     /** The speedrun.com game called {@code name}, remembered under that name; empty when absent. */
     public Optional<SpeedrunGame> byName(String name, FetchBudget budget) {
+        if (GameNames.normalize(name).isEmpty()) {
+            return Optional.empty();
+        }
         return cache.get(EnrichmentSource.SPEEDRUN_GAME, "name:" + GameNames.normalize(name), SpeedrunGame.class,
                 both(budget, limiter.member()), () -> resolve(name));
     }

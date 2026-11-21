@@ -44,7 +44,7 @@ class HttpSpeedrunClientTest {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
         limiter = mock(SpeedrunRateLimiter.class);
-        client = new HttpSpeedrunClient(builder, limiter);
+        client = new HttpSpeedrunClient(builder.build(), limiter);
     }
 
     private static String fixture(String name) throws IOException {
@@ -258,5 +258,57 @@ class HttpSpeedrunClientTest {
                 .andRespond(withSuccess(fixture("runs-new"), MediaType.APPLICATION_JSON));
 
         assertThat(client.pendingRuns("qj26goxk", null, null)).hasSize(2);
+    }
+
+    @Test
+    void blankBodyIsAnOutageNotAnAbsence() {
+        server.expect(once(), requestTo(BASE + "/games?name=Celeste&max=20"))
+                .andRespond(withSuccess("  ", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.searchGames("Celeste")).isInstanceOf(SpeedrunUnavailableException.class);
+    }
+
+    @Test
+    void htmlBodyIsAnOutageNotAnAbsence() {
+        server.expect(once(), requestTo(BASE + "/users/x"))
+                .andRespond(withSuccess("<html>Bad gateway</html>", MediaType.TEXT_HTML));
+
+        assertThatThrownBy(() -> client.user("x")).isInstanceOf(SpeedrunUnavailableException.class);
+    }
+
+    @Test
+    void user_rejectsADotDotRedirectOutOfTheApi() {
+        server.expect(once(), requestTo(BASE + "/users/x"))
+                .andRespond(withStatus(HttpStatus.FOUND).header(HttpHeaders.LOCATION, "/api/v1/../evil"));
+
+        assertThatThrownBy(() -> client.user("x")).isInstanceOf(SpeedrunUnavailableException.class);
+    }
+
+    @Test
+    void transportNeverFollowsARedirectItself() throws IOException {
+        java.util.concurrent.atomic.AtomicInteger hits = new java.util.concurrent.atomic.AtomicInteger();
+        com.sun.net.httpserver.HttpServer http =
+                com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        http.createContext("/start", ex -> {
+            ex.getResponseHeaders().add("Location", "/elsewhere");
+            ex.sendResponseHeaders(302, -1);
+            ex.close();
+        });
+        http.createContext("/elsewhere", ex -> {
+            hits.incrementAndGet();
+            ex.sendResponseHeaders(200, -1);
+            ex.close();
+        });
+        http.start();
+        try {
+            int status = RestClient.builder().requestFactory(HttpSpeedrunClient.requestFactory()).build().get()
+                    .uri("http://127.0.0.1:" + http.getAddress().getPort() + "/start")
+                    .exchange((req, res) -> res.getStatusCode().value());
+
+            assertThat(status).isEqualTo(302);
+            assertThat(hits).hasValue(0);
+        } finally {
+            http.stop(0);
+        }
     }
 }

@@ -177,4 +177,21 @@ class SpeedrunGameServiceTest {
         verify(publicShare).tryAcquire();
         verify(limiter, never()).member();
     }
+
+    @Test
+    void garbledAnswerIsNeverCachedAsAbsent() {
+        when(client.searchGames("Celeste")).thenThrow(new SpeedrunUnavailableException("not JSON"));
+
+        assertThat(service.byName("Celeste", FetchBudget.UNLIMITED)).isEmpty();
+
+        assertThat(store).isEmpty();
+    }
+
+    @Test
+    void nameWithNothingToMatchIsAbsentWithoutAnyCall() {
+        assertThat(service.byName("™", FetchBudget.UNLIMITED)).isEmpty();
+
+        verifyNoInteractions(client);
+        assertThat(store).isEmpty();
+    }
 }

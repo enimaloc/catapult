@@ -1,8 +1,12 @@
 package fr.enimaloc.catapult.service.enrichment.speedrun;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.http.client.BufferingClientHttpRequestFactory;
+import org.springframework.http.client.ClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import tools.jackson.core.JacksonException;
@@ -11,6 +15,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.math.BigDecimal;
 import java.net.URI;
+import java.net.http.HttpClient;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -44,9 +49,25 @@ public class HttpSpeedrunClient implements SpeedrunClient {
     private final RestClient restClient;
     private final SpeedrunRateLimiter limiter;
 
+    @Autowired
     public HttpSpeedrunClient(RestClient.Builder builder, SpeedrunRateLimiter limiter) {
-        this.restClient = builder.build();
+        this(builder.requestFactory(requestFactory()).build(), limiter);
+    }
+
+    HttpSpeedrunClient(RestClient restClient, SpeedrunRateLimiter limiter) {
+        this.restClient = restClient;
         this.limiter = limiter;
+    }
+
+    /**
+     * The transport of this client: it never follows a redirect by itself (the key header must not leave the API,
+     * only {@link #get} follows, after checking the target); timeouts and buffering as the shared builder's.
+     */
+    static ClientHttpRequestFactory requestFactory() {
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10)).followRedirects(HttpClient.Redirect.NEVER).build());
+        factory.setReadTimeout(Duration.ofSeconds(20));
+        return new BufferingClientHttpRequestFactory(factory);
     }
 
     @Override
@@ -140,7 +161,7 @@ public class HttpSpeedrunClient implements SpeedrunClient {
         }
         Answer answer = send(restClient.get().uri(template, variables), apiKey);
         for (int hop = 0; isRedirect(answer.status()) && answer.location() != null && hop < MAX_REDIRECTS; hop++) {
-            URI target = URI.create(SITE).resolve(answer.location());
+            URI target = URI.create(SITE).resolve(answer.location()).normalize();
             if (!target.toString().startsWith(SITE + API_PATH)) {
                 throw new SpeedrunUnavailableException("speedrun.com redirected out of its API");
             }
@@ -173,15 +194,16 @@ public class HttpSpeedrunClient implements SpeedrunClient {
         return status.is3xxRedirection();
     }
 
+    /** The body as JSON; a blank or unreadable one is an outage (an error page, a cut answer), never "absent". */
     private Optional<JsonNode> parse(String body) {
         if (body == null || body.isBlank()) {
-            return Optional.empty();
+            throw new SpeedrunUnavailableException("speedrun.com answered an empty body");
         }
         try {
             return Optional.of(mapper.readTree(body));
         } catch (JacksonException e) {
             log.warn("speedrun.com answer is not JSON: {}", e.getOriginalMessage());
-            return Optional.empty();
+            throw new SpeedrunUnavailableException("speedrun.com answered something that is not JSON");
         }
     }
 
