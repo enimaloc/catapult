@@ -144,6 +144,15 @@ class SpeedrunIdentityResolverTest {
     }
 
     @Test
+    void aRowReadByTheCallerIsNotReadAgain() {
+        SpeedrunAccount row = row(null, NOW.minus(Duration.ofDays(1)));
+
+        assertThat(resolver.resolve(user, Optional.of(row), FetchBudget.UNLIMITED)).map(SpeedrunIdentity::userId)
+                .contains("k1");
+        verify(accounts, never()).findById(any());
+    }
+
+    @Test
     void failedRecheckKeepsTheKnownAccount() {
         row(null, NOW.minus(Duration.ofDays(8)));
         when(client.profile("secretkey")).thenThrow(new SpeedrunUnavailableException("down"));

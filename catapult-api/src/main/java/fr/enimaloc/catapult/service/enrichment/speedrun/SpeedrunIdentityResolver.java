@@ -82,8 +82,15 @@ public class SpeedrunIdentityResolver {
      * @throws UpstreamBudgetExceededException when nothing is found and a step was skipped for want of budget
      */
     public Optional<SpeedrunIdentity> resolve(UserAccount user, FetchBudget budget) {
+        return resolve(user, accounts.findById(user.getId()), budget);
+    }
+
+    /**
+     * As {@link #resolve(UserAccount, FetchBudget)}, from the member's {@code speedrun_account} row the caller has
+     * just read ({@code row}), so that it is not read twice.
+     */
+    public Optional<SpeedrunIdentity> resolve(UserAccount user, Optional<SpeedrunAccount> row, FetchBudget budget) {
         Gate gate = new Gate(FetchBudget.once(budget), limiter.member());
-        Optional<SpeedrunAccount> row = accounts.findById(user.getId());
 
         Optional<SpeedrunIdentity> found = row.flatMap(account -> byKey(account, gate))
                 .or(() -> byTwitch(user.getTwitchUsername(), gate))

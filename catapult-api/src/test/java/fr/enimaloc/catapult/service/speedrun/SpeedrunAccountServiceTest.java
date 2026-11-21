@@ -108,7 +108,7 @@ class SpeedrunAccountServiceTest {
         assertThat(row.toString()).doesNotContain("ENC(abc)");
 
         when(accounts.findById(user.getId())).thenReturn(Optional.of(row));
-        when(resolver.resolve(any(), any())).thenReturn(Optional.of(new SpeedrunIdentity("k1", "KeyOwner",
+        when(resolver.resolve(any(), any(), any())).thenReturn(Optional.of(new SpeedrunIdentity("k1", "KeyOwner",
                 "https://www.speedrun.com/users/KeyOwner", SpeedrunIdentity.Source.API_KEY)));
         SpeedrunData data = service.data(user);
         assertThat(data).isEqualTo(new SpeedrunData(null, true, false, "KeyOwner", "KeyOwner",
@@ -278,15 +278,30 @@ class SpeedrunAccountServiceTest {
         SpeedrunAccount row = existing();
         row.setDeclaredUsername("n1");
         ArgumentCaptor<FetchBudget> budget = ArgumentCaptor.forClass(FetchBudget.class);
-        when(resolver.resolve(any(), budget.capture())).thenThrow(new UpstreamBudgetExceededException(Duration.ZERO));
+        when(resolver.resolve(any(), any(), budget.capture()))
+                .thenThrow(new UpstreamBudgetExceededException(Duration.ZERO));
 
         assertThat(service.data(user)).isEqualTo(new SpeedrunData("n1", false, false, null, null, null, null));
         assertThat(budget.getValue().tryAcquire()).isFalse();
     }
 
     @Test
+    void dataReadsTheRowOnceAndHandsItToTheResolver() {
+        SpeedrunAccount row = existing();
+        row.setDeclaredUsername("n1");
+        when(resolver.resolve(any(), any(), any())).thenReturn(Optional.empty());
+
+        service.data(user);
+
+        verify(accounts, org.mockito.Mockito.times(1)).findById(user.getId());
+        verify(resolver).resolve(org.mockito.ArgumentMatchers.eq(user),
+                org.mockito.ArgumentMatchers.eq(Optional.of(row)), any());
+        verify(resolver, never()).resolve(any(), any(FetchBudget.class));
+    }
+
+    @Test
     void dataWithoutRowIsEmptyButStillResolvesTwitch() {
-        when(resolver.resolve(any(), any())).thenReturn(Optional.of(new SpeedrunIdentity("t1", "Streamer",
+        when(resolver.resolve(any(), any(), any())).thenReturn(Optional.of(new SpeedrunIdentity("t1", "Streamer",
                 "https://www.speedrun.com/users/Streamer", SpeedrunIdentity.Source.TWITCH)));
 
         assertThat(service.data(user)).isEqualTo(new SpeedrunData(null, false, false, null, "Streamer",

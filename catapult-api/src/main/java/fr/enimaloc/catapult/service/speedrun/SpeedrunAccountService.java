@@ -127,12 +127,14 @@ public class SpeedrunAccountService {
         }
     }
 
-    /** The settings card's data; built from the row and the cache only, never calling speedrun.com. */
+    /**
+     * The settings card's data; built from the row (read once) and the cache only, never calling speedrun.com.
+     */
     public SpeedrunData data(UserAccount user) {
         Optional<SpeedrunAccount> row = accounts.findById(user.getId());
         Optional<SpeedrunIdentity> resolved;
         try {
-            resolved = resolver.resolve(user, () -> false);
+            resolved = resolver.resolve(user, row, () -> false);
         } catch (UpstreamBudgetExceededException e) {
             resolved = Optional.empty();
         }
