@@ -103,7 +103,12 @@ public class HttpItadClient implements ItadClient {
         }
         deals.sort(Comparator.comparing(GamePrices.Deal::price));
         return Optional.of(new GamePrices(game.id(), country, currency, deals.isEmpty() ? null : deals.get(0),
-                historyLow, List.copyOf(deals), GAME_URL + game.slug() + "/"));
+                historyLow, List.copyOf(deals), itadUrl(game.slug())));
+    }
+
+    /** The game's IsThereAnyDeal page, null when the slug is unknown. */
+    private static String itadUrl(String slug) {
+        return slug == null || slug.isBlank() ? null : GAME_URL + slug + "/";
     }
 
     /** The first element of an array answer, null when absent or empty. */

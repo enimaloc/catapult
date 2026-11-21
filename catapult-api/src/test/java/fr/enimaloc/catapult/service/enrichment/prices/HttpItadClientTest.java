@@ -88,6 +88,19 @@ class HttpItadClientTest {
     }
 
     @Test
+    void unknownSlug_noItadLink() throws IOException {
+        server.expect(once(), requestTo(BASE + "/games/prices/v3?key=keyA&country=FR&deals=false"))
+                .andRespond(withSuccess(fixture("prices"), MediaType.APPLICATION_JSON));
+        server.expect(once(), requestTo(BASE + "/games/historylow/v1?key=keyA&country=FR"))
+                .andRespond(withSuccess(fixture("historylow"), MediaType.APPLICATION_JSON));
+
+        GamePrices prices = client.prices(new ItadGame(ID, null, "Dota 2"), "FR").orElseThrow();
+
+        assertThat(prices.itadUrl()).isNull();
+        assertThat(prices.best()).isNotNull();
+    }
+
+    @Test
     void infoReadsTheSlug() throws IOException {
         server.expect(once(), requestTo(BASE + "/games/info/v2?key=keyA&id=" + ID))
                 .andRespond(withSuccess(fixture("info"), MediaType.APPLICATION_JSON));
