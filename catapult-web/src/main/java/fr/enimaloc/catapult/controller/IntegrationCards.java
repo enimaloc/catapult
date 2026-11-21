@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.common.dto.channel.EpicData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.XboxData;
@@ -69,6 +70,9 @@ public final class IntegrationCards {
         }
         if (ch.epic() != null) {
             cards.add(epic(ch.epic()));
+        }
+        if (ch.speedrun() != null) {
+            cards.add(speedrun(ch.speedrun()));
         }
         if (ch.obs() != null) {
             cards.add(obs(ch.obs()));
@@ -332,6 +336,68 @@ public final class IntegrationCards {
 
     private static SpaState ankamaState(String flag, String status, List<String> statuses) {
         return SpaState.flag(flag, statuses.contains(status), "AnkamaLinkEvent.status=" + String.join("/", statuses));
+    }
+
+    // Speedrun.com: not a link but two optional settings, the name the member declares and a personal API key. The
+    // account used (the key's owner, else the Twitch-linked profile, else the declared name) shows as a sentence per
+    // source, its name a part of its own so that SpeedrunAccountChangedEvent replaces it in place. Wide: two forms.
+    // The key is never in the page: only whether one is saved, so that its field gives way to the delete button.
+
+    private static final String SPEEDRUN_EVENT = "SpeedrunAccountChangedEvent";
+
+    static IntegrationDto speedrun(SpeedrunData speedrun) {
+        boolean hasKey = speedrun.hasApiKey();
+        boolean hasName = speedrun.declaredUsername() != null && !speedrun.declaredUsername().isBlank();
+        SpaState hasNameState = SpaState.flag("speedrunHasName", hasName, SPEEDRUN_EVENT + ".declaredUsername");
+        SpaState hasKeyState = SpaState.flag("speedrunHasKey", hasKey, SPEEDRUN_EVENT + ".hasApiKey");
+        SpaState noKeyState = SpaState.flag("speedrunNoKey", !hasKey, SPEEDRUN_EVENT + ".!hasApiKey");
+        String resolvedName = speedrun.resolvedName() == null ? "" : speedrun.resolvedName();
+
+        return wideCard("speedrun",
+                new Container(Attrs.id("speedrun-account-body"), Container.Kind.DIV, List.of(
+                        speedrunVia("speedrunViaKey", "api_key", "speedrun.via_key", speedrun, resolvedName),
+                        speedrunVia("speedrunViaTwitch", "twitch", "speedrun.via_twitch", speedrun, resolvedName),
+                        speedrunVia("speedrunViaDeclared", "declared", "speedrun.via_declared", speedrun, resolvedName),
+                        new Text(Attrs.cls("speedrun-none").withState(SpaState.flag("speedrunNoAccount",
+                                speedrun.resolvedSource() == null, SPEEDRUN_EVENT + ".!resolvedSource")),
+                                false, key(PREFIX + "speedrun.none")))),
+                new Text(Attrs.cls("speedrun-key-invalid").withState(SpaState.flag("speedrunKeyInvalid",
+                        speedrun.keyInvalid(), SPEEDRUN_EVENT + ".keyInvalid")), true,
+                        key(PREFIX + "speedrun.key.invalid")),
+
+                new Input(Attrs.id("speedrun-username-input").withState(SpaState.sync("value",
+                        SPEEDRUN_EVENT + ".declaredUsername")), "text", key(PREFIX + "speedrun.username.placeholder"),
+                        null, speedrun.declaredUsername(), null, null),
+                new Container(Attrs.id("speedrun-username-actions").withClass("card-actions"),
+                        Container.Kind.SEGMENTED_GROUP, List.of(
+                        segmented(Attrs.id("speedrun-username-save-btn"), key(PREFIX + "speedrun.username.save")),
+                        segmented(Attrs.id("speedrun-username-delete-btn").withState(hasNameState),
+                                key(PREFIX + "speedrun.username.delete")))),
+
+                new Text(Attrs.cls("speedrun-key-saved").withState(hasKeyState), false,
+                        key(PREFIX + "speedrun.key.saved")),
+                new Input(Attrs.id("speedrun-key-input").withState(noKeyState), "password",
+                        key(PREFIX + "speedrun.key.placeholder"), null, null, null, null),
+                new Container(Attrs.id("speedrun-key-actions").withClass("card-actions"),
+                        Container.Kind.SEGMENTED_GROUP, List.of(
+                        segmented(Attrs.id("speedrun-key-save-btn").withState(noKeyState),
+                                key(PREFIX + "speedrun.key.save")),
+                        segmented(Attrs.id("speedrun-key-delete-btn").withState(hasKeyState),
+                                key(PREFIX + "speedrun.key.delete")))),
+
+                new Text(Attrs.cls("speedrun-help"), true, key(PREFIX + "speedrun.help")));
+    }
+
+    /** "Account used: NAME (via ...)", shown while the account is {@code source}'s. */
+    private static Container speedrunVia(String flag, String source, String via, SpeedrunData speedrun,
+                                         String resolvedName) {
+        SpaState shown = SpaState.flag(flag, source.equals(speedrun.resolvedSource()),
+                SPEEDRUN_EVENT + ".resolvedSource=" + source);
+        return new Container(Attrs.cls("speedrun-account").withState(shown), Container.Kind.DIV, List.of(
+                new Text(Attrs.NONE, false, key(PREFIX + "speedrun.account_used")),
+                new Chip(Attrs.cls("speedrun-account-name").withState(
+                        SpaState.sync("textContent", SPEEDRUN_EVENT + ".resolvedName")), Message.literal(resolvedName)),
+                new Text(Attrs.NONE, false, key(PREFIX + via))));
     }
 
     // Epic: one sub-view and button per status, driven by the status field of EpicLinkEvent, which carries NONE too.

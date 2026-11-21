@@ -126,6 +126,22 @@ class ChannelEventStreamControllerTest {
     }
 
     @Test
+    void theSpeedrunAccountGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent("enimaloc", "RunnerName",
+                true, false, "KeyOwnerName", "KeyOwnerName", "https://www.speedrun.com/users/KeyOwnerName", "api_key");
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:SpeedrunAccountChangedEvent",
+                "RunnerName", "KeyOwnerName");
+        assertThat(moderator.getResponse().getContentAsString()).doesNotContain("SpeedrunAccountChangedEvent")
+                .doesNotContain("RunnerName").doesNotContain("KeyOwnerName");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
+
+    @Test
     void theEpicLinkGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
         MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
         MvcResult moderator = subscribe("enimaloc", member("a-moderator"));

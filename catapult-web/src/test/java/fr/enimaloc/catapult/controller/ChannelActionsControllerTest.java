@@ -230,6 +230,47 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void speedrunUsername_isSavedAndRemovedThroughTheApi() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/speedrun/username").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"Linkus7\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/speedrun/username/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveSpeedrunUsername("enimaloc", "Linkus7");
+        verify(apiService).deleteSpeedrunUsername("enimaloc");
+    }
+
+    @Test
+    void speedrunApiKey_isSavedAndDeletedThroughTheApi() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/speedrun/api-key").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"apiKey\":\"abc123\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/speedrun/api-key/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveSpeedrunApiKey("enimaloc", "abc123");
+        verify(apiService).deleteSpeedrunApiKey("enimaloc");
+    }
+
+    @Test
+    void speedrun_refusalsKeepTheirStatus() throws Exception {
+        when(apiService.saveSpeedrunUsername("enimaloc", "nobody")).thenReturn(400);
+        when(apiService.saveSpeedrunApiKey("enimaloc", "bad")).thenReturn(503);
+
+        mvc.perform(post("/channel/enimaloc/settings/speedrun/username").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"nobody\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/channel/enimaloc/settings/speedrun/api-key").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"apiKey\":\"bad\"}"))
+                .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
     void refreshSteamProfileCache_callsApiService() throws Exception {
         mvc.perform(post("/channel/enimaloc/steam/refresh-profile-cache").with(csrf()))
                 .andExpect(status().isNoContent());

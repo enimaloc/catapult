@@ -15,6 +15,7 @@ import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunIdentity;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunIdentityResolver;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRateLimiter;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunUser;
+import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -50,24 +51,27 @@ public class SpeedrunAccountService {
     private final TokenEncryptionService encryption;
     private final SpeedrunIdentityResolver resolver;
     private final EnrichmentCache cache;
+    private final ChannelEventPublisher events;
     private final Clock clock;
 
     @Autowired
     public SpeedrunAccountService(SpeedrunAccountRepository accounts, SpeedrunClient client,
                                   SpeedrunRateLimiter limiter, TokenEncryptionService encryption,
-                                  SpeedrunIdentityResolver resolver, EnrichmentCache cache) {
-        this(accounts, client, limiter, encryption, resolver, cache, Clock.systemUTC());
+                                  SpeedrunIdentityResolver resolver, EnrichmentCache cache,
+                                  ChannelEventPublisher events) {
+        this(accounts, client, limiter, encryption, resolver, cache, events, Clock.systemUTC());
     }
 
     SpeedrunAccountService(SpeedrunAccountRepository accounts, SpeedrunClient client, SpeedrunRateLimiter limiter,
                            TokenEncryptionService encryption, SpeedrunIdentityResolver resolver,
-                           EnrichmentCache cache, Clock clock) {
+                           EnrichmentCache cache, ChannelEventPublisher events, Clock clock) {
         this.accounts   = accounts;
         this.client     = client;
         this.limiter    = limiter;
         this.encryption = encryption;
         this.resolver   = resolver;
         this.cache      = cache;
+        this.events     = events;
         this.clock      = clock;
     }
 
@@ -81,10 +85,13 @@ public class SpeedrunAccountService {
                 .orElseThrow(() -> new ApiProblem(ErrorCode.BAD_REQUEST, "Unknown speedrun.com username"));
         cache.put(EnrichmentSource.SPEEDRUN_USER, "name:" + name.toLowerCase(Locale.ROOT), found);
         write(user, true, row -> row.setDeclaredUsername(name));
+        publish(user);
     }
 
     public void deleteUsername(UserAccount user) {
-        write(user, false, row -> row.setDeclaredUsername(null));
+        if (write(user, false, row -> row.setDeclaredUsername(null))) {
+            publish(user);
+        }
     }
 
     /** Saves the member's personal API key (trimmed), encrypted, once speedrun.com accepts it. */
@@ -104,16 +111,19 @@ public class SpeedrunAccountService {
             row.setKeyCheckedAt(now);
             row.setKeyInvalid(false);
         });
+        publish(user);
     }
 
     public void deleteApiKey(UserAccount user) {
-        write(user, false, row -> {
+        if (write(user, false, row -> {
             row.setApiKeyEnc(null);
             row.setKeyUserId(null);
             row.setKeyUserName(null);
             row.setKeyCheckedAt(null);
             row.setKeyInvalid(false);
-        });
+        })) {
+            publish(user);
+        }
     }
 
     /** The settings card's data; built from the row and the cache only, never calling speedrun.com. */
@@ -133,6 +143,11 @@ public class SpeedrunAccountService {
                 resolved.map(SpeedrunIdentity::name).orElse(null),
                 resolved.map(SpeedrunIdentity::url).orElse(null),
                 resolved.map(identity -> identity.source().key()).orElse(null));
+    }
+
+    /** Tells the owner's open pages how the settings now stand. */
+    private void publish(UserAccount user) {
+        events.speedrunAccountChanged(user.getId(), data(user));
     }
 
     /**

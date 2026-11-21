@@ -304,4 +304,28 @@ class DtoBehaviourTest {
             assertThat(new SpeedrunApiKeyRequest(null).toString()).isEqualTo("SpeedrunApiKeyRequest[apiKey=null]");
         }
     }
+
+    @Nested
+    class ChannelPageSpeedrun {
+        @Test
+        void aPageWithoutTheEpicLinkHasNoSpeedrunAccountEither() {
+            var page = new fr.enimaloc.catapult.common.dto.channel.ChannelPageData(null, "streamer", true, false,
+                    true, null, null, List.of(), java.util.Set.of(), List.of(), java.util.Set.of(), null, null, null,
+                    null, null, null, null, null, null, null, null);
+
+            assertThat(page.epic()).isNull();
+            assertThat(page.speedrun()).isNull();
+        }
+
+        @Test
+        void aPageWithTheEpicLinkButNotTheSpeedrunAccount() {
+            var epic = new EpicData("ACCEPTED", "Me", null);
+            var page = new fr.enimaloc.catapult.common.dto.channel.ChannelPageData(null, "streamer", true, false,
+                    true, null, null, List.of(), java.util.Set.of(), List.of(), java.util.Set.of(), null, null, null,
+                    null, null, null, null, null, null, null, null, epic);
+
+            assertThat(page.epic()).isEqualTo(epic);
+            assertThat(page.speedrun()).isNull();
+        }
+    }
 }

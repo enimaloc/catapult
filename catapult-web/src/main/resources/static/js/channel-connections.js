@@ -1,5 +1,5 @@
 /**
- * Handlers for the Steam/Minecraft/Battle.net/Ankama/Epic/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
+ * Handlers for the Steam/Minecraft/Battle.net/Ankama/Epic/Speedrun.com/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
  * pre-rendered and only toggled via the `hidden` class (spa:if/spa:switch, see
  * channel.html) instead of being created/destroyed per SSE event, so handlers only
  * need attaching once, at render — no refresh() either: the SSE echo updates the cards.
@@ -69,6 +69,30 @@ window.CatapultConnections = (function () {
                     "This Ankama account is already linked to another Catapult channel")
                 : pageLabel("labelAnkamaFull",
                     "Every Catapult Ankama account is full for now: linking will be possible again soon."));
+        } else {
+            showError(actionFailed(response.status));
+        }
+    }
+
+    // Saves a speedrun.com name or key through `url`. Unlike CatapultChannel.postJson, a refusal says why: speedrun.com
+    // does not know the name or refuses the key (400), or cannot be asked (503). The card then follows from
+    // SpeedrunAccountChangedEvent. The key's field is emptied once it is saved: it is never shown again.
+    async function saveSpeedrun(url, body, input, refusedLabel) {
+        const { showError, actionFailed, unreachable } = CatapultChannel;
+        if (!input.value.trim()) return;
+        let response;
+        try {
+            response = await CatapultCsrf.postJson(url, body);
+        } catch {
+            showError(unreachable());
+            return;
+        }
+        if (response.ok) return;
+        if (response.status === 400) {
+            showError(pageLabel(...refusedLabel));
+        } else if (response.status === 503) {
+            showError(pageLabel("labelSpeedrunUnavailable",
+                "speedrun.com cannot be reached right now: try again later."));
         } else {
             showError(actionFailed(response.status));
         }
@@ -150,6 +174,22 @@ window.CatapultConnections = (function () {
         on("epic-connect-btn", "click", () => location.assign("/oauth2/authorization/epic"));
         on("epic-resend-btn", "click", () => postJson(`${baseUrl}/epic/resend`, {}));
         on("epic-disconnect-btn", "click", () => postJson(`${baseUrl}/epic/disconnect`, {}));
+
+        // Speedrun.com: a declared name and an optional personal key, each checked with speedrun.com on saving.
+        on("speedrun-username-save-btn", "click", () => {
+            const input = document.getElementById("speedrun-username-input");
+            return saveSpeedrun(`${baseUrl}/settings/speedrun/username`, { username: input.value.trim() }, input,
+                ["labelSpeedrunRefusedUsername", "speedrun.com does not know this username"]);
+        });
+        on("speedrun-username-delete-btn", "click", () =>
+            postJson(`${baseUrl}/settings/speedrun/username/delete`, {}));
+        on("speedrun-key-save-btn", "click", async () => {
+            const input = document.getElementById("speedrun-key-input");
+            await saveSpeedrun(`${baseUrl}/settings/speedrun/api-key`, { apiKey: input.value.trim() }, input,
+                ["labelSpeedrunRefusedKey", "speedrun.com refused this API key"]);
+            input.value = "";
+        });
+        on("speedrun-key-delete-btn", "click", () => postJson(`${baseUrl}/settings/speedrun/api-key/delete`, {}));
 
         // OBS: connecting and disconnecting both save the whole form, only `enabled` differs.
         // An empty password field means "keep the stored one" (it's never sent back to the page),

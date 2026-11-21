@@ -106,6 +106,8 @@ class ChannelDashboardAssemblerTest {
             mock(fr.enimaloc.catapult.service.ankama.AnkamaLinkStateService.class);
     private final fr.enimaloc.catapult.service.epic.EpicLinkStateService epicStates =
             mock(fr.enimaloc.catapult.service.epic.EpicLinkStateService.class);
+    private final fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService speedrunAccounts =
+            mock(fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService.class);
     private final MinecraftLinkStateService minecraftStates =
             new MinecraftLinkStateService(minecraft, minecraftGate, minecraftAccounts);
     private final TwitchatWidgetSettingsService twitchat = mock(TwitchatWidgetSettingsService.class);
@@ -137,7 +139,7 @@ class ChannelDashboardAssemblerTest {
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumService.class)), categoryCache,
-                streamTitle, dropsGate, dropsCatalog);
+                streamTitle, dropsGate, dropsCatalog, speedrunAccounts);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }
@@ -522,6 +524,29 @@ class ChannelDashboardAssemblerTest {
             assertThat(assembler().page(owner, owner, "streamer", 0, null, null).epic())
                     .isEqualTo(new fr.enimaloc.catapult.common.dto.channel.EpicData("PENDING", "Streamer", "CatapultBot"));
             assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).epic()).isNull();
+        }
+
+        @Test
+        void dashboardCarriesTheSpeedrunAccountForTheOwnerOnly() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.SpeedrunData("n1", true, false, "KeyOwner",
+                    "KeyOwner", "https://www.speedrun.com/users/KeyOwner", "api_key");
+            when(speedrunAccounts.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).speedrun()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).speedrun()).isNull();
+            verify(speedrunAccounts, never()).data(moderator);
+        }
+
+        @Test
+        void dashboardNeverCarriesTheKey() {
+            when(speedrunAccounts.data(owner)).thenReturn(new fr.enimaloc.catapult.common.dto.channel.SpeedrunData(
+                    "n1", true, false, "KeyOwner", "KeyOwner", "https://www.speedrun.com/users/KeyOwner", "api_key"));
+
+            // The card's data is the names and flags only: no component could hold the key or its ciphertext.
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.SpeedrunData.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("declaredUsername", "hasApiKey", "keyInvalid", "keyAccountName", "resolvedName",
+                            "resolvedUrl", "resolvedSource");
         }
 
         @Test

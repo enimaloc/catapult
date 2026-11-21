@@ -17,6 +17,7 @@ import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunIdentityResolver
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRateLimiter;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunUnavailableException;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunUser;
+import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -53,6 +54,7 @@ class SpeedrunAccountServiceTest {
     private final TokenEncryptionService encryption = mock(TokenEncryptionService.class);
     private final SpeedrunIdentityResolver resolver = mock(SpeedrunIdentityResolver.class);
     private final EnrichmentCache cache = mock(EnrichmentCache.class);
+    private final ChannelEventPublisher events = mock(ChannelEventPublisher.class);
     private final UserAccount user = new UserAccount();
     private SpeedrunAccountService service;
 
@@ -63,7 +65,7 @@ class SpeedrunAccountServiceTest {
         when(limiter.member()).thenReturn(FetchBudget.UNLIMITED);
         when(encryption.encrypt("abc")).thenReturn("ENC(abc)");
         service = new SpeedrunAccountService(accounts, client, limiter, encryption, resolver, cache,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                events, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private SpeedrunAccount stored() {
@@ -284,6 +286,41 @@ class SpeedrunAccountServiceTest {
 
         assertThat(service.data(user)).isEqualTo(new SpeedrunData(null, false, false, null, "Streamer",
                 "https://www.speedrun.com/users/Streamer", "twitch"));
+    }
+
+    @Test
+    void everyWriteTellsTheOwnersPagesHowTheSettingsNowStand() {
+        when(client.user("n1")).thenReturn(Optional.of(KEY_OWNER));
+        when(client.profile("abc")).thenReturn(Optional.of(KEY_OWNER));
+        service.saveUsername(user, "n1");
+        service.saveApiKey(user, "abc");
+        SpeedrunAccount row = existing();
+        row.setDeclaredUsername("n1");
+        row.setApiKeyEnc("ENC(abc)");
+        service.deleteApiKey(user);
+        service.deleteUsername(user);
+
+        verify(events, org.mockito.Mockito.times(4)).speedrunAccountChanged(org.mockito.ArgumentMatchers.eq(user.getId()),
+                any(SpeedrunData.class));
+    }
+
+    @Test
+    void aRefusedWriteTellsNobody() {
+        when(client.profile("abc")).thenReturn(Optional.empty());
+
+        assertProblem(() -> service.saveApiKey(user, "abc"), ErrorCode.BAD_REQUEST);
+
+        verifyNoInteractions(events);
+    }
+
+    @Test
+    void theEventCarriesNeitherTheKeyNorItsCiphertext() {
+        when(client.profile("abc")).thenReturn(Optional.of(KEY_OWNER));
+        service.saveApiKey(user, "abc");
+        ArgumentCaptor<SpeedrunData> sent = ArgumentCaptor.forClass(SpeedrunData.class);
+        verify(events).speedrunAccountChanged(org.mockito.ArgumentMatchers.eq(user.getId()), sent.capture());
+
+        assertThat(sent.getValue().toString()).doesNotContain("abc").doesNotContain("ENC(");
     }
 
     @Test

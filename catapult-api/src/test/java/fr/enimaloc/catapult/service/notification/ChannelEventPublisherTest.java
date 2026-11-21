@@ -158,6 +158,17 @@ class ChannelEventPublisherTest {
     }
 
     @Test
+    void speedrunAccountChanged_publishesTheCardsData() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.SpeedrunData("n1", true, false, "KeyOwner",
+                "KeyOwner", "https://www.speedrun.com/users/KeyOwner", "api_key");
+
+        publisher.speedrunAccountChanged(ownerId, account);
+
+        assertThat(published(ChannelEvents.SPEEDRUN_ACCOUNT_CHANGED)).isEqualTo(
+                new ChannelEvents.SpeedrunAccountChanged(ownerId.toString(), "streamername", account));
+    }
+
+    @Test
     void battleNetLinkChanged_publishesTheLinkState() {
         publisher.battleNetLinkChanged(ownerId, "PENDING", "Streamer#2928", "CatapultBot#1234");
 

@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ public final class ChannelEvents {
     public static final String BATTLENET_LINK_CHANGED = "battlenet.link.changed";
     public static final String ANKAMA_LINK_CHANGED = "ankama.link.changed";
     public static final String EPIC_LINK_CHANGED = "epic.link.changed";
+    public static final String SPEEDRUN_ACCOUNT_CHANGED = "speedrun.account.changed";
     public static final String CUSTOM_BINDING_CHANGED = "custom.binding.changed";
     public static final String CUSTOM_BINDINGS_UPDATED = "custom.bindings.updated";
 
@@ -114,6 +116,12 @@ public final class ChannelEvents {
      */
     public record EpicLinkChanged(String channelId, String channelLogin, String status, String displayName,
                                   String serviceAccountName) {}
+
+    /**
+     * The owner's speedrun.com settings changed: {@code account} is how the settings card stands now. It carries
+     * names only, never the personal API key.
+     */
+    public record SpeedrunAccountChanged(String channelId, String channelLogin, SpeedrunData account) {}
 
     /**
      * New notifications wait to be sent to these members' Twitchat: whichever catapult-web instance holds one

@@ -15,6 +15,8 @@ import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
 import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenSharingRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
@@ -150,6 +152,31 @@ public class ChannelActionsController {
     @PostMapping("/channel/{username}/settings/steam-personal-token/delete")
     public ResponseEntity<Void> deleteSteamToken(@PathVariable String username) {
         return ApiStatus.answer(apiService.deleteSteamToken(username));
+    }
+
+    // The member's speedrun.com account. catapult-api answers 400 for a name or key speedrun.com refuses and 503
+    // when it cannot be asked: the page tells them apart by status. The key only ever travels in these bodies.
+
+    @PostMapping("/channel/{username}/settings/speedrun/username")
+    public ResponseEntity<Void> saveSpeedrunUsername(@PathVariable String username,
+                                                     @RequestBody SpeedrunUsernameRequest body) {
+        return ApiStatus.answer(apiService.saveSpeedrunUsername(username, body.username()));
+    }
+
+    @PostMapping("/channel/{username}/settings/speedrun/username/delete")
+    public ResponseEntity<Void> deleteSpeedrunUsername(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteSpeedrunUsername(username));
+    }
+
+    @PostMapping("/channel/{username}/settings/speedrun/api-key")
+    public ResponseEntity<Void> saveSpeedrunApiKey(@PathVariable String username,
+                                                   @RequestBody SpeedrunApiKeyRequest body) {
+        return ApiStatus.answer(apiService.saveSpeedrunApiKey(username, body.apiKey()));
+    }
+
+    @PostMapping("/channel/{username}/settings/speedrun/api-key/delete")
+    public ResponseEntity<Void> deleteSpeedrunApiKey(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteSpeedrunApiKey(username));
     }
 
     @PostMapping("/channel/{username}/steam/refresh-profile-cache")

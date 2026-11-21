@@ -23,6 +23,7 @@ import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
+import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
 import fr.enimaloc.catapult.event.steam.SteamConnectionStateEvent;
@@ -91,6 +92,9 @@ public final class ChannelState {
             EpicData link = ch.epic();
             events.add(new EpicLinkEvent(login, link.status() == null ? "NONE" : link.status(), link.displayName(),
                     link.serviceAccountName()));
+        }
+        if (ch.speedrun() != null) {
+            events.add(SpeedrunAccountChangedEvent.of(login, ch.speedrun()));
         }
         CustomBindingsStateDto custom = ch.customBindings();
         if (custom != null) {

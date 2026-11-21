@@ -17,6 +17,7 @@ import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.channel.XboxData;
@@ -71,6 +72,7 @@ public class MockData {
     private static final String MOCK_ANKAMA_TAG = "MockStreamer#1234";
     private static final String MOCK_BOT_ANKAMA_TAG = "CatapultBot#4242";
     private static final EpicLinkStateResponse EPIC_UNLINKED = new EpicLinkStateResponse("NONE", null, null);
+    private static final String MOCK_SPEEDRUN_KEY_OWNER = "MockRunner";
     private static final String MOCK_EPIC_NAME = "MockStreamer";
     private static final String MOCK_BOT_EPIC_NAME = "CatapultBot";
     private static final String MOCK_BATTLE_TAG = "MockStreamer#1234";
@@ -122,6 +124,9 @@ public class MockData {
     private AnkamaLinkStateResponse ankamaLink = ANKAMA_UNLINKED;
     /** Epic is offered to every mock session too, with the same presets. */
     private EpicLinkStateResponse epicLink = EPIC_UNLINKED;
+    /** The speedrun.com card is offered to every mock session: the name declared, whether a key is saved. */
+    private String speedrunUsername;
+    private boolean speedrunKeySaved;
     private ObsData obsData;
     private String obsPassword;
     private String twitchatBranch = TwitchatData.AUTO;
@@ -367,7 +372,7 @@ public class MockData {
                 obsData == null ? null : TwitchatData.of(twitchatBranch),
                 username.equals(channelDto.twitchUsername()) ? customBindings.state() : null,
                 // drops: the mock has no experiments, they are offered
-                drops(), ankamaData(), epicData());
+                drops(), ankamaData(), epicData(), speedrunData());
     }
 
     /** The mock's one running drops campaign, on the first binding's category. */
@@ -391,6 +396,30 @@ public class MockData {
 
     private AnkamaData ankamaData() {
         return new AnkamaData(ankamaLink.status(), ankamaLink.nameTag(), ankamaLink.serviceAccountTag());
+    }
+
+    /** The account used: the saved key's owner, else the declared name; the mock never finds a Twitch one. */
+    public SpeedrunData speedrunData() {
+        String source = speedrunKeySaved ? "api_key" : speedrunUsername != null ? "declared" : null;
+        String name = speedrunKeySaved ? MOCK_SPEEDRUN_KEY_OWNER : speedrunUsername;
+        return new SpeedrunData(speedrunUsername, speedrunKeySaved, false, speedrunKeySaved ? name : null, name,
+                name == null ? null : "https://www.speedrun.com/users/" + name, source);
+    }
+
+    public void saveSpeedrunUsername(String name) {
+        speedrunUsername = name;
+    }
+
+    public void deleteSpeedrunUsername() {
+        speedrunUsername = null;
+    }
+
+    public void saveSpeedrunKey() {
+        speedrunKeySaved = true;
+    }
+
+    public void deleteSpeedrunKey() {
+        speedrunKeySaved = false;
     }
 
     private EpicData epicData() {

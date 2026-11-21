@@ -289,6 +289,12 @@ describe("channel-connections", () => {
               <button id="ankama-connect-btn"></button>
               <button id="ankama-resend-btn"></button>
               <button id="ankama-disconnect-btn"></button>
+              <input id="speedrun-username-input" value="  Linkus7 ">
+              <button id="speedrun-username-save-btn"></button>
+              <button id="speedrun-username-delete-btn"></button>
+              <input id="speedrun-key-input" value=" abc123 ">
+              <button id="speedrun-key-save-btn"></button>
+              <button id="speedrun-key-delete-btn"></button>
               <button id="epic-resend-btn"></button>
               <button id="epic-disconnect-btn"></button>
               <input id="obs-host" value="10.0.0.2">
@@ -364,6 +370,69 @@ describe("channel-connections", () => {
         await click("#battlenet-disconnect-btn");
 
         expect(posts()).toEqual([["/channel/enimaloc/battlenet/disconnect", {}]]);
+    });
+
+    describe("the speedrun.com account", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
+        it("saves the trimmed name and removes it with posts", async () => {
+            await click("#speedrun-username-save-btn");
+            await click("#speedrun-username-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/speedrun/username", { username: "Linkus7" }],
+                ["/channel/enimaloc/settings/speedrun/username/delete", {}],
+            ]);
+            expect(snackbars()).toEqual([]);
+        });
+
+        it("saves the trimmed key, empties its field, and deletes it with a post", async () => {
+            await click("#speedrun-key-save-btn");
+            await click("#speedrun-key-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/speedrun/api-key", { apiKey: "abc123" }],
+                ["/channel/enimaloc/settings/speedrun/api-key/delete", {}],
+            ]);
+            expect(document.getElementById("speedrun-key-input").value).toBe("");
+        });
+
+        it("sends nothing for an empty field", async () => {
+            document.getElementById("speedrun-username-input").value = "   ";
+            document.getElementById("speedrun-key-input").value = "";
+            await click("#speedrun-username-save-btn");
+            await click("#speedrun-key-save-btn");
+
+            expect(posts()).toEqual([]);
+        });
+
+        it("tells a name or a key speedrun.com refuses, and that it cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(400));
+            await click("#speedrun-username-save-btn");
+            posted.mockResolvedValueOnce(response(400));
+            await click("#speedrun-key-save-btn");
+            posted.mockResolvedValueOnce(response(503));
+            await click("#speedrun-username-save-btn");
+
+            expect(snackbars()).toEqual([
+                "speedrun.com does not know this username",
+                "speedrun.com refused this API key",
+                "speedrun.com cannot be reached right now: try again later.",
+            ]);
+        });
+
+        it("speaks the page's language, and tells any other failure or an unreachable server", async () => {
+            document.body.dataset.labelSpeedrunRefusedUsername = "Nom inconnu";
+            posted.mockResolvedValueOnce(response(400));
+            await click("#speedrun-username-save-btn");
+            posted.mockResolvedValueOnce(response(502));
+            await click("#speedrun-username-save-btn");
+            posted.mockRejectedValueOnce(new TypeError("offline"));
+            await click("#speedrun-username-save-btn");
+
+            expect(snackbars()).toEqual(["Nom inconnu", "Action failed (502)", "Catapult could not be reached"]);
+            delete document.body.dataset.labelSpeedrunRefusedUsername;
+        });
     });
 
     describe("the Ankama link", () => {

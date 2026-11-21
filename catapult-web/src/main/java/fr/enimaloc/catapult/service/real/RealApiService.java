@@ -119,6 +119,8 @@ import fr.enimaloc.catapult.common.dto.channel.TitleSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenSharingRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwEnabledBody;
@@ -340,6 +342,30 @@ public class RealApiService implements ApiService {
     @Override
     public int deleteSteamToken(String username) {
         return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/steam-personal-token", id),
+                status -> status);
+    }
+
+    @Override
+    public int saveSpeedrunUsername(String username, String speedrunName) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/speedrun/username",
+                new SpeedrunUsernameRequest(speedrunName), id), status -> status);
+    }
+
+    @Override
+    public int deleteSpeedrunUsername(String username) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/speedrun/username", id),
+                status -> status);
+    }
+
+    @Override
+    public int saveSpeedrunApiKey(String username, String apiKey) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/speedrun/api-key",
+                new SpeedrunApiKeyRequest(apiKey), id), status -> status);
+    }
+
+    @Override
+    public int deleteSpeedrunApiKey(String username) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/speedrun/api-key", id),
                 status -> status);
     }
 

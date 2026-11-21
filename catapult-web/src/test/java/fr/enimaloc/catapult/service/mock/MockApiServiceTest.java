@@ -478,6 +478,30 @@ class MockApiServiceTest {
     }
 
     @Test
+    void speedrunAccount_followsTheSettingsAndTellsThePage() {
+        assertThat(data.speedrunData().resolvedSource()).isNull();
+
+        service.saveSpeedrunUsername(username, "Linkus7");
+        assertThat(data.speedrunData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.SpeedrunData("Linkus7",
+                false, false, null, "Linkus7", "https://www.speedrun.com/users/Linkus7", "declared"));
+
+        service.saveSpeedrunApiKey(username, "a-secret-key");
+        assertThat(data.speedrunData().resolvedSource()).isEqualTo("api_key");
+        assertThat(data.speedrunData().hasApiKey()).isTrue();
+
+        service.deleteSpeedrunApiKey(username);
+        service.deleteSpeedrunUsername(username);
+        assertThat(data.speedrunData().resolvedSource()).isNull();
+        assertThat(data.speedrunData().declaredUsername()).isNull();
+
+        assertThat(events).hasSize(4).allSatisfy(event ->
+                assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent.class));
+        assertThat(events.toString()).doesNotContain("a-secret-key");
+        assertThat(events.getLast()).isEqualTo(new fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent(
+                username, null, false, false, null, null, null, null));
+    }
+
+    @Test
     void ankamaStatus_isTheMockLink() {
         assertThat(service.ankamaStatus(username)).isEqualTo(data.getAnkamaLink());
     }

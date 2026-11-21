@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
@@ -145,6 +146,12 @@ public class ChannelEventPublisher {
         publish(channelOwnerId, ChannelEvents.EPIC_LINK_CHANGED,
                 (id, login) -> new ChannelEvents.EpicLinkChanged(id, login, state.status(), state.displayName(),
                         state.serviceAccountName()));
+    }
+
+    /** The owner's speedrun.com settings now stand as {@code account} (names only, never the key). */
+    public void speedrunAccountChanged(UUID channelOwnerId, SpeedrunData account) {
+        publish(channelOwnerId, ChannelEvents.SPEEDRUN_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.SpeedrunAccountChanged(id, login, account));
     }
 
     /** The channel's active custom binding is now {@code activeId}; null once deactivated. */
