@@ -4,11 +4,13 @@ import fr.enimaloc.catapult.service.enrichment.FetchBudget;
 import fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -24,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.ExpectedCount.once;
@@ -340,6 +343,21 @@ class HttpSpeedrunClientTest {
 
     @Test
     void transportNeverFollowsARedirectItself() throws IOException {
+        assertFollowsNoRedirect(HttpSpeedrunClient.requestFactory());
+    }
+
+    @Test
+    void theInjectedConstructorUsesTheNonRedirectingTransport() throws IOException {
+        RestClient.Builder builder = spy(RestClient.builder());
+        ArgumentCaptor<ClientHttpRequestFactory> factory = ArgumentCaptor.forClass(ClientHttpRequestFactory.class);
+
+        new HttpSpeedrunClient(builder, limiter);
+
+        verify(builder).requestFactory(factory.capture());
+        assertFollowsNoRedirect(factory.getValue());
+    }
+
+    private static void assertFollowsNoRedirect(ClientHttpRequestFactory factory) throws IOException {
         java.util.concurrent.atomic.AtomicInteger hits = new java.util.concurrent.atomic.AtomicInteger();
         com.sun.net.httpserver.HttpServer http =
                 com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
@@ -355,7 +373,7 @@ class HttpSpeedrunClientTest {
         });
         http.start();
         try {
-            int status = RestClient.builder().requestFactory(HttpSpeedrunClient.requestFactory()).build().get()
+            int status = RestClient.builder().requestFactory(factory).build().get()
                     .uri("http://127.0.0.1:" + http.getAddress().getPort() + "/start")
                     .exchange((req, res) -> res.getStatusCode().value());
 
