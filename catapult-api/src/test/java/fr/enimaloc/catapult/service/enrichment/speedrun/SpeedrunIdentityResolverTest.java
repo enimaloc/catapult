@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -30,6 +31,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -148,6 +150,38 @@ class SpeedrunIdentityResolverTest {
         assertThat(resolver.resolve(user, FetchBudget.UNLIMITED)).map(SpeedrunIdentity::userId).contains("k1");
         verify(accounts, never()).markKeyInvalid(any(), any(), any());
         verify(accounts, never()).keyRechecked(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void failedRecheckIsNotRetriedForAnHour() {
+        row(null, NOW.minus(Duration.ofDays(8)));
+        when(client.profile("secretkey")).thenThrow(new SpeedrunUnavailableException("down"));
+        AtomicReference<Instant> now = new AtomicReference<>(NOW);
+        Clock clock = mock(Clock.class);
+        when(clock.instant()).thenAnswer(inv -> now.get());
+        SpeedrunIdentityResolver resolver = new SpeedrunIdentityResolver(accounts,
+                new EnrichmentCache(cacheRepository, new EnrichmentProperties(), JsonMapper.builder().build()),
+                client, limiter, encryption, clock);
+
+        resolver.resolve(user, FetchBudget.UNLIMITED);
+        now.set(NOW.plus(Duration.ofMinutes(59)));
+        assertThat(resolver.resolve(user, FetchBudget.UNLIMITED)).map(SpeedrunIdentity::userId).contains("k1");
+        verify(client, times(1)).profile("secretkey");
+
+        now.set(NOW.plus(Duration.ofMinutes(60)));
+        assertThat(resolver.resolve(user, FetchBudget.UNLIMITED)).map(SpeedrunIdentity::userId).contains("k1");
+        verify(client, times(2)).profile("secretkey");
+    }
+
+    @Test
+    void aFailedRecheckDoesNotSpendTheBudgetAgain() {
+        row(null, NOW.minus(Duration.ofDays(8)));
+        when(client.profile("secretkey")).thenThrow(new SpeedrunUnavailableException("down"));
+        resolver.resolve(user, FetchBudget.UNLIMITED);
+        FetchBudget budget = mock(FetchBudget.class);
+
+        assertThat(resolver.resolve(user, budget)).map(SpeedrunIdentity::userId).contains("k1");
+        verifyNoInteractions(budget);
     }
 
     @Test

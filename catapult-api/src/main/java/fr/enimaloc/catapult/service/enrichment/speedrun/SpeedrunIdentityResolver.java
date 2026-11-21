@@ -19,7 +19,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -28,7 +31,8 @@ import java.util.function.Supplier;
  *   <li>the account of their personal API key, unless speedrun.com refused the key; the key is checked again
  *       ({@code GET /profile}) once its last check is older than {@value #KEY_RECHECK_DAYS} days: refused, it is
  *       marked invalid (only while the row still holds that key) and the next ways are tried; unreachable, the
- *       known account is kept;</li>
+ *       known account is kept and the check is not tried again for {@value #FAILED_RECHECK_RETRY_MINUTES}
+ *       minutes (remembered in memory);</li>
  *   <li>the only speedrun.com profile whose Twitch link is the member's Twitch login (none, or several, is none);</li>
  *   <li>the name they declared.</li>
  * </ol>
@@ -43,6 +47,8 @@ public class SpeedrunIdentityResolver {
 
     static final long KEY_RECHECK_DAYS = 7;
     private static final Duration KEY_RECHECK = Duration.ofDays(KEY_RECHECK_DAYS);
+    static final long FAILED_RECHECK_RETRY_MINUTES = 60;
+    private static final Duration FAILED_RECHECK_RETRY = Duration.ofMinutes(FAILED_RECHECK_RETRY_MINUTES);
     private static final String USER_PAGE = "https://www.speedrun.com/users/";
 
     private final SpeedrunAccountRepository accounts;
@@ -51,6 +57,8 @@ public class SpeedrunIdentityResolver {
     private final SpeedrunRateLimiter limiter;
     private final TokenEncryptionService encryption;
     private final Clock clock;
+    /** When a member's key recheck last failed (unreachable, rate limited, undecryptable). */
+    private final Map<UUID, Instant> failedRechecks = new ConcurrentHashMap<>();
 
     @Autowired
     public SpeedrunIdentityResolver(SpeedrunAccountRepository accounts, EnrichmentCache cache, SpeedrunClient client,
@@ -96,15 +104,18 @@ public class SpeedrunIdentityResolver {
         }
         Instant now = clock.instant();
         Instant checked = account.getKeyCheckedAt();
-        if ((checked == null || !checked.plus(KEY_RECHECK).isAfter(now)) && gate.tryAcquire()) {
+        if ((checked == null || !checked.plus(KEY_RECHECK).isAfter(now)) && !recentlyFailed(account, now)
+                && gate.tryAcquire()) {
             Optional<SpeedrunUser> profile;
             try {
                 profile = client.profile(encryption.decrypt(account.getApiKeyEnc()));
             } catch (RuntimeException e) {
                 // Unreachable, rate limited or undecryptable: not a refusal, the known account stays.
+                failedRechecks.put(account.getUserId(), now);
                 log.warn("speedrun.com key of {} not rechecked: {}", account.getUserId(), e.getClass().getSimpleName());
                 return Optional.of(keyIdentity(account.getKeyUserId(), account.getKeyUserName()));
             }
+            failedRechecks.remove(account.getUserId());
             if (profile.isEmpty()) {
                 accounts.markKeyInvalid(account.getUserId(), account.getApiKeyEnc(), now);
                 return Optional.empty();
@@ -117,6 +128,19 @@ public class SpeedrunIdentityResolver {
             return Optional.of(keyIdentity(owner.id(), owner.name()));
         }
         return Optional.of(keyIdentity(account.getKeyUserId(), account.getKeyUserName()));
+    }
+
+    /** Whether the member's last recheck failed less than {@link #FAILED_RECHECK_RETRY} ago. */
+    private boolean recentlyFailed(SpeedrunAccount account, Instant now) {
+        Instant failed = failedRechecks.get(account.getUserId());
+        if (failed == null) {
+            return false;
+        }
+        if (failed.plus(FAILED_RECHECK_RETRY).isAfter(now)) {
+            return true;
+        }
+        failedRechecks.remove(account.getUserId(), failed);
+        return false;
     }
 
     private Optional<SpeedrunIdentity> byTwitch(String login, Gate gate) {
