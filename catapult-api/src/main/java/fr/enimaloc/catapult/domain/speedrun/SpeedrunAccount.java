@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -48,6 +49,14 @@ public class SpeedrunAccount {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    /**
+     * Optimistic lock: a write made from a stale read fails instead of bringing back what was removed meanwhile.
+     * Null until first saved, so that a new row is persisted rather than merged.
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     public SpeedrunAccount() {
     }

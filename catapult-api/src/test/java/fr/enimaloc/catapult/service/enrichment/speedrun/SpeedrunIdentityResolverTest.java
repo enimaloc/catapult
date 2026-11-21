@@ -103,12 +103,27 @@ class SpeedrunIdentityResolverTest {
         row(null, NOW.minus(Duration.ofDays(8)));
         when(client.profile("secretkey")).thenReturn(Optional.of(
                 new SpeedrunUser("k1", "Renamed", "https://www.speedrun.com/users/Renamed", null)));
+        when(accounts.keyRechecked(user.getId(), "enc", "k1", "Renamed", NOW)).thenReturn(1);
 
         Optional<SpeedrunIdentity> identity = resolver.resolve(user, FetchBudget.UNLIMITED);
 
-        assertThat(identity).map(SpeedrunIdentity::name).contains("Renamed");
+        assertThat(identity).contains(new SpeedrunIdentity("k1", "Renamed", "https://www.speedrun.com/users/Renamed",
+                SpeedrunIdentity.Source.API_KEY));
         verify(accounts).keyRechecked(user.getId(), "enc", "k1", "Renamed", NOW);
         verify(accounts, never()).save(any());
+    }
+
+    @Test
+    void recheckOfAKeyRemovedMeanwhileDoesNotVouchForIt() {
+        SpeedrunAccount row = row(null, NOW.minus(Duration.ofDays(8)));
+        when(client.profile("secretkey")).thenReturn(Optional.of(
+                new SpeedrunUser("k1", "Renamed", "https://www.speedrun.com/users/Renamed", null)));
+        when(accounts.keyRechecked(any(), any(), any(), any(), any())).thenReturn(0);
+        when(client.usersByTwitch("Streamer")).thenReturn(List.of(T1));
+
+        assertThat(resolver.resolve(user, FetchBudget.UNLIMITED)).map(SpeedrunIdentity::source)
+                .contains(SpeedrunIdentity.Source.TWITCH);
+        assertThat(row.getKeyUserName()).as("the row read is left as it was").isEqualTo("KeyOwner");
     }
 
     @Test

@@ -86,6 +86,10 @@ public class SpeedrunIdentityResolver {
         return found;
     }
 
+    /**
+     * The key's account. The row read here is never changed nor saved (it may be managed by the caller's
+     * transaction): the checks write through conditional updates, and the answer is built from what they wrote.
+     */
     private Optional<SpeedrunIdentity> byKey(SpeedrunAccount account, Gate gate) {
         if (account.getApiKeyEnc() == null || account.isKeyInvalid() || account.getKeyUserId() == null) {
             return Optional.empty();
@@ -99,20 +103,20 @@ public class SpeedrunIdentityResolver {
             } catch (RuntimeException e) {
                 // Unreachable, rate limited or undecryptable: not a refusal, the known account stays.
                 log.warn("speedrun.com key of {} not rechecked: {}", account.getUserId(), e.getClass().getSimpleName());
-                return Optional.of(keyIdentity(account));
+                return Optional.of(keyIdentity(account.getKeyUserId(), account.getKeyUserName()));
             }
             if (profile.isEmpty()) {
                 accounts.markKeyInvalid(account.getUserId(), account.getApiKeyEnc(), now);
-                account.setKeyInvalid(true);
                 return Optional.empty();
             }
-            accounts.keyRechecked(account.getUserId(), account.getApiKeyEnc(), profile.get().id(),
-                    profile.get().name(), now);
-            account.setKeyUserId(profile.get().id());
-            account.setKeyUserName(profile.get().name());
-            account.setKeyCheckedAt(now);
+            SpeedrunUser owner = profile.get();
+            if (accounts.keyRechecked(account.getUserId(), account.getApiKeyEnc(), owner.id(), owner.name(), now) == 0) {
+                // The member removed or replaced the key meanwhile: it is no longer theirs to vouch for.
+                return Optional.empty();
+            }
+            return Optional.of(keyIdentity(owner.id(), owner.name()));
         }
-        return Optional.of(keyIdentity(account));
+        return Optional.of(keyIdentity(account.getKeyUserId(), account.getKeyUserName()));
     }
 
     private Optional<SpeedrunIdentity> byTwitch(String login, Gate gate) {
@@ -148,10 +152,9 @@ public class SpeedrunIdentityResolver {
         }
     }
 
-    private static SpeedrunIdentity keyIdentity(SpeedrunAccount account) {
-        String name = account.getKeyUserName();
+    private static SpeedrunIdentity keyIdentity(String userId, String name) {
         String url = name == null ? null : USER_PAGE + URLEncoder.encode(name, StandardCharsets.UTF_8);
-        return new SpeedrunIdentity(account.getKeyUserId(), name, url, SpeedrunIdentity.Source.API_KEY);
+        return new SpeedrunIdentity(userId, name, url, SpeedrunIdentity.Source.API_KEY);
     }
 
     private static SpeedrunIdentity identity(SpeedrunUser user, SpeedrunIdentity.Source source) {

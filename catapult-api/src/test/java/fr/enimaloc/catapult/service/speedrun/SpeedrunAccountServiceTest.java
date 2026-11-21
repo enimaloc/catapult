@@ -285,4 +285,72 @@ class SpeedrunAccountServiceTest {
         assertThat(service.data(user)).isEqualTo(new SpeedrunData(null, false, false, null, "Streamer",
                 "https://www.speedrun.com/users/Streamer", "twitch"));
     }
+
+    @Test
+    void aStaleSaveAfterAConcurrentKeyDeleteDoesNotBringTheKeyBack() {
+        SpeedrunAccount stale = existing();
+        stale.setDeclaredUsername("n1");
+        stale.setApiKeyEnc("enc");
+        stale.setKeyUserId("k1");
+        SpeedrunAccount fresh = new SpeedrunAccount(user.getId());
+        fresh.setDeclaredUsername("n1");
+        when(accounts.findById(user.getId())).thenReturn(Optional.of(stale), Optional.of(fresh));
+        when(accounts.save(any())).thenThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(
+                SpeedrunAccount.class, user.getId())).thenAnswer(inv -> inv.getArgument(0));
+        when(client.user("n2")).thenReturn(Optional.of(new SpeedrunUser("n2", "n2", "u", null)));
+
+        service.saveUsername(user, "n2");
+
+        ArgumentCaptor<SpeedrunAccount> saved = ArgumentCaptor.forClass(SpeedrunAccount.class);
+        verify(accounts, org.mockito.Mockito.times(2)).save(saved.capture());
+        assertThat(saved.getValue()).isSameAs(fresh);
+        assertThat(fresh.getDeclaredUsername()).isEqualTo("n2");
+        assertThat(fresh.getApiKeyEnc()).isNull();
+        assertThat(fresh.getKeyUserId()).isNull();
+    }
+
+    @Test
+    void aStaleDeleteIsRedoneOnTheFreshRow() {
+        SpeedrunAccount stale = existing();
+        stale.setApiKeyEnc("enc");
+        SpeedrunAccount fresh = new SpeedrunAccount(user.getId());
+        fresh.setApiKeyEnc("enc2");
+        fresh.setDeclaredUsername("n1");
+        when(accounts.findById(user.getId())).thenReturn(Optional.of(stale), Optional.of(fresh));
+        org.mockito.Mockito.doThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(
+                SpeedrunAccount.class, user.getId())).when(accounts).delete(stale);
+
+        service.deleteApiKey(user);
+
+        assertThat(stored()).isSameAs(fresh).satisfies(row -> {
+            assertThat(row.getApiKeyEnc()).isNull();
+            assertThat(row.getDeclaredUsername()).isEqualTo("n1");
+        });
+    }
+
+    @Test
+    void aConcurrentFirstInsertIsRedoneAsAnUpdate() {
+        SpeedrunAccount inserted = new SpeedrunAccount(user.getId());
+        inserted.setDeclaredUsername("n1");
+        when(accounts.findById(user.getId())).thenReturn(Optional.empty(), Optional.of(inserted));
+        when(accounts.save(any())).thenThrow(new org.springframework.dao.DataIntegrityViolationException("dup"))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(client.profile("abc")).thenReturn(Optional.of(KEY_OWNER));
+
+        service.saveApiKey(user, "abc");
+
+        assertThat(inserted.getApiKeyEnc()).isEqualTo("ENC(abc)");
+        assertThat(inserted.getDeclaredUsername()).isEqualTo("n1");
+    }
+
+    @Test
+    void aSecondCrossedWriteIs409() {
+        existing().setDeclaredUsername("n1");
+        when(accounts.save(any())).thenThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(
+                SpeedrunAccount.class, user.getId()));
+        when(client.user("n2")).thenReturn(Optional.of(new SpeedrunUser("n2", "n2", "u", null)));
+
+        assertProblem(() -> service.saveUsername(user, "n2"), ErrorCode.CONFLICT);
+        verify(accounts, org.mockito.Mockito.times(2)).save(any());
+    }
 }

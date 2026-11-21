@@ -17,12 +17,15 @@ import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRateLimiter;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunUser;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -30,7 +33,9 @@ import java.util.regex.Pattern;
  * A member's speedrun.com settings: the name they declare and their personal API key. Both are checked with
  * speedrun.com before anything is written (an unknown name or a refused key is a 400, speedrun.com out of reach a
  * 503). The key is stored encrypted and never given back, logged or put in a URL. The row is deleted once it holds
- * neither a name nor a key.
+ * neither a name nor a key. Each write re-reads the row and is optimistically locked: one that crosses another
+ * (a key removed meanwhile) is redone once on the fresh row, so it never brings back what was removed, then answers
+ * 409.
  */
 @Slf4j
 @Service
@@ -75,17 +80,11 @@ public class SpeedrunAccountService {
         SpeedrunUser found = upstream(() -> client.user(name))
                 .orElseThrow(() -> new ApiProblem(ErrorCode.BAD_REQUEST, "Unknown speedrun.com username"));
         cache.put(EnrichmentSource.SPEEDRUN_USER, "name:" + name.toLowerCase(Locale.ROOT), found);
-        SpeedrunAccount row = rowOf(user);
-        row.setDeclaredUsername(name);
-        row.setUpdatedAt(clock.instant());
-        accounts.save(row);
+        write(user, true, row -> row.setDeclaredUsername(name));
     }
 
     public void deleteUsername(UserAccount user) {
-        accounts.findById(user.getId()).ifPresent(row -> {
-            row.setDeclaredUsername(null);
-            saveOrDelete(row);
-        });
+        write(user, false, row -> row.setDeclaredUsername(null));
     }
 
     /** Saves the member's personal API key (trimmed), encrypted, once speedrun.com accepts it. */
@@ -96,25 +95,24 @@ public class SpeedrunAccountService {
         }
         SpeedrunUser owner = upstream(() -> client.profile(key))
                 .orElseThrow(() -> new ApiProblem(ErrorCode.BAD_REQUEST, "speedrun.com refused this API key"));
+        String encrypted = encryption.encrypt(key);
         Instant now = clock.instant();
-        SpeedrunAccount row = rowOf(user);
-        row.setApiKeyEnc(encryption.encrypt(key));
-        row.setKeyUserId(owner.id());
-        row.setKeyUserName(owner.name());
-        row.setKeyCheckedAt(now);
-        row.setKeyInvalid(false);
-        row.setUpdatedAt(now);
-        accounts.save(row);
+        write(user, true, row -> {
+            row.setApiKeyEnc(encrypted);
+            row.setKeyUserId(owner.id());
+            row.setKeyUserName(owner.name());
+            row.setKeyCheckedAt(now);
+            row.setKeyInvalid(false);
+        });
     }
 
     public void deleteApiKey(UserAccount user) {
-        accounts.findById(user.getId()).ifPresent(row -> {
+        write(user, false, row -> {
             row.setApiKeyEnc(null);
             row.setKeyUserId(null);
             row.setKeyUserName(null);
             row.setKeyCheckedAt(null);
             row.setKeyInvalid(false);
-            saveOrDelete(row);
         });
     }
 
@@ -137,17 +135,38 @@ public class SpeedrunAccountService {
                 resolved.map(identity -> identity.source().key()).orElse(null));
     }
 
-    private SpeedrunAccount rowOf(UserAccount user) {
-        return accounts.findById(user.getId()).orElseGet(() -> new SpeedrunAccount(user.getId()));
+    /**
+     * Applies {@code change} to the member's row as it is now ({@code create}: a missing row is started), then saves
+     * it, or deletes it once empty. A write that crosses another one is redone once on the fresh row, then is a 409.
+     *
+     * @return false when there was no row and {@code create} is false: nothing was written
+     */
+    private boolean write(UserAccount user, boolean create, Consumer<SpeedrunAccount> change) {
+        try {
+            return writeOnce(user, create, change);
+        } catch (OptimisticLockingFailureException | DataIntegrityViolationException first) {
+            try {
+                return writeOnce(user, create, change);
+            } catch (OptimisticLockingFailureException | DataIntegrityViolationException again) {
+                throw new ApiProblem(ErrorCode.CONFLICT, "The speedrun.com settings changed meanwhile, try again");
+            }
+        }
     }
 
-    private void saveOrDelete(SpeedrunAccount row) {
+    private boolean writeOnce(UserAccount user, boolean create, Consumer<SpeedrunAccount> change) {
+        Optional<SpeedrunAccount> found = accounts.findById(user.getId());
+        if (found.isEmpty() && !create) {
+            return false;
+        }
+        SpeedrunAccount row = found.orElseGet(() -> new SpeedrunAccount(user.getId()));
+        change.accept(row);
         if (row.isEmpty()) {
             accounts.delete(row);
         } else {
             row.setUpdatedAt(clock.instant());
             accounts.save(row);
         }
+        return true;
     }
 
     /** One call to speedrun.com within the limiter; out of reach (or limited) is a 503, never "unknown". */
