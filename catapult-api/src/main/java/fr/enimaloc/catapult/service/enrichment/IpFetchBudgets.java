@@ -35,8 +35,12 @@ public class IpFetchBudgets {
         this.clock      = clock;
     }
 
-    /** The budget of {@code ip}; every call to {@link FetchBudget#tryAcquire()} counts against that IP. */
-    public FetchBudget forIp(String ip) {
+    /**
+     * The budget of {@code address}; every call to {@link FetchBudget#tryAcquire()} counts against that client, an
+     * IPv6 one by its whole {@code /64} ({@link ClientKeys}).
+     */
+    public FetchBudget forIp(String address) {
+        String ip = ClientKeys.of(address);
         return new FetchBudget() {
             @Override
             public boolean tryAcquire() {

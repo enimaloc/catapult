@@ -137,6 +137,60 @@ class FfmpegTrailerStreamerTest {
     }
 
     @Test
+    void onePublicStreamPerIpv6Slash64() {
+        FfmpegTrailerStreamer.Reservation first = streamer.reservePublic("2001:db8:0:1::a");
+
+        assertThatThrownBy(() -> streamer.reservePublic("2001:db8:0:1:ffff::b"))
+                .isInstanceOf(TrailerBusyException.class);
+        assertThatThrownBy(() -> streamer.reservePublic("[2001:db8:0:1::c]"))
+                .isInstanceOf(TrailerBusyException.class);
+        FfmpegTrailerStreamer.Reservation other = streamer.reservePublic("2001:db8:0:2::a");
+
+        first.close();
+        other.close();
+        FfmpegTrailerStreamer.Reservation ipv4 = streamer.reservePublic("203.0.113.7");
+        assertThatThrownBy(() -> streamer.reservePublic("::ffff:203.0.113.7"))
+                .isInstanceOf(TrailerBusyException.class);
+        ipv4.close();
+        assertThat(streamer.trackedIps()).isZero();
+    }
+
+    @Test
+    void closeDuringStream_killsFfmpegBeforeFreeingTheSlot() throws Exception {
+        nextOutput = null;
+        FfmpegTrailerStreamer.Reservation reservation = streamer.reservePublic("203.0.113.7");
+        CountDownLatch writing = new CountDownLatch(1);
+        OutputStream out = new OutputStream() {
+            @Override
+            public void write(int b) {
+                writing.countDown();
+            }
+
+            @Override
+            public void write(byte[] b, int off, int len) {
+                writing.countDown();
+            }
+        };
+        Thread body = Thread.ofVirtual().start(() -> {
+            try {
+                reservation.stream(HLS, out);
+            } catch (IOException e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        assertThat(writing.await(5, TimeUnit.SECONDS)).isTrue();
+
+        // the async completion handler, while the body is blocked on ffmpeg's stalled output
+        reservation.close();
+
+        assertThat(processes.getFirst().destroyedForcibly).isTrue();
+        body.join(Duration.ofSeconds(5));
+        assertThat(body.isAlive()).isFalse();
+        assertThat(streamer.availablePermits()).isEqualTo(4);
+        assertThat(streamer.trackedIps()).isZero();
+    }
+
+    @Test
     void singleSlot_neverServedToPublicCallers() {
         properties.setFfmpegMaxProcesses(1);
         streamer.shutdown();

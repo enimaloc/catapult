@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.enrichment.trailer;
 
+import fr.enimaloc.catapult.service.enrichment.ClientKeys;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentProperties;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -112,7 +113,9 @@ public class FfmpegTrailerStreamer {
      *
      * @throws TrailerBusyException when no public slot is free, or {@code ip} already streams
      */
-    public Reservation reservePublic(String ip) {
+    public Reservation reservePublic(String address) {
+        // an IPv6 client counts by its whole /64, which it could otherwise rotate through
+        String ip = ClientKeys.of(address);
         boolean[] taken = {false};
         publicByIp.compute(ip, (key, running) -> {
             int count = running == null ? 0 : running;
@@ -184,6 +187,8 @@ public class FfmpegTrailerStreamer {
         private final AtomicBoolean released = new AtomicBoolean();
         /** The public caller's IP; null for the authenticated route. */
         private final String publicIp;
+        /** The ffmpeg this slot runs, killed by {@link #close()} before the slot is given back. */
+        private volatile Process current;
 
         Slot(String publicIp) {
             this.publicIp = publicIp;
@@ -195,6 +200,12 @@ public class FfmpegTrailerStreamer {
                 throw new IllegalArgumentException("Not an allowed trailer stream: " + hls);
             }
             Process process = launcher.start(command(hls));
+            current = process;
+            if (released.get()) {
+                // closed while ffmpeg was starting: the slot is no longer ours
+                process.destroyForcibly();
+                throw new IOException("Trailer slot released before ffmpeg started");
+            }
             running.add(process);
             AtomicBoolean timedOut = new AtomicBoolean();
             ScheduledFuture<?> deadline;
@@ -224,6 +235,11 @@ public class FfmpegTrailerStreamer {
         @Override
         public void close() {
             if (released.compareAndSet(false, true)) {
+                // the completion handler may close the slot while the body still streams: ffmpeg must not outlive it
+                Process process = current;
+                if (process != null) {
+                    process.destroyForcibly();
+                }
                 permits.release();
                 if (publicIp != null) {
                     publicPermits.release();

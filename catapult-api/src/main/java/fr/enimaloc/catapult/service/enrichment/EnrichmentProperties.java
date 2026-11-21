@@ -40,7 +40,10 @@ public class EnrichmentProperties {
     private Duration aggregateTimeout = Duration.ofSeconds(2);
     /** Upstream calls one client IP may trigger per minute. */
     private int ipBudgetPerMinute = 10;
-    /** Concurrent ffmpeg processes for trailer extraction. */
+    /**
+     * Concurrent ffmpeg processes for trailer extraction. One slot is always kept for the authenticated route, so
+     * public callers share the rest: with 1, public trailer streams are never served.
+     */
     private int ffmpegMaxProcesses = 4;
     /** Longest a single ffmpeg process may run. */
     private Duration ffmpegMaxDuration = Duration.ofMinutes(10);

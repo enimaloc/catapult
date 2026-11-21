@@ -40,6 +40,25 @@ class IpFetchBudgetsTest {
     }
 
     @Test
+    void ipv6_sameSlash64_sharesOneBudget_otherSlash64DoesNot() {
+        FetchBudget first = budgets.forIp("2001:db8:0:1::a");
+        for (int i = 0; i < 10; i++) {
+            assertThat(first.tryAcquire()).isTrue();
+        }
+        assertThat(budgets.forIp("2001:db8:0:1:ffff:ffff:ffff:ffff").tryAcquire()).isFalse();
+        assertThat(budgets.forIp("2001:db8:0:2::a").tryAcquire()).isTrue();
+    }
+
+    @Test
+    void ipv4Mapped_sharesTheIpv4Budget() {
+        FetchBudget mapped = budgets.forIp("::ffff:203.0.113.7");
+        for (int i = 0; i < 10; i++) {
+            mapped.tryAcquire();
+        }
+        assertThat(budgets.forIp("203.0.113.7").tryAcquire()).isFalse();
+    }
+
+    @Test
     void windowSlides_afterOneMinute() {
         FetchBudget budget = budgets.forIp("203.0.113.7");
         for (int i = 0; i < 10; i++) {
