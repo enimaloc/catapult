@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
 import fr.enimaloc.catapult.service.enrichment.GameEnrichmentAssembler;
+import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import fr.enimaloc.catapult.simulation.account.FictitiousAccountService;
 import fr.enimaloc.catapult.simulation.account.MockGuard;
@@ -38,6 +39,11 @@ class CatapultApplicationMockTests extends FullContextTestBase {
         // application-dev.properties is local only (git-ignored): without it sentry.environment falls back to
         // production, which MockGuard refuses
         registry.add("sentry.environment", () -> "development");
+        // full-context.properties turns the enrichment sources off; here the simulated clients (@Primary) answer
+        // instead of the real ones, so nothing leaves the test
+        for (String source : new String[]{"protondb", "steamdeck", "steamgriddb", "pcgamingwiki"}) {
+            registry.add("catapult.enrichment." + source + ".enabled", () -> "true");
+        }
     }
 
     @Test
@@ -59,8 +65,13 @@ class CatapultApplicationMockTests extends FullContextTestBase {
                 new MoreLinks("http://localhost", GameInfoAssembler.LinkStyle.CURRENT));
 
         assertThat(enrichment.protondb()).isNotNull();
+        assertThat(enrichment.protondb().tier()).isEqualTo("gold");
         assertThat(enrichment.steamDeck()).isNotNull();
+        assertThat(enrichment.steamDeck().category()).isEqualTo(SteamDeckCompatibility.Category.VERIFIED);
         assertThat(enrichment.steamgriddb()).isNotNull();
+        assertThat(enrichment.steamgriddb().bestGrid().url())
+                .isEqualTo("https://cdn2.steamgriddb.com/grid/simulated.png");
         assertThat(enrichment.pcgamingwiki()).isNotNull();
+        assertThat(enrichment.pcgamingwiki().ultrawide()).isEqualTo("true");
     }
 }
