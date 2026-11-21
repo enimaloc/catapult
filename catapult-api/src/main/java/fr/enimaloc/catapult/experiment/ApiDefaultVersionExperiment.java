@@ -5,8 +5,13 @@ import fr.enimaloc.catapult.domain.experiment.ExperimentAssignmentRule.RuleType;
 
 /**
  * The API version a request gets when it names none (no {@code X-API-Version} header, no {@code ?version=}). ACTIVE
- * from boot: everyone lands in {@code v2} (the control, weight 100); swapping the weights from the admin moves the
- * default to version 3 without a redeploy. A request without an account follows the heaviest variant.
+ * from boot: everyone lands in {@code v2} (the control, weight 100). A request without an account follows the
+ * heaviest variant; a member keeps the variant they were assigned, whatever the weights become.
+ *
+ * <p>To move the default to version 3 without a redeploy, from the admin experiments page: set the weights to
+ * {@code v2} 0 / {@code v3} 100 (requests without an account follow within a minute), then run "reassign" on the
+ * experiment so that the members already enrolled in {@code v2} are drawn again and land in {@code v3}. Changing
+ * the weights alone only affects members enrolled afterwards.
  */
 @ExperimentSpec(
         key           = ApiDefaultVersionExperiment.KEY,
