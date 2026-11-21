@@ -352,10 +352,10 @@ POST,/api/internal/admin/battlenet-accounts/{id}/reauth,,,401,PASS,403,403,403,P
 POST,/api/internal/admin/battlenet-accounts/{id}/bgs-call,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/battlenet-game-variants,,,401,PASS,403,403,403,PASS,401
 # handler reads the JWT itself: 401 without one
-POST,/api/internal/admin/battlenet-game-variants,,,401,401,403,403,403,PASS,401
+POST,/api/internal/admin/battlenet-game-variants,,"{""enabled"":false}",401,401,403,403,403,PASS,401
 DELETE,/api/internal/admin/battlenet-game-variants/{id},,,401,PASS,403,403,403,PASS,401
 # handler reads the JWT itself: 401 without one
-PUT,/api/internal/admin/battlenet-game-variants/{id},,,401,401,403,403,403,PASS,401
+PUT,/api/internal/admin/battlenet-game-variants/{id},,"{""enabled"":false}",401,401,403,403,403,PASS,401
 GET,/api/internal/admin/ankama-accounts,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/ankama-accounts/login,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/ankama-accounts/login/{loginId}/complete,,,401,PASS,403,403,403,PASS,401
