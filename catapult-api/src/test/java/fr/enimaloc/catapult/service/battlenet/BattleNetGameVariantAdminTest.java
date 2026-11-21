@@ -9,6 +9,8 @@ import fr.enimaloc.catapult.repository.battlenet.BattleNetGameVariantRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -164,5 +166,19 @@ class BattleNetGameVariantAdminTest {
     void deleteUnknownIdIs404() {
         assertThatThrownBy(() -> admin.delete(UUID.randomUUID()))
                 .satisfies(e -> assertThat(statusOf(e)).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void writesInATransactionInvalidateOnlyOnceCommitted() {
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            admin.create(forever("Forever - "), adminAccount);
+
+            verify(variants, never()).invalidate();
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+            verify(variants).invalidate();
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 }

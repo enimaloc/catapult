@@ -10,6 +10,8 @@ import fr.enimaloc.catapult.repository.battlenet.BattleNetGameVariantRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
@@ -22,9 +24,9 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * The admin side of the Battle.net game variants: list, create, change and delete them. Each write makes the
- * detection read the variants again ({@link BattleNetGameVariants#invalidate}); the other instance follows within
- * its refresh. Errors are 400 (invalid), 404 (unknown id) and 409 (the game already has that key).
+ * The admin side of the Battle.net game variants: list, create, change and delete them. Each write, once committed,
+ * makes the detection read the variants again ({@link BattleNetGameVariants#invalidate}); the other instance follows
+ * within its refresh. Errors are 400 (invalid), 404 (unknown id) and 409 (the game already has that key).
  */
 @Service
 public class BattleNetGameVariantAdmin {
@@ -89,7 +91,7 @@ public class BattleNetGameVariantAdmin {
     @Transactional
     public void delete(UUID id) {
         repository.delete(find(id));
-        variants.invalidate();
+        invalidateOnceCommitted();
     }
 
     private BattleNetGameVariantDto save(BattleNetGameVariant variant, BattleNetGameVariantRequest request,
@@ -100,8 +102,25 @@ public class BattleNetGameVariantAdmin {
         variant.setEnabled(request.enabled());
         variant.setUpdatedBy(admin == null ? null : admin.getId());
         BattleNetGameVariant saved = repository.save(variant);
-        variants.invalidate();
+        invalidateOnceCommitted();
         return toDto(saved, admin == null ? null : admin.getTwitchUsername());
+    }
+
+    /**
+     * Makes the detection read the variants again once the change is committed: before, it would read and cache the
+     * old rows until the next refresh.
+     */
+    private void invalidateOnceCommitted() {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            variants.invalidate();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                variants.invalidate();
+            }
+        });
     }
 
     private BattleNetGameVariant find(UUID id) {
