@@ -60,7 +60,8 @@ public class BattleNetGameGetter implements GameGetter {
             traceSession(link);
             return Optional.empty();
         }
-        Optional<String> fourcc = sessions.currentGame(link.getBnetAccountId());
+        Optional<String> fourcc = sessions.currentGame(link.getBnetAccountId())
+                .map(BattleNetSessionManager.PlayedGame::fourcc);
         if (fourcc.isEmpty()) {
             DetectionTrace.reason("no game in the presence");
             traceSession(link);

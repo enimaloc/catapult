@@ -48,7 +48,7 @@ class BattleNetGameGetterTest {
         link.setStatus(BattleNetFriendLink.Status.ACCEPTED);
         when(gate.isAvailableReadOnly(user)).thenReturn(true);
         when(links.findByUser(user)).thenReturn(Optional.of(link));
-        when(sessions.currentGame(42L)).thenReturn(Optional.of("WTCG"));
+        when(sessions.currentGame(42L)).thenReturn(Optional.of(new BattleNetSessionManager.PlayedGame("WTCG", null)));
     }
 
     @Test
@@ -80,7 +80,7 @@ class BattleNetGameGetterTest {
 
     @Test
     void unknownFourccUsesTheFourccAsName() {
-        when(sessions.currentGame(42L)).thenReturn(Optional.of("ZZZZ"));
+        when(sessions.currentGame(42L)).thenReturn(Optional.of(new BattleNetSessionManager.PlayedGame("ZZZZ", null)));
 
         assertThat(getter.getCurrentGame(user))
                 .contains(new DetectedGame("ZZZZ", GameBinding.SourceType.BATTLENET, "ZZZZ"));
@@ -162,7 +162,7 @@ class BattleNetGameGetterTest {
         when(sessions.currentGame(42L)).thenReturn(Optional.empty());
         Instant at = Instant.parse("2026-11-20T10:00:00Z");
         when(sessions.lastPresence(42L))
-            .thenReturn(Optional.of(new BattleNetSessionManager.PresenceSeen("WTCG", at, UUID.randomUUID())));
+            .thenReturn(Optional.of(new BattleNetSessionManager.PresenceSeen("WTCG", null, at, UUID.randomUUID())));
 
         JsonNode entry = TraceProbe.entryAfter(user, () -> getter.getCurrentGame(user));
 

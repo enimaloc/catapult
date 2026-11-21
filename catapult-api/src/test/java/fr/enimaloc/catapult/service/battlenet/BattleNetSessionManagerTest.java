@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount;
 import fr.enimaloc.catapult.domain.debug.DebugExchange.Direction;
 import fr.enimaloc.catapult.domain.battlenet.BattleNetServiceAccount.AuthState;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
+import fr.enimaloc.catapult.service.battlenet.BattleNetSessionManager.PlayedGame;
 import fr.enimaloc.catapult.service.battlenet.login.BattleNetLoginCoordinator;
 import fr.enimaloc.catapult.service.debug.SessionDebug;
 import fr.enimaloc.catapult.service.debug.TestSessionDebug;
@@ -251,8 +252,52 @@ class BattleNetSessionManagerTest {
 
         manager.listenerOf(bot1.getId()).onPresence(new PresenceEvent(42L, "WTCG", 0x57544347, List.of()));
 
-        assertThat(manager.currentGame(42L)).contains("WTCG");
+        assertThat(manager.currentGame(42L).map(PlayedGame::fourcc)).contains("WTCG");
         assertThat(manager.currentGame(43L)).isEmpty();
+    }
+
+    @Test
+    void activityIsKeptWithTheGame() {
+        BattleNetSessionManager manager = started();
+
+        manager.listenerOf(bot1.getId()).onPresence(wow("Forever - A"));
+
+        assertThat(manager.currentGame(42L)).contains(new PlayedGame("WoW", "Forever - A"));
+    }
+
+    @Test
+    void activityDeletedKeepsTheLastOne() {
+        BattleNetSessionManager manager = started();
+        manager.listenerOf(bot1.getId()).onPresence(wow("Forever - A"));
+
+        manager.listenerOf(bot1.getId()).onPresence(wow(null));
+
+        assertThat(manager.currentGame(42L)).contains(new PlayedGame("WoW", "Forever - A"));
+    }
+
+    @Test
+    void newActivityReplacesTheLastOne() {
+        BattleNetSessionManager manager = started();
+        manager.listenerOf(bot1.getId()).onPresence(wow("Forever - A"));
+        manager.listenerOf(bot1.getId()).onPresence(wow(null));
+
+        manager.listenerOf(bot1.getId()).onPresence(wow("Stormwind - X"));
+
+        assertThat(manager.currentGame(42L)).contains(new PlayedGame("WoW", "Stormwind - X"));
+    }
+
+    @Test
+    void fourccChangeDropsTheActivity() {
+        BattleNetSessionManager manager = started();
+        manager.listenerOf(bot1.getId()).onPresence(wow("Forever - A"));
+
+        manager.listenerOf(bot1.getId()).onPresence(new PresenceEvent(42L, "WTCG", 0x57544347, null, List.of()));
+
+        assertThat(manager.currentGame(42L)).contains(new PlayedGame("WTCG", null));
+    }
+
+    private static PresenceEvent wow(String activity) {
+        return new PresenceEvent(42L, "WoW", 0x576F57, activity, List.of());
     }
 
     @Test
@@ -274,7 +319,7 @@ class BattleNetSessionManagerTest {
         manager.stop(bot1.getId());
 
         assertThat(manager.currentGame(42L)).isEmpty();
-        assertThat(manager.currentGame(77L)).contains("Pro");
+        assertThat(manager.currentGame(77L).map(PlayedGame::fourcc)).contains("Pro");
     }
 
     @Test
