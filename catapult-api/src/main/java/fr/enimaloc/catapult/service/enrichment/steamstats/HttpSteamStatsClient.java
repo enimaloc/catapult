@@ -183,10 +183,27 @@ public class HttpSteamStatsClient implements SteamStatsClient {
 
     /**
      * One GET under the personal key or else the pool's. {@code template} has a {@code {key}} variable first
-     * among its URL variables: {@code variables} are the other ones, in order of appearance.
+     * among its URL variables: {@code variables} are the other ones, in order of appearance. A personal key Steam
+     * refuses (401, or a 403 that is not a refusal of the member's details) is replaced by a pool key, once.
      */
     private Answer get(String personalKeyOrNull, String template, Object... variables) {
         Key key = pick(personalKeyOrNull);
+        Answer answer = call(key, template, variables);
+        if (!key.pooled() && keyRefused(answer)) {
+            // the key itself is never logged
+            log.debug("Steam refused a personal key ({}); asking with the pool", answer.status().value());
+            return call(pick(null), template, variables);
+        }
+        return answer;
+    }
+
+    /** Whether Steam refused the key itself, as opposed to the member's private details. */
+    private static boolean keyRefused(Answer answer) {
+        int status = answer.status().value();
+        return status == 401 || status == 403 && refusal(answer.body()).isEmpty();
+    }
+
+    private Answer call(Key key, String template, Object... variables) {
         if (!rateLimiter.map(limiter -> limiter.tryAcquireNow(key.value())).orElse(false)) {
             throw new SteamStatsUnavailableException("Steam rate budget reached");
         }

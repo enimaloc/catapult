@@ -269,6 +269,42 @@ class HttpSteamStatsClientTest {
     }
 
     @Test
+    void aRefusedPersonalKeyFallsBackToThePoolOnce() throws IOException {
+        server.expect(once(), requestTo(API + "/IPlayerService/GetOwnedGames/v1/?key=badkey&steamid=7656"
+                        + "&include_appinfo=0&include_played_free_games=1"))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN).body("<html>Access is denied</html>"));
+        server.expect(once(), requestTo(API + "/IPlayerService/GetOwnedGames/v1/?key=poolkey&steamid=7656"
+                        + "&include_appinfo=0&include_played_free_games=1"))
+                .andRespond(withSuccess(fixture("owned-games.json"), MediaType.APPLICATION_JSON));
+        server.expect(once(), requestTo(STATS + "/GetPlayerAchievements/v1/?key=badkey&steamid=7656&appid=440"
+                        + "&l=english"))
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        server.expect(once(), requestTo(STATS + "/GetPlayerAchievements/v1/?key=poolkey&steamid=7656&appid=440"
+                        + "&l=english"))
+                .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+
+        assertThat(client.library("7656", "badkey")).isPresent();
+        assertThatThrownBy(() -> client.playerAchievements("7656", "440", "english", "badkey"))
+                .as("the pool is asked once, not again")
+                .isInstanceOf(SteamStatsUnavailableException.class)
+                .hasMessageNotContaining("badkey").hasMessageNotContaining("poolkey");
+        server.verify();
+    }
+
+    @Test
+    void aPrivateProfile403KeepsThePersonalKey() throws IOException {
+        server.expect(once(), requestTo(STATS + "/GetPlayerAchievements/v1/?key=mykey&steamid=7656&appid=440"
+                        + "&l=english"))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"playerstats\":{\"error\":\"Profile is not public\",\"success\":false}}"));
+
+        assertThat(client.playerAchievements("7656", "440", "english", "mykey").status())
+                .isEqualTo(Status.PRIVATE);
+        verify(rotator, never()).nextKey();
+        server.verify();
+    }
+
+    @Test
     void personalKeyWinsOverPool() throws IOException {
         server.expect(once(), requestTo(STATS + "/GetPlayerAchievements/v1/?key=mykey&steamid=7656&appid=440"
                         + "&l=english"))
