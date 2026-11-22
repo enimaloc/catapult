@@ -73,7 +73,7 @@ public enum SteamLanguage {
         return name().toLowerCase(Locale.ROOT);
     }
 
-    static SteamLanguage fromLocale(Locale locale) {
+    public static SteamLanguage fromLocale(Locale locale) {
         if (locale == null) return ENGLISH;
         for (SteamLanguage value : values()) {
             if (value.getCode().equals(locale.getLanguage()) && value.getAdditionalPredicate().test(locale)) {
