@@ -24,6 +24,7 @@ public class AdminEventPublisher {
     public static final String PROVIDER_STEAMGRIDDB = "steamgriddb";
     public static final String PROVIDER_ITAD = "itad";
     public static final String PROVIDER_OPENCRITIC = "opencritic";
+    public static final String PROVIDER_RETROACHIEVEMENTS = "retroachievements";
 
     private final RedisEventPublisher redisPublisher;
 

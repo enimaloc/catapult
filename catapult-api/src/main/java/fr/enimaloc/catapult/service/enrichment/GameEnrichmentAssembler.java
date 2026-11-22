@@ -13,6 +13,8 @@ import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiService;
 import fr.enimaloc.catapult.service.enrichment.prices.GamePrices;
 import fr.enimaloc.catapult.service.enrichment.prices.PricesService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbService;
+import fr.enimaloc.catapult.service.enrichment.rastats.RaUnavailableException;
+import fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsStatsService;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunEnrichment;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunGame;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunGameService;
@@ -24,9 +26,14 @@ import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRun;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckService;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbService;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.PlatformStats;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Status;
+import fr.enimaloc.catapult.service.enrichment.steamstats.SteamStatsService;
 import fr.enimaloc.catapult.service.enrichment.trailer.TrailerSourceResolver;
 import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivity;
 import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivityService;
+import fr.enimaloc.catapult.service.enrichment.xboxstats.XboxStatsService;
+import fr.enimaloc.catapult.service.enrichment.xboxstats.XboxStatsUnavailableException;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.link.ExternalLinks;
@@ -36,6 +43,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -61,6 +69,10 @@ import java.util.function.Supplier;
  * records and the member's account are fetched side by side, then the member's personal bests and runs waiting for
  * verification on that game; all of it within the same deadline. Without records there is no speedrun.com object;
  * without an identified account (no member, none found, or too late) the personal parts are null.
+ *
+ * <p>The member's own stats (Steam, Xbox, RetroAchievements) are only asked when there is a member: Steam once the
+ * app id is known, Xbox and RetroAchievements at once, each platform on its own, within the same deadline. A
+ * platform that is too late is null; one whose upstream is down says {@code unavailable}.
  */
 @Slf4j
 @Component
@@ -84,6 +96,9 @@ public class GameEnrichmentAssembler {
     private final IgdbService igdbService;
     private final IgdbGameDetailsService igdbGameDetailsService;
     private final TrailerSourceResolver trailerSourceResolver;
+    private final SteamStatsService steamStatsService;
+    private final XboxStatsService xboxStatsService;
+    private final RetroAchievementsStatsService retroAchievementsStatsService;
     private final EnrichmentProperties properties;
 
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -93,18 +108,16 @@ public class GameEnrichmentAssembler {
      * detected Steam app id (empty for another store: IGDB's mapping is looked up from {@code igdbId}), {@code name}
      * the name to search by when there is no id, {@code country} the ISO country the prices are asked for,
      * {@code language} the language of the Twitch streams (null for any), {@code links} the origin the trailer link
-     * points at, {@code member} the member whose speedrun.com account is looked up (empty: world records only).
+     * points at, {@code member} the member whose speedrun.com account and own stats are looked up (empty: world
+     * records only, no stats), {@code locale} the language of the achievements' names.
      */
     public GameEnrichment enrich(DetectedGame detected, Optional<String> igdbId, Optional<String> steamAppId,
                                  String name, String country, String language, MoreLinks links,
-                                 Optional<UserAccount> member) {
+                                 Optional<UserAccount> member, Locale locale) {
         long deadline = System.nanoTime() + properties.aggregateTimeout().toNanos();
         String igdb = igdbId.filter(id -> !id.isBlank()).orElse(null);
 
-        CompletableFuture<String> appId = steamAppId.filter(id -> !id.isBlank())
-                .map(CompletableFuture::completedFuture)
-                .orElseGet(() -> supply("steam app id", () -> igdb == null ? null
-                        : igdbService.findExternalUid(igdb, GameBinding.SourceType.STEAM).orElse(null)));
+        CompletableFuture<String> appId = appId(steamAppId, igdb);
 
         var hltb = supply("hltb", () -> hltbService.timeToBeat(igdb, FetchBudget.UNLIMITED).orElse(null));
         var protondb = then(appId, "protondb", id -> id == null ? null
@@ -118,7 +131,9 @@ public class GameEnrichmentAssembler {
         var opencritic = supply("opencritic", () -> openCritic(igdb, name));
         var twitch = supply("twitch", () -> igdb == null ? null
                 : twitchActivityService.byIgdbId(igdb, language, FetchBudget.UNLIMITED).orElse(null));
-        Speedrun speedrun = speedrun(searchName(igdb, name), member);
+        String searched = searchName(igdb, name);
+        Speedrun speedrun = speedrun(searched, member);
+        Stats stats = member.map(user -> stats(detected, igdb, appId, searched, locale, user)).orElse(null);
 
         return new GameEnrichment(
                 await(hltb, deadline, "hltb"),
@@ -131,7 +146,83 @@ public class GameEnrichmentAssembler {
                 await(prices, deadline, "prices"),
                 await(opencritic, deadline, "opencritic"),
                 await(twitch, deadline, "twitch"),
-                speedrun.await(deadline));
+                speedrun.await(deadline),
+                stats == null ? null : stats.await(deadline));
+    }
+
+    /**
+     * Only the member's own stats on {@code detected}, within the aggregate timeout: as {@link #enrich} asks them,
+     * for the routes that serve nothing else. Null when no platform applies.
+     */
+    public PersonalStatsEnrichment personalStats(DetectedGame detected, Optional<String> igdbId,
+                                                 Optional<String> steamAppId, String name, UserAccount member,
+                                                 Locale locale) {
+        long deadline = System.nanoTime() + properties.aggregateTimeout().toNanos();
+        String igdb = igdbId.filter(id -> !id.isBlank()).orElse(null);
+        return stats(detected, igdb, appId(steamAppId, igdb), searchName(igdb, name), locale, member)
+                .await(deadline);
+    }
+
+    /** The detected Steam app id, else IGDB's Steam mapping of the game (null when neither). */
+    private CompletableFuture<String> appId(Optional<String> steamAppId, String igdb) {
+        return steamAppId.filter(id -> !id.isBlank())
+                .map(CompletableFuture::completedFuture)
+                .orElseGet(() -> supply("steam app id", () -> igdb == null ? null
+                        : igdbService.findExternalUid(igdb, GameBinding.SourceType.STEAM).orElse(null)));
+    }
+
+    /**
+     * Starts the member's stats lookups: Steam once {@code appId} is known, Xbox (its title found by the detected
+     * id, the Store id IGDB gives, else by name) and RetroAchievements (among the games played lately) at once.
+     */
+    private Stats stats(DetectedGame detected, String igdb, CompletableFuture<String> appId, String searched,
+                        Locale locale, UserAccount user) {
+        CompletableFuture<PlatformStats> steam = then(appId, "steam stats", id -> id == null ? null
+                : steamStatsService.forGame(user, id, locale, FetchBudget.UNLIMITED, false).orElse(null));
+        CompletableFuture<PlatformStats> xbox = supply("xbox stats", () -> xboxStats(user, detected, igdb, searched,
+                locale));
+        CompletableFuture<PlatformStats> retro = supply("retroachievements stats", () -> retroStats(user, detected,
+                searched));
+        return new Stats(steam, xbox, retro, detected.getSourceType());
+    }
+
+    private PlatformStats xboxStats(UserAccount user, DetectedGame detected, String igdb, String searched,
+                                    Locale locale) {
+        Optional<String> storeId = igdb == null ? Optional.empty()
+                : igdbService.findExternalUid(igdb, GameBinding.SourceType.XBOX);
+        Optional<String> titleId;
+        try {
+            titleId = xboxStatsService.resolveTitle(user, detected, storeId, searched, locale,
+                    FetchBudget.UNLIMITED);
+        } catch (XboxStatsUnavailableException e) {
+            return PlatformStats.of(Status.UNAVAILABLE, null);
+        }
+        return titleId.flatMap(id -> xboxStatsService.forTitle(user, id, locale, FetchBudget.UNLIMITED, false))
+                .orElse(null);
+    }
+
+    private PlatformStats retroStats(UserAccount user, DetectedGame detected, String searched) {
+        Optional<Integer> gameId;
+        try {
+            gameId = retroAchievementsStatsService.resolveGame(user, detected, searched, FetchBudget.UNLIMITED);
+        } catch (RaUnavailableException e) {
+            return PlatformStats.of(Status.UNAVAILABLE, null);
+        }
+        return gameId.flatMap(id -> retroAchievementsStatsService.forGame(user, id, FetchBudget.UNLIMITED, false))
+                .orElse(null);
+    }
+
+    /** The member's stats lookups under way. */
+    private record Stats(CompletableFuture<PlatformStats> steam, CompletableFuture<PlatformStats> xbox,
+                         CompletableFuture<PlatformStats> retroachievements, GameBinding.SourceType detectedOn) {
+
+        /** What arrived before {@code deadline}; null when no platform applies. */
+        PersonalStatsEnrichment await(long deadline) {
+            return PersonalStatsEnrichment.of(GameEnrichmentAssembler.await(steam, deadline, "steam stats"),
+                    GameEnrichmentAssembler.await(xbox, deadline, "xbox stats"),
+                    GameEnrichmentAssembler.await(retroachievements, deadline, "retroachievements stats"),
+                    detectedOn);
+        }
     }
 
     /**
@@ -141,9 +232,10 @@ public class GameEnrichmentAssembler {
     public CompletableFuture<GameEnrichment> enrichAsync(DetectedGame detected, Optional<String> igdbId,
                                                          Optional<String> steamAppId, String name, String country,
                                                          String language, MoreLinks links,
-                                                         Optional<UserAccount> member) {
+                                                         Optional<UserAccount> member, Locale locale) {
         return CompletableFuture.supplyAsync(
-                        () -> enrich(detected, igdbId, steamAppId, name, country, language, links, member), executor)
+                        () -> enrich(detected, igdbId, steamAppId, name, country, language, links, member, locale),
+                        executor)
                 .exceptionally(e -> {
                     log.warn("Game enrichment failed: {}", e.getMessage(), e);
                     return GameEnrichment.EMPTY;

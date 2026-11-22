@@ -502,6 +502,28 @@ class MockApiServiceTest {
     }
 
     @Test
+    void retroAchievementsAccount_followsTheSettingsAndTellsThePage() {
+        assertThat(data.retroAchievementsData().username()).isNull();
+        assertThat(data.retroAchievementsData().poolAvailable()).isTrue();
+
+        service.saveRetroAchievementsUsername(username, "Bob");
+        assertThat(data.retroAchievementsData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData("Bob",
+                "https://retroachievements.org/user/Bob", false, false, true));
+
+        service.saveRetroAchievementsApiKey(username, "a-secret-key");
+        assertThat(data.retroAchievementsData().hasApiKey()).isTrue();
+
+        service.deleteRetroAchievementsApiKey(username);
+        service.deleteRetroAchievementsUsername(username);
+        assertThat(data.retroAchievementsData().username()).isNull();
+        assertThat(data.retroAchievementsData().hasApiKey()).isFalse();
+
+        assertThat(events).hasSize(4).allSatisfy(event -> assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent.class));
+        assertThat(events.toString()).doesNotContain("a-secret-key");
+        assertThat(events.getLast()).isEqualTo(new fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent(username, null, null, false, false, true));
+    }
+
+    @Test
     void ankamaStatus_isTheMockLink() {
         assertThat(service.ankamaStatus(username)).isEqualTo(data.getAnkamaLink());
     }

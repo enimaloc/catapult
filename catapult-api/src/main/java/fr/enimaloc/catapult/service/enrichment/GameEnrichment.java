@@ -13,16 +13,18 @@ import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivity;
 /**
  * What the enrichment sources know of the game played now, each null when the source is off, knows nothing, failed
  * or answered too late. {@code steamAppId} is the Steam app id the Steam-keyed sources were asked with (the detected
- * one, else IGDB's mapping), null when there was none.
+ * one, else IGDB's mapping), null when there was none. {@code stats} is the member's own (null without a member, or
+ * when no platform applies).
  */
 public record GameEnrichment(TimeToBeat hltb, ProtonDbSummary protondb, SteamGridDbAssets steamgriddb,
                              SteamDeckCompatibility steamDeck, PcGamingWikiPage pcgamingwiki, Trailer trailer,
                              String steamAppId, GamePrices prices, OpenCriticGame opencritic,
-                             TwitchActivity twitch, SpeedrunEnrichment speedrun) {
+                             TwitchActivity twitch, SpeedrunEnrichment speedrun,
+                             PersonalStatsEnrichment stats) {
 
     /** Nothing known from any source. */
     public static final GameEnrichment EMPTY = new GameEnrichment(null, null, null, null, null, null, null, null, null,
-            null, null);
+            null, null, null);
 
     /**
      * Where to watch the game's trailer: {@code kind} {@value #MP4} for the MP4 the API rebuilds from a store's HLS

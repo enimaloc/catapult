@@ -123,6 +123,15 @@ public interface ApiService {
     /** Saves the owner's personal speedrun.com key (never logged); 400 when speedrun.com refuses it, 503 when unreachable. */
     int saveSpeedrunApiKey(String username, String apiKey);
     int deleteSpeedrunApiKey(String username);
+    /**
+     * Declares {@code raName} as the channel owner's RetroAchievements name; catapult-api's status: 400 when
+     * RetroAchievements does not know it, 503 when it cannot be asked.
+     */
+    int saveRetroAchievementsUsername(String username, String raName);
+    int deleteRetroAchievementsUsername(String username);
+    /** Saves the owner's personal RetroAchievements key (never logged); 400 when refused, 503 when unreachable. */
+    int saveRetroAchievementsApiKey(String username, String apiKey);
+    int deleteRetroAchievementsApiKey(String username);
     int refreshSteamProfileCache(String username);
     LinkStateResponse minecraftStatus(String username);
     int minecraftEnroll(String username, String name);

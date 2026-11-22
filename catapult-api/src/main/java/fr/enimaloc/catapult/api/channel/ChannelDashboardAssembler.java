@@ -57,6 +57,7 @@ import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.ankama.AnkamaLinkStateService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetLinkStateService;
 import fr.enimaloc.catapult.service.epic.EpicLinkStateService;
+import fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService;
 import fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
@@ -113,6 +114,7 @@ public class ChannelDashboardAssembler {
     private final DropsGate dropsGate;
     private final DropsCatalog dropsCatalog;
     private final SpeedrunAccountService speedrunAccounts;
+    private final RetroAchievementsAccountService retroAchievementsAccounts;
 
     @Value("${xbox.enabled:false}")
     private boolean xboxEnabled;
@@ -168,7 +170,8 @@ public class ChannelDashboardAssembler {
                 drops ? drops(channel, shown, custom) : null,
                 owner ? ankamaData(channel) : null,
                 owner ? epicData(channel) : null,
-                owner ? speedrunAccounts.data(channel) : null);
+                owner ? speedrunAccounts.data(channel) : null,
+                owner ? retroAchievementsAccounts.data(channel) : null);
     }
 
     /** The source value of the "with drops" filter. */

@@ -40,6 +40,24 @@ public class EnrichmentProperties {
         private int perMinute = 60;
     }
 
+    /** RetroAchievements settings that are not a source's own ({@code catapult.enrichment.retroachievements.*}). */
+    @Getter
+    @Setter
+    public static class RetroAchievements {
+        /** Upstream calls per minute. */
+        private int perMinute = 30;
+    }
+
+    /** Xbox stats settings that are not a source's own ({@code catapult.enrichment.xbox-stats.*}). */
+    @Getter
+    @Setter
+    public static class XboxStats {
+        /** Upstream calls per minute across all members. */
+        private int perMinute = 120;
+        /** Upstream calls per minute one member may trigger. */
+        private int perMemberPerMinute = 10;
+    }
+
     private SourceSettings hltb = new SourceSettings();
     private SourceSettings protondb = new SourceSettings();
     private SourceSettings steamgriddb = new SourceSettings();
@@ -56,7 +74,23 @@ public class EnrichmentProperties {
     private SourceSettings speedrunUser = new SourceSettings();
     private SourceSettings speedrunPbs = new SourceSettings();
     private SourceSettings speedrunPending = new SourceSettings();
+    private SourceSettings steamLibrary = new SourceSettings();
+    private SourceSettings steamAchievements = new SourceSettings();
+    private SourceSettings steamSchema = new SourceSettings();
+    private SourceSettings steamRarity = new SourceSettings();
+    private SourceSettings xboxTitles = new SourceSettings();
+    private SourceSettings xboxAchievements = new SourceSettings();
+    private SourceSettings xboxPlaytime = new SourceSettings();
+    private SourceSettings raUser = new SourceSettings();
+    private SourceSettings raProgress = new SourceSettings();
+    private SourceSettings raRecent = new SourceSettings();
     private Speedrun speedrun = new Speedrun();
+    private RetroAchievements retroachievements = new RetroAchievements();
+    private XboxStats xboxStats = new XboxStats();
+    /** Upstream calls one member may trigger per minute through the personal stats routes. */
+    private int memberPerMinute = 20;
+    /** How long a "known absent" answer of a personal source is trusted. */
+    private Duration personalAbsentTtl = Duration.ofMinutes(15);
     /** How long a "known absent" answer is trusted. */
     private Duration absentTtl = Duration.ofDays(1);
     /** Longest the aggregate endpoint waits for the slow sources. */
@@ -98,6 +132,26 @@ public class EnrichmentProperties {
         return ffmpegMaxDuration;
     }
 
+    public Duration personalAbsentTtl() {
+        return personalAbsentTtl;
+    }
+
+    public int memberPerMinute() {
+        return memberPerMinute;
+    }
+
+    public int raPerMinute() {
+        return retroachievements.getPerMinute();
+    }
+
+    public int xboxStatsPerMinute() {
+        return xboxStats.getPerMinute();
+    }
+
+    public int xboxStatsPerMemberPerMinute() {
+        return xboxStats.getPerMemberPerMinute();
+    }
+
     public int speedrunPerMinute() {
         return speedrun.getPerMinute();
     }
@@ -128,6 +182,16 @@ public class EnrichmentProperties {
             case SPEEDRUN_USER -> speedrunUser;
             case SPEEDRUN_PBS -> speedrunPbs;
             case SPEEDRUN_PENDING -> speedrunPending;
+            case STEAM_LIBRARY -> steamLibrary;
+            case STEAM_ACHIEVEMENTS -> steamAchievements;
+            case STEAM_SCHEMA -> steamSchema;
+            case STEAM_RARITY -> steamRarity;
+            case XBOX_TITLES -> xboxTitles;
+            case XBOX_ACHIEVEMENTS -> xboxAchievements;
+            case XBOX_PLAYTIME -> xboxPlaytime;
+            case RA_USER -> raUser;
+            case RA_PROGRESS -> raProgress;
+            case RA_RECENT -> raRecent;
         };
     }
 
@@ -141,7 +205,11 @@ public class EnrichmentProperties {
             case TWITCH_CLIPS, SPEEDRUN_RECORDS -> Duration.ofHours(1);
             case SPEEDRUN_GAME -> Duration.ofDays(30);
             case SPEEDRUN_USER -> Duration.ofDays(7);
-            case SPEEDRUN_PBS, SPEEDRUN_PENDING -> Duration.ofMinutes(15);
+            case SPEEDRUN_PBS, SPEEDRUN_PENDING, STEAM_LIBRARY, XBOX_PLAYTIME -> Duration.ofMinutes(15);
+            case STEAM_ACHIEVEMENTS, XBOX_TITLES, XBOX_ACHIEVEMENTS, RA_PROGRESS, RA_RECENT -> Duration.ofMinutes(5);
+            case STEAM_SCHEMA -> Duration.ofDays(7);
+            case STEAM_RARITY -> Duration.ofDays(1);
+            case RA_USER -> Duration.ofMinutes(2);
         };
     }
 }

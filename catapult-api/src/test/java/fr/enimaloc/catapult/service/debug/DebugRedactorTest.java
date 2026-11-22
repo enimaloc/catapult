@@ -27,6 +27,23 @@ class DebugRedactorTest {
     }
 
     @Test
+    void raKeyParamIsMasked() {
+        assertThat(redactor.url(URI.create("https://retroachievements.org/API/API_GetUserProfile.php?u=bob&y=SECRET"),
+                false)).isEqualTo("https://retroachievements.org/API/API_GetUserProfile.php?u=bob&y=[masqué]");
+        assertThat(redactor.url(URI.create("https://x.test/a?ay=1"), false)).isEqualTo("https://x.test/a?ay=1");
+        assertThat(redactor.query("u=bob&y=SECRET", false)).isEqualTo("u=bob&y=[masqué]");
+        assertThat(redactor.text("GET https://retroachievements.org/API/API_GetUserProfile.php?u=bob&y=SECRET failed",
+                false)).isEqualTo("GET https://retroachievements.org/API/API_GetUserProfile.php?u=bob&y=[masqué] failed");
+        assertThat(redactor.text("point x=1 y=2", false)).isEqualTo("point x=1 y=2");
+    }
+
+    @Test
+    void yIsNotMaskedInJsonBodies() {
+        assertThat(redactor.body(b("{\"x\":1,\"y\":2}"), org.springframework.http.MediaType.APPLICATION_JSON, false))
+                .isEqualTo("{\"x\":1,\"y\":2}");
+    }
+
+    @Test
     void queryKey_isMasked() {
         assertThat(redactor.url(URI.create("https://x.test/a?key=ABC&steamids=1"), false))
                 .isEqualTo("https://x.test/a?key=[masqué]&steamids=1");

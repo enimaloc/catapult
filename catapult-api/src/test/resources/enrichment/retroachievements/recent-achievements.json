@@ -1,0 +1,33 @@
+[
+  {
+    "Date": "2026-11-22 10:05:00",
+    "HardcoreMode": 1,
+    "AchievementID": 3,
+    "Title": "First",
+    "Description": "Do the first thing",
+    "BadgeName": "00003",
+    "Points": 5,
+    "TrueRatio": 7,
+    "Type": "progression",
+    "Author": "Someone",
+    "GameTitle": "Super Mario World",
+    "GameIcon": "/Images/112233.png",
+    "GameID": 228,
+    "ConsoleName": "SNES/Super Famicom",
+    "BadgeURL": "/Badge/00003.png",
+    "GameURL": "/game/228"
+  },
+  {
+    "Date": "2026-11-22 09:50:00",
+    "HardcoreMode": 0,
+    "AchievementID": 5,
+    "Title": "Second",
+    "Description": "Do the second thing",
+    "BadgeName": "00005",
+    "Points": 10,
+    "TrueRatio": 20,
+    "GameTitle": "Super Mario World",
+    "GameID": 228,
+    "ConsoleName": "SNES/Super Famicom"
+  }
+]

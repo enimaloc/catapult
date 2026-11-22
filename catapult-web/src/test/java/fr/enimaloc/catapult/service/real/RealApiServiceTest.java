@@ -813,6 +813,37 @@ class RealApiServiceTest {
     }
 
     @Test
+    void retroAchievementsUsername_isSavedAndRemovedOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/retroachievements/username", "{\"username\":\"Bob\"}");
+        expectDelete(channel("enimaloc") + "/settings/retroachievements/username");
+
+        assertThat(service.saveRetroAchievementsUsername("enimaloc", "Bob")).isEqualTo(204);
+        assertThat(service.deleteRetroAchievementsUsername("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void retroAchievementsApiKey_isSavedAndRemovedOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/retroachievements/api-key", "{\"apiKey\":\"abc123\"}");
+        expectDelete(channel("enimaloc") + "/settings/retroachievements/api-key");
+
+        assertThat(service.saveRetroAchievementsApiKey("enimaloc", "abc123")).isEqualTo(204);
+        assertThat(service.deleteRetroAchievementsApiKey("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void retroAchievementsRefusals_keepTheirStatus() {
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/retroachievements/api-key")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/retroachievements/username")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThat(service.saveRetroAchievementsApiKey("enimaloc", "bad")).isEqualTo(400);
+        assertThat(service.saveRetroAchievementsUsername("enimaloc", "n1")).isEqualTo(503);
+    }
+
+    @Test
     void speedrunRefusals_keepTheirStatus() {
         expect(HttpMethod.PUT, channel("enimaloc") + "/settings/speedrun/api-key")
                 .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
@@ -2041,6 +2072,21 @@ class RealApiServiceTest {
                 .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
         expect(HttpMethod.DELETE, "/api/internal/admin/opencritic-keys/k1").andRespond(withNoContent());
         expectPost("/api/internal/admin/opencritic-keys/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
+    }
+
+    @Test
+    void retroAchievementsKeys_areReadAndManagedThroughTheirRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.RETROACHIEVEMENTS;
+        respond(HttpMethod.GET, "/api/internal/admin/retroachievements-keys", "{\"keys\":[],\"retroachievementsEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/retroachievements-keys")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/retroachievements-keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/retroachievements-keys/refresh");
 
         assertThat(service.adminApiKeys(provider).enabled()).isTrue();
         assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);

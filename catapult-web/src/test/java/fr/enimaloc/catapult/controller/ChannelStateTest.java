@@ -99,6 +99,27 @@ class ChannelStateTest {
     }
 
     @Test
+    void retroAchievementsAccount_asItsEvent() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData("Bob",
+                "https://retroachievements.org/user/Bob", true, false, true));
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent("enimaloc", "Bob",
+                        "https://retroachievements.org/user/Bob", true, false, true));
+    }
+
+    @Test
+    void noRetroAchievementsAccount_noEvent() {
+        ChannelPageData ch = page(null, new PagedBindings(0, 0, 0, List.of()), null, null, null, null);
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .noneMatch(event -> event instanceof fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent);
+    }
+
+    @Test
     void noSpeedrunAccount_noEvent() {
         ChannelPageData ch = page(null, new PagedBindings(0, 0, 0, List.of()), null, null, null, null);
 

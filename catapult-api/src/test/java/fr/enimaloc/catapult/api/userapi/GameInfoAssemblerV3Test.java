@@ -9,6 +9,9 @@ import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
 import fr.enimaloc.catapult.service.enrichment.GameEnrichmentAssembler;
+import fr.enimaloc.catapult.service.enrichment.PersonalStatsEnrichment;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.PlatformStats;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Status;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
@@ -19,8 +22,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.MessageSource;
 import org.springframework.web.context.request.RequestContextHolder;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -48,6 +53,7 @@ class GameInfoAssemblerV3Test {
     private final IgdbGameDetailsService igdbGameDetailsService = mock(IgdbGameDetailsService.class);
     private final SteamStoreService steamStoreService = mock(SteamStoreService.class);
     private final GameEnrichmentAssembler enrichmentAssembler = mock(GameEnrichmentAssembler.class);
+    private final WidgetTokenService widgetTokens = mock(WidgetTokenService.class);
 
     private GameInfoAssembler assembler;
     private UserAccount user;
@@ -61,7 +67,7 @@ class GameInfoAssemblerV3Test {
     }
 
     private GameInfoAssembler assembler(Optional<GameEnrichmentAssembler> enrichment) {
-        return new GameInfoAssembler(mock(WidgetTokenService.class), gameStateService, gameBindingRepository,
+        return new GameInfoAssembler(widgetTokens, gameStateService, gameBindingRepository,
                 igdbService, igdbGameDetailsService, steamStoreService, mock(XboxStoreService.class),
                 mock(TwLabelService.class), null, mock(DevBackdoorResolver.class), mock(MessageSource.class),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), new PublicBaseUrl(BASE),
@@ -83,15 +89,15 @@ class GameInfoAssemblerV3Test {
     void steamGame_enrichedWithItsAppIdIgdbIdAndDetectedName_currentLinks() {
         DetectedGame detected = playing(Duration.ZERO);
         ProtonDbSummary proton = new ProtonDbSummary("gold", "gold", "gold", "good", 0.7, 10, "https://p");
-        when(enrichmentAssembler.enrichAsync(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(
-                CompletableFuture.completedFuture(new GameEnrichment(null, proton, null, null, null, null, "620", null, null, null, null)));
+        when(enrichmentAssembler.enrichAsync(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(
+                CompletableFuture.completedFuture(new GameEnrichment(null, proton, null, null, null, null, "620", null, null, null, null, null)));
 
         GameInfoV3Response response = assembler.gameInfoV3(user, Locale.FRENCH, null, null);
 
         // the detected name, not the localized store name the v2 answer shows
         verify(enrichmentAssembler).enrichAsync(eq(detected), eq(Optional.of("72")), eq(Optional.of("620")),
                 eq("Portal 2"), eq("FR"), isNull(), eq(new MoreLinks(BASE, GameInfoAssembler.LinkStyle.CURRENT)),
-                eq(Optional.of(user)));
+                eq(Optional.of(user)), eq(Locale.FRENCH));
         verify(igdbService, times(1)).resolveDetected(any(), any(), any());
         assertThat(response.inGame()).isTrue();
         assertThat(response.name()).isEqualTo("Portail 2");
@@ -103,7 +109,7 @@ class GameInfoAssemblerV3Test {
     @Test
     void enrichment_overlapsTheV2Aggregation() {
         playing(Duration.ofSeconds(1));
-        when(enrichmentAssembler.enrichAsync(any(), any(), any(), any(), any(), any(), any(), any())).thenAnswer(invocation ->
+        when(enrichmentAssembler.enrichAsync(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenAnswer(invocation ->
                 CompletableFuture.supplyAsync(() -> {
                     sleep(Duration.ofSeconds(1));
                     return GameEnrichment.EMPTY;
@@ -128,6 +134,54 @@ class GameInfoAssemblerV3Test {
         assertThat(response.inGame()).isTrue();
         assertThat(response.protondb()).isNull();
         assertThat(response.trailer()).isNull();
+    }
+
+    @Test
+    void widgetRoutesHaveNoStats() {
+        playing(Duration.ZERO);
+        UUID widget = UUID.randomUUID();
+        when(widgetTokens.resolve(widget)).thenReturn(Optional.of(user));
+        JsonMapper mapper = JsonMapper.builder().build();
+
+        // /api/game/{uuid} and /api/user/game/{uuid} (by widget token), and the v2 /api/me/game
+        String byWidget = mapper.writeValueAsString(assembler.gameInfo(widget, Locale.ENGLISH).orElseThrow());
+        String v2 = mapper.writeValueAsString(assembler.gameInfo(user, Locale.ENGLISH));
+
+        for (String answer : List.of(byWidget, v2)) {
+            assertThat(answer).contains("\"inGame\":true").doesNotContain("\"stats\"")
+                    .doesNotContain("\"playtime\"").doesNotContain("\"lastAchievement\"");
+        }
+        verifyNoInteractions(enrichmentAssembler);
+    }
+
+    @Test
+    void currentStats_ofTheGamePlayedNow() {
+        DetectedGame detected = playing(Duration.ZERO);
+        PlatformStats steam = PlatformStats.of(Status.OK, "620");
+        when(enrichmentAssembler.personalStats(any(), any(), any(), any(), any(), any()))
+                .thenReturn(new PersonalStatsEnrichment(steam, null, null, GameBinding.SourceType.STEAM));
+
+        MeStatsController.CurrentStats current = assembler.currentStats(user, Locale.FRENCH);
+
+        assertThat(current.inGame()).isTrue();
+        assertThat(current.stats().steam().more()).isEqualTo(BASE + "/api/me/stats/steam/620?version=3");
+        verify(enrichmentAssembler).personalStats(detected, Optional.of("72"), Optional.of("620"), "Portal 2", user,
+                Locale.FRENCH);
+    }
+
+    @Test
+    void currentStats_notInGameOrNoPlatform() {
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.empty());
+        assertThat(assembler.currentStats(user, Locale.ENGLISH))
+                .isEqualTo(new MeStatsController.CurrentStats(false, null));
+        verifyNoInteractions(enrichmentAssembler);
+
+        playing(Duration.ZERO);
+        when(enrichmentAssembler.personalStats(any(), any(), any(), any(), any(), any())).thenReturn(null);
+        assertThat(assembler.currentStats(user, Locale.ENGLISH))
+                .isEqualTo(new MeStatsController.CurrentStats(true, null));
+        assertThat(assembler(Optional.empty()).currentStats(user, Locale.ENGLISH))
+                .isEqualTo(new MeStatsController.CurrentStats(true, null));
     }
 
     /** Portal 2 detected on Steam, its store page (localized as "Portail 2") taking {@code storeDelay}. */

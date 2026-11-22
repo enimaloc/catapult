@@ -3,7 +3,11 @@ package fr.enimaloc.catapult.api.userapi;
 import fr.enimaloc.catapult.service.enrichment.IpFetchBudgets;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticService;
+import fr.enimaloc.catapult.service.enrichment.MemberFetchBudgets;
+import fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsStatsService;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunGameService;
+import fr.enimaloc.catapult.service.enrichment.steamstats.SteamStatsService;
+import fr.enimaloc.catapult.service.enrichment.xboxstats.XboxStatsService;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiService;
 import fr.enimaloc.catapult.service.enrichment.prices.PricesService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbService;
@@ -57,6 +61,7 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @WebMvcTest(
         controllers = {MeGameController.class, MeBindingsController.class, MeCustomBindingsController.class,
+                MeStatsController.class,
                 GamesController.class, EnrichmentGamesController.class, UserApiV1Controller.class, UserApiV2Controller.class},
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
@@ -104,6 +109,10 @@ class OpenApiDocsTest {
     @MockitoBean OpenCriticService openCriticService;
     @MockitoBean TwitchActivityService twitchActivityService;
     @MockitoBean SpeedrunGameService speedrunGameService;
+    @MockitoBean SteamStatsService steamStatsService;
+    @MockitoBean XboxStatsService xboxStatsService;
+    @MockitoBean RetroAchievementsStatsService retroAchievementsStatsService;
+    @MockitoBean MemberFetchBudgets memberFetchBudgets;
 
     private JsonNode docs() throws Exception {
         String body = mvc.perform(get("/api/v3/api-docs")).andExpect(status().isOk())
@@ -224,6 +233,32 @@ class OpenApiDocsTest {
                 "/api/games/steamdeck/{appId}", "/api/games/steamgriddb/{sgdbGameId}",
                 "/api/games/pcgamingwiki/{pageId}", "/api/games/prices/{itadId}", "/api/games/opencritic/{ocId}",
                 "/api/games/twitch/{twitchGameId}", "/api/games/speedrun/{srcGameId}");
+    }
+
+    /**
+     * The personal stats routes are documented, version 3 only; the achievement schema keeps its own name (the Steam
+     * store page has an {@code Achievement} too, which springdoc would otherwise merge it with).
+     */
+    @Test
+    void docs_listThePersonalStatsRoutes() throws Exception {
+        JsonNode docs = docs();
+
+        assertThat(paths(docs)).contains("/api/me/stats", "/api/me/stats/steam/{appId}",
+                "/api/me/stats/xbox/{titleId}", "/api/me/stats/retroachievements/{gameId}",
+                "/api/me/stats/retroachievements");
+        assertThat(versionHeader(docs, "/paths/~1api~1me~1stats~1steam~1{appId}/get/parameters").get("schema")
+                .get("enum").toString()).isEqualTo("[\"3\"]");
+        JsonNode schemas = docs.at("/components/schemas");
+        assertThat(schemas.has("PersonalAchievement")).isTrue();
+        assertThat(schemas.at("/Achievement/properties").has("highlighted")).isTrue();
+        assertThat(schemas.at("/StatsObject/properties").has("detectedOn")).isFalse();
+        // the detail routes answer the aggregate's objects, with every achievement
+        for (String name : List.of("SteamStats", "XboxStats", "RaStats")) {
+            assertThat(schemas.at("/" + name + "/properties").has("all")).as(name).isTrue();
+        }
+        assertThat(schemas.has("PlatformStats")).isFalse();
+        assertThat(docs.at("/paths/~1api~1me~1stats~1steam~1{appId}/get/responses/200/content").toString())
+                .contains("SteamStats");
     }
 
     private static JsonNode versionHeader(JsonNode docs, String parametersPointer) {

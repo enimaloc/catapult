@@ -1,0 +1,8 @@
+{
+  "groups": [{"name": "Hero", "titleid": "1791712750"}],
+  "statlistscollection": [
+    {"arrangebyfield": "xuid", "arrangebyfieldid": "2535400000000000",
+     "stats": [{"groupproperties": {"Ordinal": "1"}, "xuid": "2535400000000000", "scid": "00000000-0000-0000-0000-000000000000",
+                "titleid": "1791712750", "name": "MinutesPlayed", "type": "Integer", "value": 610}]}
+  ]
+}

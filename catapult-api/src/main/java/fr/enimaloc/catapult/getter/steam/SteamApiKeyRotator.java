@@ -44,6 +44,11 @@ public class SteamApiKeyRotator {
         log.info("Steam API key pool refreshed: {} key(s)", keys.size());
     }
 
+    /** Whether the pool holds at least one key (blocked or not). */
+    public boolean hasKeys() {
+        return !keys.isEmpty();
+    }
+
     public Optional<String> nextKey() {
         List<String> snapshot = keys;
         if (snapshot.isEmpty()) return Optional.empty();

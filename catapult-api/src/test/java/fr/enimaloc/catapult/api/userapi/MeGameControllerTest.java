@@ -3,14 +3,20 @@ package fr.enimaloc.catapult.api.userapi;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.domain.account.ApiTokenScope;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.ApiSecurityConfig;
 import fr.enimaloc.catapult.service.account.ApiTokenOwner;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
+import fr.enimaloc.catapult.service.enrichment.PersonalStatsEnrichment;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Achievement;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.AchievementSummary;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.PlatformStats;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Status;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,8 +34,11 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -160,7 +169,10 @@ class MeGameControllerTest {
                         "https://www.protondb.com/app/400"),
                 null, new SteamDeckCompatibility(SteamDeckCompatibility.Category.VERIFIED, List.of()), null,
                 new GameEnrichment.Trailer(GameEnrichment.Trailer.YOUTUBE, "https://www.youtube.com/watch?v=x"),
-                "400", null, null, null, null);
+                "400", null, null, null, null, new PersonalStatsEnrichment(new PlatformStats(Status.OK, "400", 610L,
+                        null, null, AchievementSummary.of(List.of(new Achievement("A1", "First", "d", "i", true,
+                                Instant.parse("2026-11-20T10:00:00Z"), new BigDecimal("3.2"), null, false))), null,
+                        Map.of()), null, null, GameBinding.SourceType.STEAM));
         when(games.gameInfoV3(eq(user), any(Locale.class), any(), any())).thenReturn(GameInfoV3Response.of(base, enrichment,
                 new MoreLinks("http://localhost", GameInfoAssembler.LinkStyle.CURRENT), Optional.of("1942")));
     }
@@ -184,6 +196,28 @@ class MeGameControllerTest {
     }
 
     @Test
+    void meGame_v3_hasPersonalStats() throws Exception {
+        playingPortalV3();
+
+        mvc.perform(withToken(get("/api/me/game")).header(ApiV2.VERSION_HEADER, "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stats.steam.status").value("ok"))
+                .andExpect(jsonPath("$.stats.steam.playtimeMinutes").value(610))
+                .andExpect(jsonPath("$.stats.steam.achievements.recent[0].name").value("First"))
+                .andExpect(jsonPath("$.stats.steam.more").value("http://localhost/api/me/stats/steam/400?version=3"))
+                .andExpect(jsonPath("$.stats.xbox").doesNotExist());
+
+        mvc.perform(withToken(get("/api/me/game/summary")).header(ApiV2.VERSION_HEADER, "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playtime").value(610))
+                .andExpect(jsonPath("$.achievements.platform").value("steam"))
+                .andExpect(jsonPath("$.achievements.unlocked").value(1))
+                .andExpect(jsonPath("$.lastAchievement.name").value("First"))
+                .andExpect(jsonPath("$.lastAchievement.unlockedAt").value("2026-11-20T10:00:00Z"))
+                .andExpect(jsonPath("$.stats").doesNotExist());
+    }
+
+    @Test
     void meGame_v3_field_returnsPlainText() throws Exception {
         playingPortalV3();
 
@@ -201,7 +235,8 @@ class MeGameControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Halo"))
                 .andExpect(jsonPath("$.hltb").doesNotExist())
-                .andExpect(jsonPath("$.protondb").doesNotExist());
+                .andExpect(jsonPath("$.protondb").doesNotExist())
+                .andExpect(jsonPath("$.stats").doesNotExist());
 
         verify(games, never()).gameInfoV3(any(UserAccount.class), any(), any(), any());
     }

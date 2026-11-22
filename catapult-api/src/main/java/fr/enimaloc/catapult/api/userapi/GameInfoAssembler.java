@@ -15,6 +15,7 @@ import fr.enimaloc.catapult.service.dtdd.DtddService;
 import fr.enimaloc.catapult.service.dtdd.DtddSignalService;
 import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
 import fr.enimaloc.catapult.service.enrichment.GameEnrichmentAssembler;
+import fr.enimaloc.catapult.service.enrichment.PersonalStatsEnrichment;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.link.ExternalLinks;
@@ -311,7 +312,8 @@ public class GameInfoAssembler {
      * completed with the enrichment sources (each null when unavailable or too slow). inGame=false while nothing
      * is detected. {@code country} and {@code language} are the validated query parameters of the request, null
      * when it gave none (the prices then default to France; the Twitch streams to any language). The speedrun.com
-     * object carries {@code user}'s own account, personal bests and pending runs: this answer is personal.
+     * object carries {@code user}'s own account, personal bests and pending runs, the stats object their own play
+     * time and achievements ({@code locale} names the achievements): this answer is personal.
      */
     public GameInfoV3Response gameInfoV3(UserAccount user, Locale locale, String country, String language) {
         String base = publicBaseUrl.get();
@@ -329,14 +331,15 @@ public class GameInfoAssembler {
                 ? Optional.ofNullable(detected.getSourceId()) : Optional.empty();
         MoreLinks links = new MoreLinks(base, LinkStyle.CURRENT);
         CompletableFuture<GameEnrichment> enrichment = enrichAsync(detected, igdbId, steamAppId, country, language, links,
-                user);
+                user, locale);
         GameInfoResponse v2 = aggregate(detected, igdbId, Optional.of(user), locale, base, LinkStyle.CURRENT);
         return GameInfoV3Response.of(v2, enrichment.join(), links, igdbId, country, language);
     }
 
     private CompletableFuture<GameEnrichment> enrichAsync(DetectedGame detected, Optional<String> igdbId,
                                                           Optional<String> steamAppId, String country,
-                                                          String language, MoreLinks links, UserAccount user) {
+                                                          String language, MoreLinks links, UserAccount user,
+                                                          Locale locale) {
         if (gameEnrichmentAssembler.isEmpty()) {
             if (!missingEnrichmentLogged.getAndSet(true)) {
                 log.warn("No GameEnrichmentAssembler: v3 game info answers carry no enrichment object");
@@ -345,7 +348,29 @@ public class GameInfoAssembler {
         }
         // the detected name, not the localized store name: the sources search by a stable name
         return gameEnrichmentAssembler.get().enrichAsync(detected, igdbId, steamAppId, detected.getSourceName(),
-                ApiV2.country(country), language, links, Optional.of(user));
+                ApiV2.country(country), language, links, Optional.of(user), locale);
+    }
+
+    /**
+     * The member's own stats on the game their channel plays now, as the v3 game info carries them; inGame=false
+     * while nothing is detected, stats null when no platform applies. {@code locale} is the language of the
+     * achievements' names.
+     */
+    public MeStatsController.CurrentStats currentStats(UserAccount user, Locale locale) {
+        Optional<DetectedGame> playing = gameStateService.getLastKnownGame(user);
+        if (playing.isEmpty()) {
+            return new MeStatsController.CurrentStats(false, null);
+        }
+        if (gameEnrichmentAssembler.isEmpty()) {
+            return new MeStatsController.CurrentStats(true, null);
+        }
+        DetectedGame detected = playing.get();
+        Optional<String> steamAppId = detected.getSourceType() == GameBinding.SourceType.STEAM
+                ? Optional.ofNullable(detected.getSourceId()) : Optional.empty();
+        PersonalStatsEnrichment stats = gameEnrichmentAssembler.get().personalStats(detected,
+                resolveIgdbId(detected), steamAppId, detected.getSourceName(), user, locale);
+        return new MeStatsController.CurrentStats(true,
+                GameInfoV3Response.StatsObject.of(stats, new MoreLinks(publicBaseUrl.get(), LinkStyle.CURRENT)));
     }
 
     // ---------------------------------------------------------------- v1 (frozen schema)

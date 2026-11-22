@@ -1,0 +1,200 @@
+package fr.enimaloc.catapult.api.userapi;
+
+import fr.enimaloc.catapult.api.ApiUserResolver;
+import fr.enimaloc.catapult.api.error.ApiProblem;
+import fr.enimaloc.catapult.common.error.ErrorCode;
+import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.service.enrichment.FetchBudget;
+import fr.enimaloc.catapult.service.enrichment.MemberFetchBudgets;
+import fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException;
+import fr.enimaloc.catapult.service.enrichment.rastats.RaAccountView;
+import fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsStatsService;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.PlatformStats;
+import fr.enimaloc.catapult.service.enrichment.steamstats.SteamStatsService;
+import fr.enimaloc.catapult.service.enrichment.xboxstats.XboxStatsService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Pattern;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Optional;
+import java.util.UUID;
+import java.util.function.BiFunction;
+
+import static fr.enimaloc.catapult.api.userapi.RequestLocale.ACCEPT_LANGUAGE_DESCRIPTION;
+import static fr.enimaloc.catapult.api.userapi.RequestLocale.LANG_DESCRIPTION;
+
+/**
+ * The token owner's own play time and achievements on Steam, Xbox and RetroAchievements: on the game their channel
+ * plays now, on a game of their choice (every achievement), and their RetroAchievements account. Personal data: only
+ * ever served here and in {@code /api/me/game}, never on the public routes. A game of their choice costs one of the
+ * member's {@code catapult.enrichment.member-per-minute} refreshes, so that a token cannot walk a whole library and
+ * drain the shared quotas. Version 3 and later only.
+ */
+@RestController
+@RequestMapping(path = ApiV2.ME_STATS_PATH, version = ApiV2.VERSION_3 + "+")
+@RequiredArgsConstructor
+@Tag(name = "Me — stats", description = "Your own play time and achievements on Steam, Xbox and "
+        + "RetroAchievements, by your personal API token (Authorization: Bearer cat_… or catr_…).")
+public class MeStatsController {
+
+    private static final String BUDGET_NOTE = " Each call takes one of your refreshes (20 a minute by default).";
+    private static final String STATUS_NOTE = " A status that is not ok (private, not_owned, no_achievements, "
+            + "unsupported, unavailable) is still a 200.";
+
+    private final GameInfoAssembler gameInfoAssembler;
+    private final SteamStatsService steamStatsService;
+    private final XboxStatsService xboxStatsService;
+    private final RetroAchievementsStatsService retroAchievementsStatsService;
+    private final MemberFetchBudgets memberFetchBudgets;
+    private final ApiUserResolver userResolver;
+    private final PublicBaseUrl publicBaseUrl;
+
+    /** The member's stats on the game played now: inGame=false while nothing is detected. */
+    public record CurrentStats(boolean inGame, GameInfoV3Response.StatsObject stats) {
+    }
+
+    @GetMapping
+    @Operation(summary = "Get your stats on the game your channel plays now",
+            description = "The stats object of GET /api/me/game (version 3): steam, xbox and retroachievements, each "
+                    + "null when the platform does not apply (not linked, game not found there), each with its "
+                    + "status, play time, achievements summary (unlocked, total, percent, the 5 latest, the rarest) "
+                    + "and a \"more\" link to every achievement. stats is null when no platform applies.")
+    @ApiResponse(responseCode = "200", description = "inGame=false while no game is detected; otherwise your stats.")
+    public CurrentStats current(
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = LANG_DESCRIPTION, example = "fr", schema = @Schema(defaultValue = "en"))
+            @RequestParam(name = "lang", required = false) String lang,
+            @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER,
+                    example = "fr-FR,fr;q=0.9")
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        return gameInfoAssembler.currentStats(userResolver.tokenOwner(userId), RequestLocale.parse(lang,
+                acceptLanguage));
+    }
+
+    @GetMapping("/steam/{appId}")
+    @Operation(summary = "Get your play time and every achievement on a Steam app",
+            description = "The steam object of GET /api/me/stats (play time in minutes, total and last two weeks, "
+                    + "last played, achievements summary), plus all: every achievement of the app (unlocked or "
+                    + "not, with its date and rarity; a locked hidden one without name)." + STATUS_NOTE
+                    + BUDGET_NOTE)
+    @ApiResponse(responseCode = "200", description = "Your stats on the app.")
+    @ApiResponse(responseCode = "400", description = "Malformed appId.", content = @Content)
+    @ApiResponse(responseCode = "404", description = "No Steam account linked, or Steam stats disabled.",
+            content = @Content)
+    @ApiResponse(responseCode = "429", description = "Your refreshes are spent; retry after Retry-After seconds.",
+            content = @Content)
+    public GameInfoV3Response.SteamStats steam(
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "Steam appId.", in = ParameterIn.PATH, example = "440")
+            @PathVariable @Pattern(regexp = ApiV2.STEAM_APP_ID) String appId,
+            @Parameter(description = LANG_DESCRIPTION, example = "fr", schema = @Schema(defaultValue = "en"))
+            @RequestParam(name = "lang", required = false) String lang,
+            @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER,
+                    example = "fr-FR,fr;q=0.9")
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        PlatformStats stats = detail(userId, "No Steam stats for you", (user, budget) -> steamStatsService.forGame(
+                user, appId, RequestLocale.parse(lang, acceptLanguage), budget, true));
+        return GameInfoV3Response.SteamStats.of(stats, links(), true);
+    }
+
+    @GetMapping("/xbox/{titleId}")
+    @Operation(summary = "Get your play time, gamerscore and every achievement on an Xbox title",
+            description = "The xbox object of GET /api/me/stats (play time in minutes, last played, gamerscore, "
+                    + "achievements summary), plus all: every achievement of the title (unlocked or not; a locked "
+                    + "secret one without name). unsupported: Xbox refused the achievements to your session, the "
+                    + "counts come from your title history." + STATUS_NOTE + BUDGET_NOTE)
+    @ApiResponse(responseCode = "200", description = "Your stats on the title.")
+    @ApiResponse(responseCode = "400", description = "Malformed titleId.", content = @Content)
+    @ApiResponse(responseCode = "404", description = "No Xbox account linked, title not in your history, or Xbox "
+            + "stats disabled.", content = @Content)
+    @ApiResponse(responseCode = "429", description = "Your refreshes are spent; retry after Retry-After seconds.",
+            content = @Content)
+    public GameInfoV3Response.XboxStats xbox(
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "Xbox titleId (decimal).", in = ParameterIn.PATH, example = "1144039928")
+            @PathVariable @Pattern(regexp = ApiV2.XBOX_TITLE_ID) String titleId,
+            @Parameter(description = LANG_DESCRIPTION, example = "fr", schema = @Schema(defaultValue = "en"))
+            @RequestParam(name = "lang", required = false) String lang,
+            @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER,
+                    example = "fr-FR,fr;q=0.9")
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        PlatformStats stats = detail(userId, "No Xbox stats for you on that title",
+                (user, budget) -> xboxStatsService.forTitle(user, titleId, RequestLocale.parse(lang, acceptLanguage),
+                        budget, true));
+        return GameInfoV3Response.XboxStats.of(stats, links(), true);
+    }
+
+    @GetMapping("/retroachievements/{gameId}")
+    @Operation(summary = "Get your progress and every achievement in a RetroAchievements game",
+            description = "The retroachievements object of GET /api/me/stats (game, points, hardcore progress, "
+                    + "highest award, play time as RetroAchievements gives it, unit not verified, achievements "
+                    + "summary), plus all: every achievement (unlocked or not, rarity = share of the game's "
+                    + "players who unlocked it). private: your account is untracked." + STATUS_NOTE + BUDGET_NOTE)
+    @ApiResponse(responseCode = "200", description = "Your progress in the game.")
+    @ApiResponse(responseCode = "400", description = "Malformed gameId.", content = @Content)
+    @ApiResponse(responseCode = "404", description = "No RetroAchievements account declared or no key to read it "
+            + "with, unknown game, or RetroAchievements disabled.", content = @Content)
+    @ApiResponse(responseCode = "429", description = "Your refreshes are spent; retry after Retry-After seconds.",
+            content = @Content)
+    public GameInfoV3Response.RaStats retroAchievementsGame(
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "RetroAchievements game id.", in = ParameterIn.PATH, example = "228")
+            @PathVariable @Pattern(regexp = ApiV2.RA_GAME_ID) String gameId) {
+        PlatformStats stats = detail(userId, "No RetroAchievements stats for you on that game",
+                (user, budget) -> retroAchievementsStatsService.forGame(user, Integer.parseInt(gameId), budget,
+                        true));
+        return GameInfoV3Response.RaStats.of(stats, links(), true);
+    }
+
+    @GetMapping("/retroachievements")
+    @Operation(summary = "Get your RetroAchievements account",
+            description = "Your profile (points, rich presence, last game), the games you played lately and the "
+                    + "achievements you unlocked in the last 24 hours. status private: your account is untracked "
+                    + "(nothing but the name); unavailable: RetroAchievements could not be read. A list is null "
+                    + "when it could not be read.")
+    @ApiResponse(responseCode = "200", description = "Your account.")
+    @ApiResponse(responseCode = "404", description = "No RetroAchievements account declared or no key to read it "
+            + "with, or RetroAchievements disabled.", content = @Content)
+    public RaAccountView retroAchievementsAccount(@AuthenticationPrincipal UUID userId) {
+        return retroAchievementsStatsService.account(userResolver.tokenOwner(userId), FetchBudget.UNLIMITED)
+                .orElseThrow(() -> new ApiProblem(ErrorCode.NOT_FOUND, "No RetroAchievements account for you"));
+    }
+
+    /** The member's budget is asked before anything: one call is one refresh, however many upstream calls it makes. */
+    private PlatformStats detail(UUID userId, String notFound,
+                                 BiFunction<UserAccount, FetchBudget, Optional<PlatformStats>> read) {
+        UserAccount user = userResolver.tokenOwner(userId);
+        FetchBudget budget = FetchBudget.once(memberFetchBudgets.forMember(user.getId()));
+        if (!budget.tryAcquire()) {
+            throw new UpstreamBudgetExceededException(budget.retryAfter());
+        }
+        return read.apply(user, budget).orElseThrow(() -> new ApiProblem(ErrorCode.NOT_FOUND, notFound));
+    }
+
+    /** The "more" links of a detail answer: the caller's origin, current routes. */
+    private MoreLinks links() {
+        return new MoreLinks(publicBaseUrl.get(), GameInfoAssembler.LinkStyle.CURRENT);
+    }
+
+    @ExceptionHandler(UpstreamBudgetExceededException.class)
+    ResponseEntity<ProblemDetail> refreshesSpent(UpstreamBudgetExceededException e) {
+        return RetryAfterProblems.answer(ErrorCode.TOO_MANY_REQUESTS, "Too many stats refreshes for your account",
+                e.retryAfter());
+    }
+}

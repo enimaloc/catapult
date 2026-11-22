@@ -271,6 +271,47 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void retroAchievementsUsername_isSavedAndRemovedThroughTheApi() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/retroachievements/username").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"Bob\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/retroachievements/username/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveRetroAchievementsUsername("enimaloc", "Bob");
+        verify(apiService).deleteRetroAchievementsUsername("enimaloc");
+    }
+
+    @Test
+    void retroAchievementsApiKey_isSavedAndDeletedThroughTheApi() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/retroachievements/api-key").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"apiKey\":\"abc123\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/retroachievements/api-key/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveRetroAchievementsApiKey("enimaloc", "abc123");
+        verify(apiService).deleteRetroAchievementsApiKey("enimaloc");
+    }
+
+    @Test
+    void retroAchievements_refusalsKeepTheirStatus() throws Exception {
+        when(apiService.saveRetroAchievementsUsername("enimaloc", "nobody")).thenReturn(400);
+        when(apiService.saveRetroAchievementsApiKey("enimaloc", "bad")).thenReturn(503);
+
+        mvc.perform(post("/channel/enimaloc/settings/retroachievements/username").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"nobody\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/channel/enimaloc/settings/retroachievements/api-key").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"apiKey\":\"bad\"}"))
+                .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
     void refreshSteamProfileCache_callsApiService() throws Exception {
         mvc.perform(post("/channel/enimaloc/steam/refresh-profile-cache").with(csrf()))
                 .andExpect(status().isNoContent());

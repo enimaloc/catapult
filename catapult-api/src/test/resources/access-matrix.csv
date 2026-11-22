@@ -204,6 +204,10 @@ PUT,/api/internal/users/{userId}/settings/speedrun/username,,"{""username"":""ma
 DELETE,/api/internal/users/{userId}/settings/speedrun/username,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/speedrun/api-key,,"{""apiKey"":""matrix""}",401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/settings/speedrun/api-key,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/retroachievements/username,,"{""username"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/retroachievements/username,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/retroachievements/api-key,,"{""apiKey"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/retroachievements/api-key,,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/settings/twitchat,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat,,"{""enabled"":false}",401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat/branch,,,401,401,403,403,PASS,403,401
@@ -260,6 +264,10 @@ GET,/api/internal/admin/itad-keys,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/itad-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/itad-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/itad-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/retroachievements-keys,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/retroachievements-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/retroachievements-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/retroachievements-keys/refresh,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/opencritic-keys,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/opencritic-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/opencritic-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
@@ -509,3 +517,8 @@ HEAD,/api/games/xbox/{productId}/trailer.mp4,productId=9NBLGGH4R315;?version=3,,
 GET,/api/me/game/trailer.mp4,?version=3,,401,401,401,401,401,401,PASS
 HEAD,/api/me/game/trailer.mp4,?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/speedrun,?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats,?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/steam/{appId},appId=440;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/xbox/{titleId},titleId=1144039928;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/retroachievements/{gameId},gameId=228;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/retroachievements,?version=3,,401,401,401,401,401,401,PASS

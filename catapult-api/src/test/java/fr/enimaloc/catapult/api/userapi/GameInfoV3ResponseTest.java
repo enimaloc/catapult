@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
+import fr.enimaloc.catapult.service.enrichment.PersonalStatsEnrichment;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
@@ -13,6 +15,10 @@ import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRecords;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRun;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Achievement;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.AchievementSummary;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.PlatformStats;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Status;
 import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivity;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -23,6 +29,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.stream.IntStream;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,7 +64,7 @@ class GameInfoV3ResponseTest {
 
     @Test
     void summaryView_containsNewDerivedFields_notObjects() {
-        GameEnrichment enrichment = new GameEnrichment(TTB, PROTON, SGDB, DECK, PCGW, TRAILER, "620", null, null, null, null);
+        GameEnrichment enrichment = new GameEnrichment(TTB, PROTON, SGDB, DECK, PCGW, TRAILER, "620", null, null, null, null, null);
         GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.of("72"));
 
         JsonNode summary = MAPPER.readTree(MAPPER.writerWithView(GameInfoResponse.Summary.class)
@@ -96,11 +103,11 @@ class GameInfoV3ResponseTest {
     void coverUrl_fallsBackToIgdbCover() {
         GameEnrichment noGrid = new GameEnrichment(null, null, new SteamGridDbAssets(5L, "Portal 2",
                 "https://www.steamgriddb.com/game/5", List.of(), List.of(), List.of(), List.of()),
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
         assertThat(GameInfoV3Response.of(BASE_V2, noGrid, LINKS, Optional.of("72")).coverUrl())
                 .isEqualTo("https://images.igdb.com/cover.jpg");
 
-        GameEnrichment nothing = new GameEnrichment(null, null, null, null, null, null, null, null, null, null, null);
+        GameEnrichment nothing = new GameEnrichment(null, null, null, null, null, null, null, null, null, null, null, null);
         GameInfoV3Response bare = GameInfoV3Response.of(BASE_V2, nothing, LINKS, Optional.of("72"));
         assertThat(bare.coverUrl()).isEqualTo("https://images.igdb.com/cover.jpg");
         assertThat(bare.timeToBeat()).isNull();
@@ -115,7 +122,7 @@ class GameInfoV3ResponseTest {
 
     @Test
     void hltbWithoutIgdbId_hasNoMoreLink() {
-        GameEnrichment enrichment = new GameEnrichment(TTB, null, null, null, null, null, null, null, null, null, null);
+        GameEnrichment enrichment = new GameEnrichment(TTB, null, null, null, null, null, null, null, null, null, null, null);
 
         GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.empty());
 
@@ -136,7 +143,7 @@ class GameInfoV3ResponseTest {
     private static GameEnrichment withNewSources(GamePrices prices) {
         return new GameEnrichment(null, null, null, null, null, null, "620", prices,
                 new OpenCriticGame(7L, "Portal 2", 88, 95, "Mighty", 50, "https://opencritic.com/game/7/portal-2"),
-                new TwitchActivity("490377", "Portal 2", 3, 1234L, false, List.of(), List.of()), null);
+                new TwitchActivity("490377", "Portal 2", 3, 1234L, false, List.of(), List.of()), null, null);
     }
 
     @Test
@@ -222,7 +229,7 @@ class GameInfoV3ResponseTest {
             category("any", "Any%", "1484.083"), category("arb", "ARB", "1700"), category("100", "100%", "5000")));
 
     private static GameEnrichment withSpeedrun(SpeedrunEnrichment speedrun) {
-        return new GameEnrichment(null, null, null, null, null, null, null, null, null, null, speedrun);
+        return new GameEnrichment(null, null, null, null, null, null, null, null, null, null, speedrun, null);
     }
 
     @Test
@@ -324,5 +331,150 @@ class GameInfoV3ResponseTest {
         assertThat(noCategory.worldRecord()).isNull();
         assertThat(noCategory.personalBest().place()).isEqualTo(1);
         assertThat(GameInfoV3Response.notInGame().worldRecord()).isNull();
+    }
+
+    // ---------------------------------------------------------------- personal stats
+
+    private static Achievement unlocked(String id, String at, String rarity) {
+        return new Achievement(id, "Name " + id, "d", "icon", true, Instant.parse(at), new BigDecimal(rarity), null,
+                false);
+    }
+
+    private static final PlatformStats STEAM = new PlatformStats(Status.OK, "620", 7320L, 95L,
+            Instant.parse("2026-11-21T20:14:00Z"), AchievementSummary.of(List.of(
+                    unlocked("S1", "2026-11-01T10:00:00Z", "12.5"),
+                    new Achievement("S2", "n", "d", "i", false, null, null, null, false))),
+            null, Map.of());
+    private static final PlatformStats XBOX = new PlatformStats(Status.OK, "1144039928", 610L, null,
+            Instant.parse("2026-11-20T20:00:00Z"), AchievementSummary.of(List.of(
+                    unlocked("X1", "2026-11-10T10:00:00Z", "3.2"),
+                    unlocked("X2", "2026-11-12T10:00:00Z", "40"),
+                    new Achievement("X3", null, null, "i", false, null, null, 10, true))),
+            null, Map.of("gamerscore", 350, "gamerscoreTotal", 1000));
+    private static final PlatformStats RA = new PlatformStats(Status.OK, "228", null, null, null,
+            AchievementSummary.of(List.of(unlocked("1", "2026-11-15T10:00:00Z", "25.00"))), null,
+            Map.of("title", "Super Mario World", "console", "SNES", "playtime", 120, "points", 15,
+                    "pointsTotal", 40, "hardcoreUnlocked", 1, "hardcorePoints", 5, "award", "beaten-hardcore"));
+
+    private static GameInfoV3Response withStats(PlatformStats steam, PlatformStats xbox, PlatformStats ra,
+                                                GameBinding.SourceType detectedOn) {
+        GameEnrichment enrichment = new GameEnrichment(null, null, null, null, null, null, null, null, null, null,
+                null, PersonalStatsEnrichment.of(steam, xbox, ra, detectedOn));
+        return GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.of("72"));
+    }
+
+    @Test
+    void statsObjectsCarryTheirMoreLinks() {
+        JsonNode stats = MAPPER.readTree(MAPPER.writeValueAsString(withStats(STEAM, XBOX, RA,
+                GameBinding.SourceType.STEAM))).path("stats");
+
+        assertThat(stats.path("steam").path("status").asString()).isEqualTo("ok");
+        assertThat(stats.path("steam").path("appId").asString()).isEqualTo("620");
+        assertThat(stats.path("steam").path("playtimeMinutes").asLong()).isEqualTo(7320);
+        assertThat(stats.path("steam").path("achievements").path("unlocked").asInt()).isEqualTo(1);
+        assertThat(stats.path("steam").path("more").asString())
+                .isEqualTo(BASE + "/api/me/stats/steam/620?version=3");
+        assertThat(stats.path("xbox").path("gamerscore").path("earned").asInt()).isEqualTo(350);
+        assertThat(stats.path("xbox").path("gamerscore").path("total").asInt()).isEqualTo(1000);
+        assertThat(stats.path("xbox").path("more").asString())
+                .isEqualTo(BASE + "/api/me/stats/xbox/1144039928?version=3");
+        JsonNode ra = stats.path("retroachievements");
+        assertThat(ra.path("gameId").asInt()).isEqualTo(228);
+        assertThat(ra.path("title").asString()).isEqualTo("Super Mario World");
+        assertThat(ra.path("console").asString()).isEqualTo("SNES");
+        assertThat(ra.path("playtime").asInt()).isEqualTo(120);
+        assertThat(ra.path("points").path("earned").asInt()).isEqualTo(15);
+        assertThat(ra.path("points").path("total").asInt()).isEqualTo(40);
+        assertThat(ra.path("hardcore").path("unlocked").asInt()).isEqualTo(1);
+        assertThat(ra.path("hardcore").path("points").asInt()).isEqualTo(5);
+        assertThat(ra.path("award").asString()).isEqualTo("beaten-hardcore");
+        assertThat(ra.has("playtimeMinutes")).isFalse();
+        assertThat(ra.path("more").asString())
+                .isEqualTo(BASE + "/api/me/stats/retroachievements/228?version=3");
+        assertThat(stats.has("detectedOn")).isFalse();
+    }
+
+    @Test
+    void unavailableWithoutIdHasNoMoreLink() {
+        GameInfoV3Response response = withStats(null, PlatformStats.of(Status.UNAVAILABLE, null), null,
+                GameBinding.SourceType.STEAM);
+
+        assertThat(response.stats().xbox().status()).isEqualTo(Status.UNAVAILABLE);
+        assertThat(response.stats().xbox().more()).isNull();
+        assertThat(response.stats().steam()).isNull();
+    }
+
+    @Test
+    void summaryUsesTheDetectedPlatform() {
+        GameInfoV3Response response = withStats(STEAM, XBOX, RA, GameBinding.SourceType.XBOX);
+
+        assertThat(response.playtime()).isEqualTo(610L);
+        assertThat(response.achievements())
+                .isEqualTo(new GameInfoV3Response.AchievementsSummary("xbox", 2, 3));
+        JsonNode summary = MAPPER.readTree(MAPPER.writerWithView(GameInfoResponse.Summary.class)
+                .writeValueAsString(response));
+        assertThat(summary.path("playtime").asLong()).isEqualTo(610);
+        assertThat(summary.path("achievements").path("platform").asString()).isEqualTo("xbox");
+        assertThat(summary.path("achievements").path("unlocked").asInt()).isEqualTo(2);
+        assertThat(summary.path("achievements").path("total").asInt()).isEqualTo(3);
+        assertThat(summary.has("stats")).isFalse();
+    }
+
+    @Test
+    void summaryFallsBackToTheFirstOkPlatform() {
+        GameInfoV3Response response = withStats(PlatformStats.of(Status.NOT_OWNED, "620"), null, RA,
+                GameBinding.SourceType.MANUAL);
+
+        // RetroAchievements' play time is not in minutes: never the summary's
+        assertThat(response.playtime()).isNull();
+        assertThat(response.achievements())
+                .isEqualTo(new GameInfoV3Response.AchievementsSummary("retroachievements", 1, 1));
+    }
+
+    @Test
+    void anUnavailableDetectedPlatformFallsBackToTheFirstOkOne() {
+        GameInfoV3Response response = withStats(PlatformStats.of(Status.UNAVAILABLE, "620"), XBOX, RA,
+                GameBinding.SourceType.STEAM);
+
+        assertThat(response.playtime()).isEqualTo(610L);
+        assertThat(response.achievements())
+                .isEqualTo(new GameInfoV3Response.AchievementsSummary("xbox", 2, 3));
+    }
+
+    @Test
+    void lastAchievementIsTheLatestAcrossPlatforms() {
+        GameInfoV3Response response = withStats(STEAM, XBOX, RA, GameBinding.SourceType.STEAM);
+
+        assertThat(response.lastAchievement()).isEqualTo(new GameInfoV3Response.LastAchievement("retroachievements",
+                "Name 1", Instant.parse("2026-11-15T10:00:00Z"), new BigDecimal("25.00")));
+        JsonNode summary = MAPPER.readTree(MAPPER.writerWithView(GameInfoResponse.Summary.class)
+                .writeValueAsString(response));
+        assertThat(summary.path("lastAchievement").path("platform").asString()).isEqualTo("retroachievements");
+        assertThat(summary.path("lastAchievement").path("unlockedAt").asString()).isEqualTo("2026-11-15T10:00:00Z");
+    }
+
+    @Test
+    void privateSteamGivesNoSummaryNumbers() {
+        GameInfoV3Response detected = withStats(PlatformStats.of(Status.PRIVATE, "620"), null, null,
+                GameBinding.SourceType.STEAM);
+        GameInfoV3Response elsewhere = withStats(PlatformStats.of(Status.PRIVATE, "620"), null, null,
+                GameBinding.SourceType.MANUAL);
+
+        for (GameInfoV3Response response : List.of(detected, elsewhere)) {
+            assertThat(response.playtime()).isNull();
+            assertThat(response.achievements()).isNull();
+            assertThat(response.lastAchievement()).isNull();
+        }
+    }
+
+    @Test
+    void noStats_noObjectNorSummaryFields() {
+        GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, GameEnrichment.EMPTY, LINKS, Optional.of("72"));
+
+        assertThat(response.stats()).isNull();
+        assertThat(response.playtime()).isNull();
+        assertThat(response.achievements()).isNull();
+        assertThat(response.lastAchievement()).isNull();
+        assertThat(GameInfoV3Response.notInGame().stats()).isNull();
     }
 }

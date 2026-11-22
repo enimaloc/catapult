@@ -147,12 +147,15 @@ public class DebugRedactor {
         masked = FREE_TEXT_PARAM.matcher(masked).replaceAll(r -> isSecretName(r.group(1))
                 ? Matcher.quoteReplacement(r.group(1) + "=" + MASK)
                 : Matcher.quoteReplacement(r.group()));
+        masked = RA_KEY_IN_TEXT.matcher(masked).replaceAll(r -> Matcher.quoteReplacement(r.group(1) + MASK));
         return maskJsonByRegex(masked);
     }
 
     /** A parameter name not glued to a longer name ({@code monkey=} is not {@code key=}), its value up to a separator. */
     private static final Pattern FREE_TEXT_PARAM = Pattern.compile(
             "(?<![\\w.-])([A-Za-z_][\\w.-]*)=[^&\\s\"'#<>,;)\\]}]*");
+    /** The RetroAchievements key in a query string quoted in text; a bare {@code y=} (a coordinate) is left alone. */
+    private static final Pattern RA_KEY_IN_TEXT = Pattern.compile("(?i)([?&]y=)(?!\\[masqué])[^&\\s\"'#<>,;)\\]}]+");
     /** {@code Name:} as a header is written; what follows, up to the end of the line or a quote, is its value. */
     private static final Pattern HEADER_IN_TEXT = Pattern.compile("(?<![\\w.-])([A-Za-z][\\w-]*)[ \\t]*:[ \\t]*");
     /** An HTTP credential written with its scheme: {@code Bearer <token>}, {@code Basic <b64>}, {@code XBL3.0 x=…}. */
@@ -222,7 +225,8 @@ public class DebugRedactor {
                 continue;
             }
             String name = parts[i].substring(0, eq);
-            if (isSecretName(decode(name))) {
+            String decoded = decode(name);
+            if (isSecretName(decoded) || "y".equalsIgnoreCase(decoded)) {
                 parts[i] = name + "=" + MASK;
             }
         }

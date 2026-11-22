@@ -1,5 +1,5 @@
 /**
- * Handlers for the Steam/Minecraft/Battle.net/Ankama/Epic/Speedrun.com/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
+ * Handlers for the Steam/Minecraft/Battle.net/Ankama/Epic/Speedrun.com/RetroAchievements/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
  * pre-rendered and only toggled via the `hidden` class (spa:if/spa:switch, see
  * channel.html) instead of being created/destroyed per SSE event, so handlers only
  * need attaching once, at render — no refresh() either: the SSE echo updates the cards.
@@ -77,7 +77,8 @@ window.CatapultConnections = (function () {
     // Saves a speedrun.com name or key through `url`. Unlike CatapultChannel.postJson, a refusal says why: speedrun.com
     // does not know the name or refuses the key (400), or cannot be asked (503). The card then follows from
     // SpeedrunAccountChangedEvent. The key's field is emptied once it is saved: it is never shown again.
-    async function saveSpeedrun(url, body, input, refusedLabel) {
+    // RetroAchievements' name and key are saved the same way, with their own unavailable label.
+    async function saveSpeedrun(url, body, input, refusedLabel, unavailableLabel) {
         const { showError, actionFailed, unreachable } = CatapultChannel;
         if (!input.value.trim()) return;
         let response;
@@ -91,8 +92,8 @@ window.CatapultConnections = (function () {
         if (response.status === 400) {
             showError(pageLabel(...refusedLabel));
         } else if (response.status === 503) {
-            showError(pageLabel("labelSpeedrunUnavailable",
-                "speedrun.com cannot be reached right now: try again later."));
+            showError(pageLabel(...(unavailableLabel || ["labelSpeedrunUnavailable",
+                "speedrun.com cannot be reached right now: try again later."])));
         } else {
             showError(actionFailed(response.status));
         }
@@ -190,6 +191,26 @@ window.CatapultConnections = (function () {
             input.value = "";
         });
         on("speedrun-key-delete-btn", "click", () => postJson(`${baseUrl}/settings/speedrun/api-key/delete`, {}));
+
+        // RetroAchievements: a declared name and an optional personal web API key, each checked on saving.
+        const raUnavailable = ["labelRetroachievementsUnavailable",
+            "RetroAchievements cannot be reached right now: try again later."];
+        on("retroachievements-username-save-btn", "click", () => {
+            const input = document.getElementById("retroachievements-username-input");
+            return saveSpeedrun(`${baseUrl}/settings/retroachievements/username`, { username: input.value.trim() },
+                input, ["labelRetroachievementsRefusedUsername", "RetroAchievements does not know this username"],
+                raUnavailable);
+        });
+        on("retroachievements-username-delete-btn", "click", () =>
+            postJson(`${baseUrl}/settings/retroachievements/username/delete`, {}));
+        on("retroachievements-key-save-btn", "click", async () => {
+            const input = document.getElementById("retroachievements-key-input");
+            await saveSpeedrun(`${baseUrl}/settings/retroachievements/api-key`, { apiKey: input.value.trim() }, input,
+                ["labelRetroachievementsRefusedKey", "RetroAchievements refused this API key"], raUnavailable);
+            input.value = "";
+        });
+        on("retroachievements-key-delete-btn", "click", () =>
+            postJson(`${baseUrl}/settings/retroachievements/api-key/delete`, {}));
 
         // OBS: connecting and disconnecting both save the whole form, only `enabled` differs.
         // An empty password field means "keep the stored one" (it's never sent back to the page),

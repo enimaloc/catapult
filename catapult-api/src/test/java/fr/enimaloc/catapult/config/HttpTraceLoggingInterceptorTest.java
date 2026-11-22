@@ -84,6 +84,15 @@ class HttpTraceLoggingInterceptorTest {
     }
 
     @Test
+    void raKeyParamIsMasked() {
+        assertThat(HttpTraceLoggingInterceptor.masked(
+                URI.create("https://retroachievements.org/API/API_GetUserProfile.php?u=bob&y=SECRET")))
+                .isEqualTo("https://retroachievements.org/API/API_GetUserProfile.php?u=bob&y=***");
+        assertThat(HttpTraceLoggingInterceptor.masked(URI.create("https://api.example/x?ay=1&Y=2")))
+                .isEqualTo("https://api.example/x?ay=1&Y=***");
+    }
+
+    @Test
     void credentialQueryParams_areMaskedWhenTheCallFails() {
         MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET,
                 URI.create("https://api.example/x?key=s1"));

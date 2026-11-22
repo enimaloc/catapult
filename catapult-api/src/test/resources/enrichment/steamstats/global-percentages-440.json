@@ -1,0 +1,26 @@
+{
+  "achievementpercentages": {
+    "achievements": [
+      {
+        "name": "TF_SCOUT_LONG_DISTANCE_RUNNER",
+        "percent": "49.4"
+      },
+      {
+        "name": "TF_HEAVY_DAMAGE_TAKEN",
+        "percent": "39.8"
+      },
+      {
+        "name": "TF_GET_CONSECUTIVEKILLS_NODEATHS",
+        "percent": "36.1"
+      },
+      {
+        "name": "TF_PYRO_CAMP_POSITION",
+        "percent": "30.1"
+      },
+      {
+        "name": "TF_BURN_PLAYERSINMINIMUMTIME",
+        "percent": "28.2"
+      }
+    ]
+  }
+}

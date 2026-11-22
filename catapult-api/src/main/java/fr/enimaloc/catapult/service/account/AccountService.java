@@ -22,6 +22,7 @@ import fr.enimaloc.catapult.service.twitch.EventSubService;
 import fr.enimaloc.catapult.service.twitch.TwitchChatService;
 import fr.enimaloc.catapult.service.xbox.XboxUserTokenService;
 import lombok.RequiredArgsConstructor;
+import fr.enimaloc.catapult.service.enrichment.EnrichmentCache;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -54,6 +55,7 @@ public class AccountService {
     private final BotToggleService botToggleService;
     private final TwitchChatService twitchChatService;
     private final EventSubService twitchEventSubService;
+    private final EnrichmentCache enrichmentCache;
 
     // =========================================================
     // Two-step deletion
@@ -99,6 +101,7 @@ public class AccountService {
         catapultCategoryChangeStateRepository.deleteByUser(account);
         twitchatActionTokenRepository.deleteByUserId(account.getId());
         twitchatEventActionService.deleteAllOfUser(account);
+        enrichmentCache.evictUser(account.getId());
         // No official revocation endpoint for these providers — database deletion only
 //        for (OAuthToken.Provider p : List.of(OAuthToken.Provider.XBOX, OAuthToken.Provider.BATTLENET)) {
 //            oAuthTokenRepository.findByUserAndProvider(account, p)
@@ -134,6 +137,10 @@ public class AccountService {
         if (provider == OAuthToken.Provider.STEAM) {
             account.setSteamId(null);
             userAccountRepository.save(account);
+        }
+        if (provider == OAuthToken.Provider.STEAM || provider == OAuthToken.Provider.XBOX) {
+            // the stats read through the link are personal: none of them outlives it
+            enrichmentCache.evictUser(account.getId());
         }
         if (provider == OAuthToken.Provider.XBOX) {
             xboxUserTokenService.ifPresent(service -> service.evict(account.getId()));

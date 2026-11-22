@@ -53,6 +53,7 @@ public class ApiRelayController {
             "/oauth2/**", "/login/oauth2/**", "/api/connect/steam/callback", "/api/game/**", "/api/user/**",
             "/api/me/game", "/api/me/game/**", "/api/me/bindings/**",
             "/api/me/custom-bindings", "/api/me/custom-bindings/**", "/api/me/drops", "/api/me/speedrun",
+            "/api/me/stats", "/api/me/stats/**",
             "/api/games/**",
             "/api/v3/api-docs", "/api/v3/api-docs/**",
     };
@@ -92,6 +93,7 @@ public class ApiRelayController {
             "/oauth2/**", "/login/oauth2/**", "/api/connect/steam/callback", "/api/game/**", "/api/user/**",
             "/api/me/game", "/api/me/game/**", "/api/me/bindings/**",
             "/api/me/custom-bindings", "/api/me/custom-bindings/**", "/api/me/drops", "/api/me/speedrun",
+            "/api/me/stats", "/api/me/stats/**",
             "/api/games/**",
             "/api/v3/api-docs", "/api/v3/api-docs/**",
     })

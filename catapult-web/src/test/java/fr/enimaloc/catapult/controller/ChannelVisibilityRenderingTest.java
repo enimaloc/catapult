@@ -975,6 +975,44 @@ class ChannelVisibilityRenderingTest {
         assertThat(speedrunPage(null)).doesNotContain("data-conn=\"speedrun\"").doesNotContain("speedrun-key-input");
     }
 
+    private String retroAchievementsPage(fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData ra) throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null, new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null, null, null, null, null, null,
+                null, null, null, ra));
+        return mvc.perform(get("/spa/channel/enimaloc").locale(java.util.Locale.ENGLISH))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    @Test
+    void retroAchievementsCardShowsTheAccountAndNeverRendersTheKey() throws Exception {
+        String html = retroAchievementsPage(new fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData("Bob",
+                "https://retroachievements.org/user/Bob", true, true, false));
+
+        String card = html.substring(html.indexOf("data-conn=\"retroachievements\""));
+        assertThat(card).contains("<span>RetroAchievements</span>").contains("Account:").contains("Bob")
+                .contains("RetroAchievements refused your API key").contains("API key saved.")
+                .contains("href=\"https://retroachievements.org/settings\"")
+                .contains("data-value=\"textContent:RetroAchievementsAccountChangedEvent.declaredUsername\"");
+        assertThat(openingTagForId(html, "retroachievements-username-input"))
+                .contains("placeholder=\"RetroAchievements username\"").contains("value=\"Bob\"");
+        assertThat(openingTagForId(html, "retroachievements-key-input")).contains("type=\"password\"")
+                .contains("autocomplete=\"new-password\"").contains("hidden").contains("value=\"\"");
+        assertThat(openingTagForId(html, "retroachievements-key-delete-btn")).doesNotContain("hidden");
+    }
+
+    @Test
+    void retroAchievementsCardWithoutAnAccountSaysSo_andOtherViewersHaveNoCard() throws Exception {
+        String html = retroAchievementsPage(new fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData(null, null, false, false, false));
+
+        assertThat(html).contains("No account: declare your RetroAchievements username.")
+                .contains("Catapult has no shared key for now");
+        assertThat(retroAchievementsPage(null)).doesNotContain("data-conn=\"retroachievements\"")
+                .doesNotContain("retroachievements-key-input");
+    }
+
     private String epicPage(fr.enimaloc.catapult.common.dto.channel.EpicData epic) throws Exception {
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
                 new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),

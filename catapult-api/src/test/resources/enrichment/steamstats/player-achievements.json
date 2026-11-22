@@ -1,0 +1,7 @@
+{"playerstats":{"steamID":"76561198000000000","gameName":"Team Fortress 2","achievements":[
+ {"apiname":"TF_SCOUT_LONG_DISTANCE_RUNNER","achieved":1,"unlocktime":1763000000,"name":"Long Distance Runner","description":"Run a marathon"},
+ {"apiname":"TF_HEAVY_DAMAGE_TAKEN","achieved":1,"unlocktime":1763500000,"name":"Tank","description":"Take damage"},
+ {"apiname":"TF_GET_CONSECUTIVEKILLS_NODEATHS","achieved":1,"unlocktime":1763600000,"name":"Streak","description":"Kill streak"},
+ {"apiname":"TF_PYRO_CAMP_POSITION","achieved":0,"unlocktime":0,"name":"Camper","description":"Camp"},
+ {"apiname":"TF_BURN_PLAYERSINMINIMUMTIME","achieved":0,"unlocktime":0,"name":"Fast burn","description":"Burn fast"}
+],"success":true}}

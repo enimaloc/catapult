@@ -108,6 +108,8 @@ class ChannelDashboardAssemblerTest {
             mock(fr.enimaloc.catapult.service.epic.EpicLinkStateService.class);
     private final fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService speedrunAccounts =
             mock(fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService.class);
+    private final fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService raAccounts =
+            mock(fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService.class);
     private final MinecraftLinkStateService minecraftStates =
             new MinecraftLinkStateService(minecraft, minecraftGate, minecraftAccounts);
     private final TwitchatWidgetSettingsService twitchat = mock(TwitchatWidgetSettingsService.class);
@@ -139,7 +141,7 @@ class ChannelDashboardAssemblerTest {
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumService.class)), categoryCache,
-                streamTitle, dropsGate, dropsCatalog, speedrunAccounts);
+                streamTitle, dropsGate, dropsCatalog, speedrunAccounts, raAccounts);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }
@@ -547,6 +549,25 @@ class ChannelDashboardAssemblerTest {
                     .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
                     .containsExactly("declaredUsername", "hasApiKey", "keyInvalid", "keyAccountName", "resolvedName",
                             "resolvedUrl", "resolvedSource");
+        }
+
+        @Test
+        void dashboardCarriesTheRetroAchievementsAccountForTheOwnerOnly() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData("Bob",
+                    "https://retroachievements.org/user/Bob", true, false, true);
+            when(raAccounts.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).retroAchievements())
+                    .isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).retroAchievements()).isNull();
+            verify(raAccounts, never()).data(moderator);
+        }
+
+        @Test
+        void retroAchievementsDashboardDataNeverCarriesTheKey() {
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("username", "profileUrl", "hasApiKey", "keyInvalid", "poolAvailable");
         }
 
         @Test

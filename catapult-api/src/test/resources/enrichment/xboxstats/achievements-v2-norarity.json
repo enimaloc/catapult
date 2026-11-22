@@ -1,0 +1,77 @@
+{
+  "achievements": [
+    {
+      "id": "1",
+      "name": "First Drive",
+      "description": "Drive a car.",
+      "lockedDescription": "Drive a car.",
+      "isSecret": false,
+      "progressState": "Achieved",
+      "progression": {
+        "timeUnlocked": "2026-11-01T10:00:00.0000000Z"
+      },
+      "mediaAssets": [
+        {
+          "type": "Icon",
+          "url": "https://images.example/1.png"
+        }
+      ],
+      "rewards": [
+        {
+          "type": "Gamerscore",
+          "value": "10"
+        }
+      ]
+    },
+    {
+      "id": "2",
+      "name": "Rare One",
+      "description": "Do the rare thing.",
+      "lockedDescription": "Do the rare thing.",
+      "isSecret": false,
+      "progressState": "Achieved",
+      "progression": {
+        "timeUnlocked": "2026-11-05T10:00:00.0000000Z"
+      },
+      "mediaAssets": [
+        {
+          "type": "Icon",
+          "url": "https://images.example/2.png"
+        }
+      ],
+      "rewards": [
+        {
+          "type": "Gamerscore",
+          "value": "50"
+        }
+      ]
+    },
+    {
+      "id": "3",
+      "name": "Hidden Name",
+      "description": "Hidden description.",
+      "lockedDescription": "Secret",
+      "isSecret": true,
+      "progressState": "NotStarted",
+      "progression": {
+        "timeUnlocked": "0001-01-01T00:00:00.0000000Z"
+      },
+      "mediaAssets": [
+        {
+          "type": "Icon",
+          "url": "https://images.example/3.png"
+        }
+      ],
+      "rewards": [
+        {
+          "type": "Gamerscore",
+          "value": "25"
+        }
+      ]
+    }
+  ],
+  "pagingInfo": {
+    "continuationToken": null,
+    "totalRecords": 3
+  }
+}

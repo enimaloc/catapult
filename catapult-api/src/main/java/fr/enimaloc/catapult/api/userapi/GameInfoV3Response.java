@@ -1,19 +1,27 @@
 package fr.enimaloc.catapult.api.userapi;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonView;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
+import fr.enimaloc.catapult.service.enrichment.PersonalStatsEnrichment;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
 import fr.enimaloc.catapult.service.enrichment.prices.GamePrices;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
+import fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsStatsService;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunEnrichment;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunIdentity;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRecords;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunRun;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Achievement;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.AchievementSummary;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.PlatformStats;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Status;
 import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivity;
 import fr.enimaloc.catapult.service.enrichment.twitch.TwitchClips;
 import fr.enimaloc.catapult.service.enrichment.twitch.TwitchLives;
@@ -26,15 +34,17 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * The v3 aggregated game info: the v2 platform objects ({@link GameInfoResponse}, kept as {@code base}) plus the
  * enrichment ones (HowLongToBeat, ProtonDB, SteamGridDB, Steam Deck, PCGamingWiki, store prices, OpenCritic, Twitch
- * activity, speedrun.com), each a short projection with a
+ * activity, speedrun.com) and the member's own stats (Steam, Xbox, RetroAchievements), each a short projection with a
  * "more" link to its detail route, null when unavailable. The {@link GameInfoResponse.Summary} view adds to the v2
  * derived fields {@code timeToBeat}, {@code protonTier}, {@code deckStatus}, {@code coverUrl}, {@code trailer}, {@code price},
- * {@code criticScore}, {@code liveViewers}, {@code worldRecord} and {@code personalBest};
- * the enrichment objects never feed {@code name} or {@code description}.
+ * {@code criticScore}, {@code liveViewers}, {@code worldRecord}, {@code personalBest}, {@code playtime},
+ * {@code achievements} and {@code lastAchievement}; the enrichment objects never feed {@code name} or
+ * {@code description}. The stats are personal: this answer is only ever served under {@code /api/me}.
  */
 public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boolean inGame,
                                  GameInfoResponse.IgdbObject igdb, GameInfoResponse.SteamObject steam,
@@ -43,13 +53,14 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
                                  SteamGridDbObject steamgriddb, SteamDeckObject steamDeck,
                                  PcGamingWikiObject pcgamingwiki, PricesObject prices,
                                  OpenCriticObject opencritic, TwitchObject twitch, SpeedrunObject speedrun,
+                                 StatsObject stats,
                                  @JsonView(GameInfoResponse.Summary.class) Trailer trailer,
                                  @JsonIgnore GameInfoResponse base) {
 
     /** The answer while nothing is detected: inGame=false, every object null. */
     public static GameInfoV3Response notInGame() {
         return new GameInfoV3Response(false, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, new GameInfoResponse(false));
+                null, null, null, new GameInfoResponse(false));
     }
 
     /**
@@ -82,6 +93,7 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
                 OpenCriticObject.of(enrichment.opencritic(), links),
                 TwitchObject.of(enrichment.twitch(), links, language),
                 SpeedrunObject.of(enrichment.speedrun(), links),
+                StatsObject.of(enrichment.stats(), links),
                 Trailer.of(enrichment.trailer()),
                 base);
     }
@@ -202,7 +214,233 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
                 .orElse(null);
     }
 
+    /**
+     * The member's play time in minutes on the main platform of the stats (the one the game was detected on unless
+     * it is unavailable, else the first that answered {@code ok} among Steam, Xbox, RetroAchievements); null if
+     * unknown.
+     */
+    @JsonView(GameInfoResponse.Summary.class)
+    public Long playtime() {
+        PlatformObject main = stats == null ? null : stats.main();
+        return main == null ? null : main.playtimeMinutes();
+    }
+
+    /** How many achievements the member unlocked on the main platform of the stats, out of how many; null if unknown. */
+    @JsonView(GameInfoResponse.Summary.class)
+    public AchievementsSummary achievements() {
+        PlatformObject main = stats == null ? null : stats.main();
+        if (main == null || main.achievements() == null) {
+            return null;
+        }
+        return new AchievementsSummary(main.platform(), main.achievements().unlocked(), main.achievements().total());
+    }
+
+    /** The member's latest unlocked achievement on the game, every platform taken together; null if none is known. */
+    @JsonView(GameInfoResponse.Summary.class)
+    public LastAchievement lastAchievement() {
+        if (stats == null) {
+            return null;
+        }
+        LastAchievement latest = null;
+        for (PlatformObject platform : stats.platforms()) {
+            if (platform.achievements() == null || platform.achievements().recent() == null) {
+                continue;
+            }
+            for (Achievement a : platform.achievements().recent()) {
+                if (a.unlockedAt() != null && (latest == null || a.unlockedAt().isAfter(latest.unlockedAt()))) {
+                    latest = new LastAchievement(platform.platform(), a.name(), a.unlockedAt(), a.rarity());
+                }
+            }
+        }
+        return latest;
+    }
+
     // ---------------------------------------------------------------- objects
+
+    /** The summary's achievements: the platform they were counted on, how many are unlocked, out of how many. */
+    public record AchievementsSummary(@JsonView(GameInfoResponse.Summary.class) String platform,
+                                      @JsonView(GameInfoResponse.Summary.class) int unlocked,
+                                      @JsonView(GameInfoResponse.Summary.class) int total) {
+    }
+
+    /** The summary's latest achievement: its platform, name (null for a secret one), date and rarity in percent. */
+    public record LastAchievement(@JsonView(GameInfoResponse.Summary.class) String platform,
+                                  @JsonView(GameInfoResponse.Summary.class) String name,
+                                  @JsonView(GameInfoResponse.Summary.class) Instant unlockedAt,
+                                  @JsonView(GameInfoResponse.Summary.class) BigDecimal rarity) {
+    }
+
+    /** What the summary reads of one platform's stats. */
+    interface PlatformObject {
+        /** {@code steam}, {@code xbox} or {@code retroachievements}. */
+        String platform();
+
+        Status status();
+
+        Long playtimeMinutes();
+
+        AchievementSummary achievements();
+    }
+
+    /**
+     * The member's own stats on the game: Steam, Xbox and RetroAchievements, each null when the platform does not
+     * apply, each with a {@code status} ({@code ok}, {@code private}, {@code not_owned}, {@code no_achievements},
+     * {@code unsupported}, {@code unavailable}) and a "more" link to its full achievement list. Personal data.
+     */
+    public record StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements,
+                              @JsonIgnore GameBinding.SourceType detectedOn) {
+
+        static StatsObject of(PersonalStatsEnrichment s, MoreLinks links) {
+            if (s == null) {
+                return null;
+            }
+            return new StatsObject(SteamStats.of(s.steam(), links), XboxStats.of(s.xbox(), links),
+                    RaStats.of(s.retroachievements(), links), s.detectedOn());
+        }
+
+        List<PlatformObject> platforms() {
+            return Stream.<PlatformObject>of(steam, xbox, retroachievements).filter(p -> p != null).toList();
+        }
+
+        /**
+         * The platform the game was detected on (unless it is {@code unavailable}), else the first that answered
+         * {@code ok}.
+         */
+        PlatformObject main() {
+            PlatformObject detected = detectedOn == GameBinding.SourceType.STEAM ? steam
+                    : detectedOn == GameBinding.SourceType.XBOX ? xbox : null;
+            if (detected != null && detected.status() != Status.UNAVAILABLE) {
+                return detected;
+            }
+            return platforms().stream().filter(p -> p.status() == Status.OK).findFirst().orElse(null);
+        }
+    }
+
+    /**
+     * The member's play time and achievements on a Steam app; play times in minutes. {@code all} (every
+     * achievement) is only on the detail route.
+     */
+    public record SteamStats(Status status, String appId, Long playtimeMinutes, Long playtimeTwoWeeksMinutes,
+                             Instant lastPlayed, AchievementSummary achievements,
+                             @JsonInclude(JsonInclude.Include.NON_NULL) List<Achievement> all, String more)
+            implements GameInfoResponse.HasMore, PlatformObject {
+        static SteamStats of(PlatformStats p, MoreLinks links) {
+            return of(p, links, false);
+        }
+
+        /** The projection of {@code p}; with {@code detail}, also every achievement. */
+        static SteamStats of(PlatformStats p, MoreLinks links, boolean detail) {
+            return p == null ? null : new SteamStats(p.status(), p.id(), p.playtimeMinutes(),
+                    p.playtimeTwoWeeksMinutes(), p.lastPlayed(), p.achievements(), detail ? p.all() : null,
+                    p.id() == null ? null : links.toMe(ApiV2.ME_STATS_PATH + "/steam/" + p.id()));
+        }
+
+        @Override
+        public String platform() {
+            return "steam";
+        }
+    }
+
+    /**
+     * The member's play time (minutes), gamerscore and achievements on an Xbox title. {@code all} (every
+     * achievement) is only on the detail route.
+     */
+    public record XboxStats(Status status, String titleId, Long playtimeMinutes, Instant lastPlayed,
+                            XboxGamerscore gamerscore, AchievementSummary achievements,
+                            @JsonInclude(JsonInclude.Include.NON_NULL) List<Achievement> all, String more)
+            implements GameInfoResponse.HasMore, PlatformObject {
+        static XboxStats of(PlatformStats p, MoreLinks links) {
+            return of(p, links, false);
+        }
+
+        /** The projection of {@code p}; with {@code detail}, also every achievement. */
+        static XboxStats of(PlatformStats p, MoreLinks links, boolean detail) {
+            if (p == null) {
+                return null;
+            }
+            Integer earned = integer(p.extra(), "gamerscore");
+            Integer total = integer(p.extra(), "gamerscoreTotal");
+            return new XboxStats(p.status(), p.id(), p.playtimeMinutes(), p.lastPlayed(),
+                    earned == null && total == null ? null : new XboxGamerscore(earned, total), p.achievements(),
+                    detail ? p.all() : null,
+                    p.id() == null ? null : links.toMe(ApiV2.ME_STATS_PATH + "/xbox/" + p.id()));
+        }
+
+        @Override
+        public String platform() {
+            return "xbox";
+        }
+    }
+
+    /** An Xbox gamerscore: earned on the title, out of its total. */
+    public record XboxGamerscore(Integer earned, Integer total) {
+    }
+
+    /**
+     * The member's progress in a RetroAchievements game: points, hardcore unlocks, highest award ({@code award},
+     * as RetroAchievements names it) and achievements. {@code playtime} is RetroAchievements' own number, its unit
+     * not verified yet (so never in the summary's minutes). {@code all} (every achievement) is only on the detail
+     * route.
+     */
+    public record RaStats(Status status, Integer gameId, String title, String console, String iconUrl,
+                          Integer playtime, Instant lastPlayed, RaPoints points, RaHardcore hardcore, String award,
+                          AchievementSummary achievements,
+                          @JsonInclude(JsonInclude.Include.NON_NULL) List<Achievement> all, String more)
+            implements GameInfoResponse.HasMore, PlatformObject {
+        static RaStats of(PlatformStats p, MoreLinks links) {
+            return of(p, links, false);
+        }
+
+        /** The projection of {@code p}; with {@code detail}, also every achievement. */
+        static RaStats of(PlatformStats p, MoreLinks links, boolean detail) {
+            if (p == null) {
+                return null;
+            }
+            Map<String, Object> extra = p.extra() == null ? Map.of() : p.extra();
+            Integer earned = integer(extra, RetroAchievementsStatsService.POINTS);
+            Integer total = integer(extra, RetroAchievementsStatsService.POINTS_TOTAL);
+            Integer hardcoreUnlocked = integer(extra, RetroAchievementsStatsService.HARDCORE_UNLOCKED);
+            Integer hardcorePoints = integer(extra, RetroAchievementsStatsService.HARDCORE_POINTS);
+            return new RaStats(p.status(), p.id() == null ? null : Integer.valueOf(p.id()),
+                    text(extra, RetroAchievementsStatsService.TITLE),
+                    text(extra, RetroAchievementsStatsService.CONSOLE),
+                    text(extra, RetroAchievementsStatsService.ICON_URL),
+                    integer(extra, RetroAchievementsStatsService.PLAYTIME), p.lastPlayed(),
+                    earned == null && total == null ? null : new RaPoints(earned, total),
+                    hardcoreUnlocked == null && hardcorePoints == null ? null
+                            : new RaHardcore(hardcoreUnlocked, hardcorePoints),
+                    text(extra, RetroAchievementsStatsService.AWARD), p.achievements(), detail ? p.all() : null,
+                    p.id() == null ? null : links.toMe(ApiV2.ME_STATS_PATH + "/retroachievements/" + p.id()));
+        }
+
+        @Override
+        public String platform() {
+            return "retroachievements";
+        }
+
+        /** RetroAchievements' play time is not in minutes (see {@link RaStats}). */
+        @Override
+        @JsonIgnore
+        public Long playtimeMinutes() {
+            return null;
+        }
+    }
+
+    /** RetroAchievements points: earned in the game, out of its total. */
+    public record RaPoints(Integer earned, Integer total) {
+    }
+
+    /** RetroAchievements hardcore progress: achievements unlocked in hardcore mode and their points. */
+    public record RaHardcore(Integer unlocked, Integer points) {
+    }
+
+    private static Integer integer(Map<String, Object> extra, String key) {
+        return extra != null && extra.get(key) instanceof Number n ? n.intValue() : null;
+    }
+
+    private static String text(Map<String, Object> extra, String key) {
+        return extra != null && extra.get(key) instanceof String t ? t : null;
+    }
 
     /** The summary's world record: the main category, its time in seconds and every runner of a tie. */
     public record WorldRecord(@JsonView(GameInfoResponse.Summary.class) String category,

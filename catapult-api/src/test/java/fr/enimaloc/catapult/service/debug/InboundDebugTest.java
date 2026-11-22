@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentCache;
 import fr.enimaloc.catapult.site.SiteRoles;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fr.enimaloc.catapult.api.connect.ApiSteamConnectController;
@@ -226,7 +227,7 @@ class InboundDebugTest {
                 .andRespond(withSuccess("is_valid:true\n", MediaType.TEXT_PLAIN));
         SteamOpenIdLinkService links = new SteamOpenIdLinkService(accounts,
                 mock(ApplicationEventPublisher.class), mock(ChannelEventPublisher.class), builder.build(),
-                new DebugRecording(registry, realRecorder()));
+                new DebugRecording(registry, realRecorder()), mock(EnrichmentCache.class));
         ReflectionTestUtils.setField(links, "apiBaseUrl", "http://api.test");
         ApiSteamConnectController controller = new ApiSteamConnectController(links);
         ReflectionTestUtils.setField(controller, "webBaseUrl", "http://web.test");
