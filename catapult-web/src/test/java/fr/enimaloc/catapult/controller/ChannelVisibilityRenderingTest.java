@@ -1013,6 +1013,41 @@ class ChannelVisibilityRenderingTest {
                 .doesNotContain("retroachievements-key-input");
     }
 
+    private String blizzardPage(fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData blizzard) throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null, new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, blizzard));
+        return mvc.perform(get("/spa/channel/enimaloc").locale(java.util.Locale.ENGLISH))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    @Test
+    void blizzardCardShowsTheSettingsAndOnlyOffersTheImportWhenAvailable() throws Exception {
+        var imported = new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(true, "eu", true,
+                List.of(new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData.WowCharacterOption(
+                        "eu:1001", "Thrall")), "eu:1001", true, java.time.Instant.parse("2026-11-20T10:00:00Z"));
+        String html = blizzardPage(imported);
+
+        String card = html.substring(html.indexOf("data-conn=\"blizzard-stats\""));
+        assertThat(card).contains("<span>Blizzard stats</span>").contains("Battle.net region")
+                .contains("Main character").contains("Imported on").contains("2026-11-20").contains("Thrall")
+                .contains("Import again").contains("Forget my characters")
+                .contains("Catapult does not keep the Blizzard authorization");
+        assertThat(openingTagForId(html, "blizzard-reimport-btn")).doesNotContain("hidden");
+        assertThat(openingTagForId(html, "blizzard-import-btn")).contains("hidden");
+
+        String off = blizzardPage(new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(true, "eu", false,
+                List.of(), null, false));
+        assertThat(openingTagForId(off, "blizzard-import-btn")).contains("hidden");
+        assertThat(openingTagForId(off, "blizzard-reimport-btn")).contains("hidden");
+
+        assertThat(blizzardPage(null)).doesNotContain("data-conn=\"blizzard-stats\"")
+                .doesNotContain("blizzard-import-btn");
+    }
+
     private String epicPage(fr.enimaloc.catapult.common.dto.channel.EpicData epic) throws Exception {
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
                 new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),

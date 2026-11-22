@@ -142,6 +142,21 @@ class ChannelEventStreamControllerTest {
     }
 
     @Test
+    void theBlizzardSettingsGoToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent("enimaloc", true, "eu", true, true, "eu:424242", "2026-11-20", true);
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:BlizzardAccountChangedEvent",
+                "eu:424242");
+        assertThat(moderator.getResponse().getContentAsString())
+                .doesNotContain("BlizzardAccountChangedEvent").doesNotContain("eu:424242");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
+
+    @Test
     void theRetroAchievementsAccountGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
         MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
         MvcResult moderator = subscribe("enimaloc", member("a-moderator"));

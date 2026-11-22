@@ -301,6 +301,9 @@ describe("channel-connections", () => {
               <input id="retroachievements-key-input" value=" abc123 ">
               <button id="retroachievements-key-save-btn"></button>
               <button id="retroachievements-key-delete-btn"></button>
+              <select id="blizzard-region-select"><option value="eu">EU</option><option value="us">US</option></select>
+              <select id="blizzard-main-select"><option value="eu:1001">Thrall</option><option value="us:77">Jaina</option></select>
+              <button id="blizzard-forget-btn"></button>
               <button id="epic-resend-btn"></button>
               <button id="epic-disconnect-btn"></button>
               <input id="obs-host" value="10.0.0.2">
@@ -575,6 +578,71 @@ describe("channel-connections", () => {
                 ["/channel/enimaloc/ankama/resend", {}],
                 ["/channel/enimaloc/ankama/disconnect", {}],
             ]);
+        });
+    });
+
+    describe("the Blizzard stats", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+        const pick = (id, value) => {
+            const select = document.getElementById(id);
+            select.value = value;
+            select.dispatchEvent(new Event("change"));
+            return flush();
+        };
+
+        it("saves the region as picked", async () => {
+            await pick("blizzard-region-select", "us");
+
+            expect(posts()).toEqual([["/channel/enimaloc/settings/blizzard/region", { region: "us" }]]);
+        });
+
+        it("saves the main character as its region and numeric id", async () => {
+            await pick("blizzard-main-select", "us:77");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/blizzard/wow-main", { region: "us", characterId: 77 }]]);
+        });
+
+        it("forgets the characters with a post", async () => {
+            await click("#blizzard-forget-btn");
+
+            expect(posts()).toEqual([["/channel/enimaloc/settings/blizzard/wow-characters/delete", {}]]);
+        });
+
+        it.each([
+            ["battlenet_stats_unavailable", "The Blizzard import is not available for now: try again later."],
+            ["battlenet_stats_mismatch",
+                "This is not the Battle.net account linked to Catapult: sign in with the same account."],
+            ["battlenet_stats_failed", "Importing your characters failed: try again later."],
+        ])("tells an import refused with %s once, and takes it off the address", (code, text) => {
+            history.replaceState(null, "", `/channel/enimaloc?error=${code}#integrations`);
+
+            render();
+            render();
+
+            expect(snackbars()).toEqual([text]);
+            expect(location.pathname + location.search + location.hash).toBe("/channel/enimaloc#integrations");
+        });
+
+        it("tells a finished import once, in the page's language", () => {
+            document.body.dataset.labelBlizzardStatsDone = "Importe";
+            history.replaceState(null, "", "/channel/enimaloc?imported=wow#integrations");
+
+            render();
+            render();
+
+            expect(snackbars()).toEqual(["Importe"]);
+            expect(location.search).toBe("");
+            delete document.body.dataset.labelBlizzardStatsDone;
+        });
+
+        it("leaves any other imported value alone", () => {
+            history.replaceState(null, "", "/channel/enimaloc?imported=other#integrations");
+
+            render();
+
+            expect(snackbars()).toEqual([]);
+            expect(location.search).toBe("?imported=other");
         });
     });
 

@@ -1,5 +1,5 @@
 /**
- * Handlers for the Steam/Minecraft/Battle.net/Ankama/Epic/Speedrun.com/RetroAchievements/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
+ * Handlers for the Steam/Minecraft/Battle.net/Ankama/Epic/Speedrun.com/RetroAchievements/Blizzard stats/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
  * pre-rendered and only toggled via the `hidden` class (spa:if/spa:switch, see
  * channel.html) instead of being created/destroyed per SSE event, so handlers only
  * need attaching once, at render — no refresh() either: the SSE echo updates the cards.
@@ -104,16 +104,28 @@ window.CatapultConnections = (function () {
         epic_full: ["labelEpicFull", "Every Catapult Epic Games account is full for now: linking will be possible again soon."],
         epic_already_linked: ["labelEpicAlreadyLinked", "This Epic Games account is already linked to another Catapult channel"],
         epic_unavailable: ["labelEpicUnavailable", "Epic Games linking is not available for now: try again later."],
+        // The World of Warcraft import (Blizzard stats card) comes back the same way.
+        battlenet_stats_unavailable: ["labelBlizzardStatsUnavailable",
+            "The Blizzard import is not available for now: try again later."],
+        battlenet_stats_mismatch: ["labelBlizzardStatsMismatch",
+            "This is not the Battle.net account linked to Catapult: sign in with the same account."],
+        battlenet_stats_failed: ["labelBlizzardStatsFailed", "Importing your characters failed: try again later."],
     };
 
-    // Tells a refused Epic login once: the code leaves the address, so neither a reload nor binding again repeats it.
+    // Tells a refused Epic login or World of Warcraft import once, or a finished import (?imported=wow): the code
+    // leaves the address, so neither a reload nor binding again repeats it.
     function showEpicLinkError() {
         const url = new URL(location.href);
         const code = url.searchParams.get("error");
-        if (!Object.hasOwn(EPIC_LINK_ERRORS, code)) return;
-        url.searchParams.delete("error");
-        history.replaceState(history.state, "", url);
-        CatapultChannel.showError(pageLabel(...EPIC_LINK_ERRORS[code]));
+        if (Object.hasOwn(EPIC_LINK_ERRORS, code)) {
+            url.searchParams.delete("error");
+            history.replaceState(history.state, "", url);
+            CatapultChannel.showError(pageLabel(...EPIC_LINK_ERRORS[code]));
+        } else if (url.searchParams.get("imported") === "wow") {
+            url.searchParams.delete("imported");
+            history.replaceState(history.state, "", url);
+            CatapultChannel.showError(pageLabel("labelBlizzardStatsDone", "World of Warcraft characters imported."));
+        }
     }
 
     // The Integrations tab is built only once picked (lazy.js): its cards are bound then, as with the page otherwise.
@@ -211,6 +223,22 @@ window.CatapultConnections = (function () {
         });
         on("retroachievements-key-delete-btn", "click", () =>
             postJson(`${baseUrl}/settings/retroachievements/api-key/delete`, {}));
+
+        // Blizzard stats: the region and the main are saved as picked; importing leaves for Blizzard's login (which
+        // sends the member back to this tab with ?imported=wow, or the reason it failed). The card follows from the
+        // event.
+        on("blizzard-region-select", "change", event => {
+            const region = event.currentTarget.value;
+            return region && postJson(`${baseUrl}/settings/blizzard/region`, { region });
+        });
+        on("blizzard-main-select", "change", event => {
+            const [region, characterId] = String(event.currentTarget.value).split(":");
+            return region && characterId &&
+                postJson(`${baseUrl}/settings/blizzard/wow-main`, { region, characterId: Number(characterId) });
+        });
+        on("blizzard-import-btn", "click", () => location.assign("/oauth2/authorization/battlenet-stats"));
+        on("blizzard-reimport-btn", "click", () => location.assign("/oauth2/authorization/battlenet-stats"));
+        on("blizzard-forget-btn", "click", () => postJson(`${baseUrl}/settings/blizzard/wow-characters/delete`, {}));
 
         // OBS: connecting and disconnecting both save the whole form, only `enabled` differs.
         // An empty password field means "keep the stored one" (it's never sent back to the page),

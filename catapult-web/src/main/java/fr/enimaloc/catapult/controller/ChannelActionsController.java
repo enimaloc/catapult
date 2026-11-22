@@ -15,6 +15,8 @@ import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
 import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardRegionRequest;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardWowMainRequest;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
@@ -204,6 +206,26 @@ public class ChannelActionsController {
     @PostMapping("/channel/{username}/settings/retroachievements/api-key/delete")
     public ResponseEntity<Void> deleteRetroAchievementsApiKey(@PathVariable String username) {
         return ApiStatus.answer(apiService.deleteRetroAchievementsApiKey(username));
+    }
+
+    // The member's Blizzard settings: 400 for an unknown region or a character that is not an imported one, 404 without a
+    // Battle.net link. Importing the characters is a login (/oauth2/authorization/battlenet-stats), not a route here.
+
+    @PostMapping("/channel/{username}/settings/blizzard/region")
+    public ResponseEntity<Void> saveBlizzardRegion(@PathVariable String username,
+                                                   @RequestBody BlizzardRegionRequest body) {
+        return ApiStatus.answer(apiService.saveBlizzardRegion(username, body.region()));
+    }
+
+    @PostMapping("/channel/{username}/settings/blizzard/wow-main")
+    public ResponseEntity<Void> saveBlizzardWowMain(@PathVariable String username,
+                                                    @RequestBody BlizzardWowMainRequest body) {
+        return ApiStatus.answer(apiService.saveBlizzardWowMain(username, body.region(), body.characterId()));
+    }
+
+    @PostMapping("/channel/{username}/settings/blizzard/wow-characters/delete")
+    public ResponseEntity<Void> deleteBlizzardWowCharacters(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteBlizzardWowCharacters(username));
     }
 
     @PostMapping("/channel/{username}/steam/refresh-profile-cache")

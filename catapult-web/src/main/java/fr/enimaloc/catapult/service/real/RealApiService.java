@@ -122,6 +122,8 @@ import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardRegionRequest;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardWowMainRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
@@ -396,6 +398,24 @@ public class RealApiService implements ApiService {
     public int deleteRetroAchievementsApiKey(String username) {
         return onChannel(username, id -> client.delete(
                 "/api/internal/users/{userId}/settings/retroachievements/api-key", id), status -> status);
+    }
+
+    @Override
+    public int saveBlizzardRegion(String username, String region) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/blizzard/region",
+                new BlizzardRegionRequest(region), id), status -> status);
+    }
+
+    @Override
+    public int saveBlizzardWowMain(String username, String region, long characterId) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/blizzard/wow-main",
+                new BlizzardWowMainRequest(region, characterId), id), status -> status);
+    }
+
+    @Override
+    public int deleteBlizzardWowCharacters(String username) {
+        return onChannel(username, id -> client.delete(
+                "/api/internal/users/{userId}/settings/blizzard/wow-characters", id), status -> status);
     }
 
     @Override

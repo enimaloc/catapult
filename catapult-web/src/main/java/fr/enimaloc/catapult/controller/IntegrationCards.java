@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.AnkamaData;
 import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.EpicData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
@@ -25,6 +26,7 @@ import fr.enimaloc.catapult.dto.integration.IntegrationNode.Switch;
 import fr.enimaloc.catapult.dto.integration.IntegrationNode.Text;
 import fr.enimaloc.catapult.dto.integration.Message;
 import fr.enimaloc.catapult.dto.integration.SpaState;
+import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -77,6 +79,9 @@ public final class IntegrationCards {
         }
         if (ch.retroAchievements() != null) {
             cards.add(retroAchievements(ch.retroAchievements()));
+        }
+        if (ch.blizzardStats() != null) {
+            cards.add(blizzardStats(ch.blizzardStats()));
         }
         if (ch.obs() != null) {
             cards.add(obs(ch.obs()));
@@ -457,6 +462,64 @@ public final class IntegrationCards {
                                 key(PREFIX + "retroachievements.key.delete")))),
 
                 new Text(Attrs.cls("retroachievements-help"), true, key(PREFIX + "retroachievements.help")));
+    }
+
+    // Blizzard stats: the settings of the owner's Blizzard stats (the region of their Battle.net account, the imported
+    // World of Warcraft characters and the one that is their main). It needs the Battle.net link: without one the card
+    // only says so. Importing leaves for Blizzard's login (catapult-api's /oauth2/authorization/battlenet-stats), which
+    // sends the member back to this tab; it is not offered when the instance has no Blizzard API set up. The imported
+    // list is read once, by the page: BlizzardAccountChangedEvent flips what shows and the values picked, and an import
+    // reloads the tab. Wide: two selects and their buttons. Never a token, never an internal id.
+
+    private static final String BLIZZARD_EVENT = "BlizzardAccountChangedEvent";
+    private static final String BLIZZARD_PREFIX = PREFIX + "blizzard-stats.";
+
+    static IntegrationDto blizzardStats(BlizzardStatsData blizzard) {
+        boolean imported = blizzard.wowImported();
+        SpaState linkedState = SpaState.flag("blizzardLinked", blizzard.linked(), BLIZZARD_EVENT + ".linked");
+        SpaState importedState = SpaState.flag("blizzardImported", imported, BLIZZARD_EVENT + ".wowImported");
+        // The import needs the Blizzard API: without it the login would fail, so its buttons stay out.
+        SpaState importState = SpaState.flag("blizzardCanImport", blizzard.available(), BLIZZARD_EVENT + ".available")
+                .and("blizzardNotImported", !imported, BLIZZARD_EVENT + ".!wowImported");
+        SpaState reimportState = SpaState.flag("blizzardCanReimport", blizzard.available(),
+                BLIZZARD_EVENT + ".available").and("blizzardWasImported", imported, BLIZZARD_EVENT + ".wowImported");
+        List<Select.Option> regions = Stream.of("eu", "us", "kr", "tw")
+                .map(region -> new Select.Option(region, literal(region.toUpperCase(java.util.Locale.ROOT)))).toList();
+        List<Select.Option> characters = blizzard.characters().stream()
+                .map(character -> new Select.Option(character.key(), literal(character.label()))).toList();
+
+        return wideCard("blizzard-stats",
+                new Text(Attrs.cls("blizzard-stats-unlinked").withState(SpaState.flag("blizzardUnlinked",
+                        !blizzard.linked(), BLIZZARD_EVENT + ".!linked")), true, key(BLIZZARD_PREFIX + "unlinked")),
+                new Container(Attrs.id("blizzard-stats-body").withState(linkedState), Container.Kind.DIV, List.of(
+                        new Select(Attrs.id("blizzard-region-select").withState(
+                                SpaState.sync("value", BLIZZARD_EVENT + ".region")),
+                                key(BLIZZARD_PREFIX + "region"), blizzard.region() == null ? "" : blizzard.region(),
+                                regions, null),
+                        new Container(Attrs.cls("blizzard-stats-imported").withState(importedState),
+                                Container.Kind.DIV, List.of(
+                                new Text(Attrs.NONE, false, key(BLIZZARD_PREFIX + "imported")),
+                                new Chip(Attrs.cls("blizzard-stats-imported-on").withState(
+                                        SpaState.sync("textContent", BLIZZARD_EVENT + ".importedOn")),
+                                        literal(BlizzardAccountChangedEvent.importedOn(blizzard.wowImportedAt()))))),
+                        new Select(Attrs.id("blizzard-main-select").withState(
+                                SpaState.flag("blizzardHasCharacters", !characters.isEmpty(),
+                                        BLIZZARD_EVENT + ".hasCharacters")
+                                        .andSync("value", BLIZZARD_EVENT + ".wowMainKey")),
+                                key(BLIZZARD_PREFIX + "main"),
+                                blizzard.wowMainKey() == null ? "" : blizzard.wowMainKey(), characters, null),
+                        new Text(Attrs.cls("blizzard-stats-unavailable").withState(SpaState.flag("blizzardUnavailable",
+                                !blizzard.available(), BLIZZARD_EVENT + ".!available")), true,
+                                key(BLIZZARD_PREFIX + "unavailable")),
+                        new Container(Attrs.id("blizzard-stats-actions").withClass("card-actions"),
+                                Container.Kind.DIV, List.of(
+                                new Button(Attrs.id("blizzard-import-btn").withState(importState),
+                                        Button.Kind.FILLED, key(BLIZZARD_PREFIX + "import")),
+                                new Button(Attrs.id("blizzard-reimport-btn").withState(reimportState),
+                                        Button.Kind.TEXT, key(BLIZZARD_PREFIX + "reimport")),
+                                new Button(Attrs.id("blizzard-forget-btn").withState(importedState),
+                                        Button.Kind.TEXT, key(BLIZZARD_PREFIX + "forget")))),
+                        new Text(Attrs.cls("blizzard-stats-help"), true, key(BLIZZARD_PREFIX + "help")))));
     }
 
     // Epic: one sub-view and button per status, driven by the status field of EpicLinkEvent, which carries NONE too.

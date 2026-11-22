@@ -256,6 +256,21 @@ class ChannelEventRedisBridgeTest {
     }
 
     @Test
+    void bridgeRelaysBlizzardAccountChanged() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(true, "eu", false, List.of(), null, true);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.BLIZZARD_ACCOUNT_CHANGED,
+                new ChannelEvents.BlizzardAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent("streamer", true, "eu", false, false, null, "", true));
+    }
+
+    @Test
+    void bridgeDropsABlizzardEventWithoutItsData() {
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.BLIZZARD_ACCOUNT_CHANGED,
+                new ChannelEvents.BlizzardAccountChanged(owner.toString(), "streamer", null)))).isEmpty();
+    }
+
+    @Test
     void bridgeDropsARetroAchievementsEventWithoutItsData() {
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.RETROACHIEVEMENTS_ACCOUNT_CHANGED,
                 new ChannelEvents.RetroAchievementsAccountChanged(owner.toString(), "streamer", null)))).isEmpty();
