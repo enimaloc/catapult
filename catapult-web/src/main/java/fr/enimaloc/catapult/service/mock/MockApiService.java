@@ -105,6 +105,7 @@ import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
+import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
 import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
 import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
@@ -172,6 +173,7 @@ public class MockApiService implements ApiService {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     /** What catapult-api answers an action that went through. */
     private static final int NO_CONTENT = 204;
+    private static final int BAD_REQUEST = 400;
 
     /** {@code catapult.mock.degraded=true} shows the degraded banner. */
     @Value("${catapult.mock.degraded:false}")
@@ -646,6 +648,39 @@ public class MockApiService implements ApiService {
         MockData data = currentData();
         change.accept(data);
         eventPublisher.publishEvent(RetroAchievementsAccountChangedEvent.of(username, data.retroAchievementsData()));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public int saveBlizzardRegion(String username, String region) {
+        log.trace("saveBlizzardRegion({}, {})", username, region);
+        if (!MockData.BLIZZARD_REGIONS.contains(region)) {
+            return BAD_REQUEST;
+        }
+        return blizzardChanged(username, data -> data.saveBlizzardRegion(region));
+    }
+
+    @Override
+    public int saveBlizzardWowMain(String username, String region, long characterId) {
+        log.trace("saveBlizzardWowMain({}, {}, {})", username, region, characterId);
+        MockData data = currentData();
+        if (!data.saveBlizzardWowMain(region + ":" + characterId)) {
+            return BAD_REQUEST;
+        }
+        eventPublisher.publishEvent(BlizzardAccountChangedEvent.of(username, data.blizzardStatsData()));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public int deleteBlizzardWowCharacters(String username) {
+        log.trace("deleteBlizzardWowCharacters({})", username);
+        return blizzardChanged(username, MockData::deleteBlizzardWowCharacters);
+    }
+
+    private int blizzardChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(BlizzardAccountChangedEvent.of(username, data.blizzardStatsData()));
         return NO_CONTENT;
     }
 

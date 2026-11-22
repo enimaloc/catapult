@@ -14,6 +14,8 @@ import fr.enimaloc.catapult.service.access.WhitelistService;
 import fr.enimaloc.catapult.service.account.AdminMigrationService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetFriendService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
+import fr.enimaloc.catapult.service.blizzard.BlizzardImportRefusedException;
+import fr.enimaloc.catapult.service.blizzard.BlizzardWowImportService;
 import fr.enimaloc.catapult.service.epic.EpicEnrollmentException;
 import fr.enimaloc.catapult.service.epic.EpicFriendService;
 import fr.enimaloc.catapult.service.epic.EpicGateService;
@@ -23,6 +25,7 @@ import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -36,6 +39,8 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 import java.util.Map;
@@ -63,6 +68,8 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     // Only present when epic.enabled.
     private final ObjectProvider<EpicFriendService> epicFriends;
     private final TransactionTemplate transactions;
+    // Only present when battlenet.enabled.
+    private final ObjectProvider<BlizzardWowImportService> wowImports;
 
     @Value("${app.owner-id:}")
     private String ownerId;
@@ -98,6 +105,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
                 case "xbox" -> transactions.execute(status ->
                     handleSecondaryLink(userRequest, OAuthToken.Provider.XBOX));
                 case "battlenet" -> handleBattleNetLink(userRequest);
+                case "battlenet-stats" -> handleBattleNetStatsConsent(userRequest);
                 case "epic" -> handleEpicLink(userRequest);
                 default -> delegate.loadUser(userRequest);
             };
@@ -163,6 +171,41 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             throw new OAuth2AuthenticationException(new OAuth2Error("battlenet_full"), e);
         }
         log.info("BATTLENET linked for user {}", user.getId());
+        return existingUser;
+    }
+
+    /**
+     * The World of Warcraft import ({@code wow.profile} consent) of a member already linked to Battle.net: the user
+     * token reads their characters, then is forgotten (TwitchLoginSuccessHandler drops the authorized client). Neither
+     * the link nor the bot's enrolment is touched, and no userinfo is loaded for them. The token never reaches a log:
+     * failures are logged by their type only. Not transactional, see {@link #loadUser}.
+     */
+    private OAuth2User handleBattleNetStatsConsent(OAuth2UserRequest userRequest) {
+        Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
+        if (currentAuth == null || !(currentAuth.getPrincipal() instanceof CatapultOAuth2User existingUser)) {
+            log.error("BATTLENET-STATS consent without an authenticated Twitch session");
+            throw new OAuth2AuthenticationException(new OAuth2Error("unauthorized"));
+        }
+        UserAccount user = existingUser.getUserAccount();
+        BlizzardWowImportService imports = wowImports.getIfAvailable();
+        if (imports == null || !battleNetGate.isAvailableFor(user)) {
+            throw new OAuth2AuthenticationException(new OAuth2Error("battlenet_stats_unavailable"));
+        }
+        try {
+            int count = imports.importFor(user, userRequest.getAccessToken().getTokenValue(),
+                    LocaleContextHolder.getLocale());
+            if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes web) {
+                web.getRequest().setAttribute(TwitchLoginSuccessHandler.WOW_IMPORT_COUNT_ATTRIBUTE, count);
+            }
+        } catch (BlizzardImportRefusedException e) {
+            log.warn("World of Warcraft import refused for user {}: {}", user.getId(), e.reason());
+            String code = e.reason() == BlizzardImportRefusedException.Reason.OTHER_ACCOUNT
+                ? "battlenet_stats_mismatch" : "battlenet_stats_unavailable";
+            throw new OAuth2AuthenticationException(new OAuth2Error(code));
+        } catch (RuntimeException e) {
+            log.warn("World of Warcraft import failed for user {}: {}", user.getId(), e.getClass().getSimpleName());
+            throw new OAuth2AuthenticationException(new OAuth2Error("battlenet_stats_failed"));
+        }
         return existingUser;
     }
 

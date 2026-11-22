@@ -121,13 +121,17 @@ class Oauth2LoginFailureHandlerTest {
 
     /** The Epic callback of a member logged in through Twitch as {@code login}, as the link's session holds them. */
     private static MockHttpServletRequest epicCallbackOf(String login) {
+        return callbackOf("epic", login);
+    }
+
+    private static MockHttpServletRequest callbackOf(String registrationId, String login) {
         UserAccount account = new UserAccount();
         account.setTwitchUsername(login);
         CatapultOAuth2User user = new CatapultOAuth2User(null, account, false);
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, new SecurityContextImpl(
                 UsernamePasswordAuthenticationToken.authenticated(user, null, user.getAuthorities())));
-        MockHttpServletRequest callback = new MockHttpServletRequest("GET", "/login/oauth2/code/epic");
+        MockHttpServletRequest callback = new MockHttpServletRequest("GET", "/login/oauth2/code/" + registrationId);
         callback.setSession(session);
         return callback;
     }
@@ -142,5 +146,57 @@ class Oauth2LoginFailureHandlerTest {
         handler.onAuthenticationFailure(request, givenUp,
                 new OAuth2AuthenticationException(new OAuth2Error("not_whitelisted")));
         assertThat(givenUp.getCookie(InviteCodeRelayFilter.WEB_STATE_COOKIE_NAME).getMaxAge()).isZero();
+    }
+
+    @Test
+    void wowImportRefusals_goBackToTheChannelsIntegrationsTab_withTheirCode() throws Exception {
+        for (String code : new String[]{"battlenet_stats_unavailable", "battlenet_stats_failed",
+                "battlenet_stats_mismatch"}) {
+            request = callbackOf("battlenet-stats", "jeb_");
+            response = new MockHttpServletResponse();
+
+            handler.onAuthenticationFailure(request, response,
+                    new OAuth2AuthenticationException(new OAuth2Error(code)));
+
+            assertThat(response.getRedirectedUrl())
+                    .isEqualTo("http://localhost:8081/channel/jeb_?error=" + code + "#integrations");
+            assertThat(response.getCookie("catapult_oauth2_retry").getMaxAge()).isZero();
+        }
+    }
+
+    @Test
+    void anyOtherWowImportFailure_isAFailedImportOnTheCard() throws Exception {
+        // A failed token exchange or an unexpected error: never the login page.
+        for (String code : new String[]{"invalid_token_response", "server_error"}) {
+            request = callbackOf("battlenet-stats", "jeb_");
+            response = new MockHttpServletResponse();
+
+            handler.onAuthenticationFailure(request, response,
+                    new OAuth2AuthenticationException(new OAuth2Error(code)));
+
+            assertThat(response.getRedirectedUrl())
+                    .isEqualTo("http://localhost:8081/channel/jeb_?error=battlenet_stats_failed#integrations");
+        }
+    }
+
+    @Test
+    void decliningTheBlizzardConsent_isACancelledImportNotAFailure() throws Exception {
+        request = callbackOf("battlenet-stats", "jeb_");
+
+        handler.onAuthenticationFailure(request, response,
+                new OAuth2AuthenticationException(new OAuth2Error("access_denied")));
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("http://localhost:8081/channel/jeb_?error=battlenet_stats_cancelled#integrations");
+    }
+
+    @Test
+    void wowImportWithoutTheMembersSession_showsTheLoginError() throws Exception {
+        request = new MockHttpServletRequest("GET", "/login/oauth2/code/battlenet-stats");
+
+        handler.onAuthenticationFailure(request, response,
+                new OAuth2AuthenticationException(new OAuth2Error("unauthorized")));
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("http://localhost:8081/login?error");
     }
 }

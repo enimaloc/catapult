@@ -41,8 +41,23 @@ public record ChannelPageData(
         /** The owner's speedrun.com account; null for anyone else. */
         SpeedrunData speedrun,
         /** The owner's RetroAchievements account; null for anyone else. Names and flags only, never the key. */
-        RetroAchievementsData retroAchievements
+        RetroAchievementsData retroAchievements,
+        /** The owner's Blizzard settings; null for anyone else, or without Battle.net on this instance. Names only. */
+        BlizzardStatsData blizzardStats
 ) {
+    /** A page without the Blizzard settings. */
+    public ChannelPageData(ChannelUserDto channelUser, String channelUsername, boolean isOwner, boolean isLive,
+                           boolean botEnabled, GameDto currentGame, PagedBindings bindings, List<CclDto> availableCcls,
+                           Set<String> blockedCcls, List<TwDto> availableTws, Set<String> blockedTws,
+                           String filterStatus, String filterSource, SteamData steam, XboxData xbox,
+                           MinecraftData minecraft, BattleNetData battleNet, ObsData obs, TwitchatData twitchat,
+                           CustomBindingsStateDto customBindings, Map<String, DropDto> drops, AnkamaData ankama,
+                           EpicData epic, SpeedrunData speedrun, RetroAchievementsData retroAchievements) {
+        this(channelUser, channelUsername, isOwner, isLive, botEnabled, currentGame, bindings, availableCcls,
+                blockedCcls, availableTws, blockedTws, filterStatus, filterSource, steam, xbox, minecraft, battleNet,
+                obs, twitchat, customBindings, drops, ankama, epic, speedrun, retroAchievements, null);
+    }
+
     /** A page without the RetroAchievements account. */
     public ChannelPageData(ChannelUserDto channelUser, String channelUsername, boolean isOwner, boolean isLive,
                            boolean botEnabled, GameDto currentGame, PagedBindings bindings, List<CclDto> availableCcls,
@@ -53,7 +68,7 @@ public record ChannelPageData(
                            EpicData epic, SpeedrunData speedrun) {
         this(channelUser, channelUsername, isOwner, isLive, botEnabled, currentGame, bindings, availableCcls,
                 blockedCcls, availableTws, blockedTws, filterStatus, filterSource, steam, xbox, minecraft, battleNet,
-                obs, twitchat, customBindings, drops, ankama, epic, speedrun, null);
+                obs, twitchat, customBindings, drops, ankama, epic, speedrun, null, null);
     }
 
     /** A page without the speedrun.com account. */

@@ -18,6 +18,7 @@ import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
+import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService;
 import fr.enimaloc.catapult.service.debug.SessionDebug;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.Getter;
@@ -75,6 +76,7 @@ public class BattleNetFriendService {
     private final BattleNetSessionManager sessionManager;
     private final TransactionOperations transactions;
     private final SessionDebug debug;
+    private final BlizzardAccountService blizzardAccounts;
     private final Executor followUps;
 
     @Autowired
@@ -84,10 +86,11 @@ public class BattleNetFriendService {
                                   ChannelEventPublisher channelEventPublisher,
                                   BattleNetSessionManager sessionManager,
                                   TransactionOperations transactions,
-                                  @Qualifier("battleNetSessionDebug") SessionDebug debug) {
+                                  @Qualifier("battleNetSessionDebug") SessionDebug debug,
+                                  BlizzardAccountService blizzardAccounts) {
         // The outcome of an invitation completes on the BGS session loop: its database follow-up leaves that thread
         this(accountRepository, linkRepository, getterConfigRepository, channelEventPublisher, sessionManager,
-                transactions, debug, task -> Thread.ofVirtual().name("battlenet-friends").start(task));
+                transactions, debug, blizzardAccounts, task -> Thread.ofVirtual().name("battlenet-friends").start(task));
     }
 
     /** @param followUps runs what follows the outcome of an invitation sent at enrolment */
@@ -98,6 +101,7 @@ public class BattleNetFriendService {
                            BattleNetSessionManager sessionManager,
                            TransactionOperations transactions,
                            SessionDebug debug,
+                           BlizzardAccountService blizzardAccounts,
                            Executor followUps) {
         this.accountRepository = accountRepository;
         this.linkRepository = linkRepository;
@@ -106,6 +110,7 @@ public class BattleNetFriendService {
         this.sessionManager = sessionManager;
         this.transactions = transactions;
         this.debug = debug;
+        this.blizzardAccounts = blizzardAccounts;
         this.followUps = followUps;
     }
 
@@ -172,6 +177,8 @@ public class BattleNetFriendService {
             });
             return link.orElse(null);
         });
+        // Whatever Blizzard settings are kept go with the link, also when there was no link left to remove
+        forgetBlizzard(user.getId());
         if (removed == null) {
             return;
         }
@@ -188,6 +195,16 @@ public class BattleNetFriendService {
             long friendId = removed.getBnetAccountId();
             call(botId, user.getId(), "removeFriend", friendId, client -> client.removeFriend(friendId))
                     .whenComplete(logFailure("removeFriend", user.getId()));
+        }
+    }
+
+    /** Purges the member's Blizzard settings; a failure is logged (the purge is idempotent, a later unlink redoes it). */
+    private void forgetBlizzard(UUID userId) {
+        try {
+            blizzardAccounts.forget(userId);
+        } catch (RuntimeException e) {
+            log.warn("Blizzard settings of user {} not purged with their Battle.net link: {}", userId,
+                    e.getClass().getSimpleName());
         }
     }
 
@@ -384,6 +401,7 @@ public class BattleNetFriendService {
         if (!moved) {
             log.warn("No Battle.net service account has room left: the link of user {} is deleted", ownerId);
             channelEventPublisher.battleNetLinkChanged(ownerId, "NONE", null, null);
+            forgetBlizzard(ownerId);
             return;
         }
         log.info("Battle.net link of user {} moved to {}", ownerId, next[0].getId());

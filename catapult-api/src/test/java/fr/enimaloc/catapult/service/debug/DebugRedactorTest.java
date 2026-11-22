@@ -272,4 +272,12 @@ class DebugRedactorTest {
                 .isEqualTo("HTTP status code: 500, key: name");
         assertThat(redactor.text("Bearer abc", true)).isEqualTo("Bearer abc");
     }
+
+    @Test
+    void bearerInFreeTextIsMasked() {
+        assertThat(redactor.text("401 for Bearer abc.DEF-123", false)).doesNotContain("abc.DEF-123");
+        assertThat(redactor.text("401 for bearer abc.DEF-123", false)).doesNotContain("abc.DEF-123");
+        assertThat(redactor.body(b("{\"access_token\":\"SECRET\",\"token_type\":\"bearer\",\"expires_in\":86399}"),
+                MediaType.APPLICATION_JSON, false)).doesNotContain("SECRET").contains("\"token_type\":\"bearer\"");
+    }
 }

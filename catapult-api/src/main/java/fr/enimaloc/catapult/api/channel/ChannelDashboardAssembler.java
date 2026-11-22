@@ -57,6 +57,7 @@ import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.ankama.AnkamaLinkStateService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetLinkStateService;
 import fr.enimaloc.catapult.service.epic.EpicLinkStateService;
+import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService;
 import fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService;
 import fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
@@ -115,6 +116,8 @@ public class ChannelDashboardAssembler {
     private final DropsCatalog dropsCatalog;
     private final SpeedrunAccountService speedrunAccounts;
     private final RetroAchievementsAccountService retroAchievementsAccounts;
+    // Only present when battlenet.enabled.
+    private final Optional<BlizzardAccountService> blizzardAccounts;
 
     @Value("${xbox.enabled:false}")
     private boolean xboxEnabled;
@@ -171,7 +174,8 @@ public class ChannelDashboardAssembler {
                 owner ? ankamaData(channel) : null,
                 owner ? epicData(channel) : null,
                 owner ? speedrunAccounts.data(channel) : null,
-                owner ? retroAchievementsAccounts.data(channel) : null);
+                owner ? retroAchievementsAccounts.data(channel) : null,
+                owner ? blizzardAccounts.map(accounts -> accounts.data(channel)).orElse(null) : null);
     }
 
     /** The source value of the "with drops" filter. */

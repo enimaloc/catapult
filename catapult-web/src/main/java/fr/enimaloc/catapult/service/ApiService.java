@@ -132,6 +132,12 @@ public interface ApiService {
     /** Saves the owner's personal RetroAchievements key (never logged); 400 when refused, 503 when unreachable. */
     int saveRetroAchievementsApiKey(String username, String apiKey);
     int deleteRetroAchievementsApiKey(String username);
+    /** Sets the region of the owner's Battle.net account (400 for an unknown one, 404 without a Battle.net link). */
+    int saveBlizzardRegion(String username, String region);
+    /** Picks the imported World of Warcraft character {@code characterId} of {@code region} as the owner's main (400 when not one). */
+    int saveBlizzardWowMain(String username, String region, long characterId);
+    /** Forgets the owner's imported World of Warcraft characters and their main. */
+    int deleteBlizzardWowCharacters(String username);
     int refreshSteamProfileCache(String username);
     LinkStateResponse minecraftStatus(String username);
     int minecraftEnroll(String username, String name);

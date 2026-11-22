@@ -266,6 +266,15 @@ class EnrichmentCacheTest {
     }
 
     @Test
+    void evictUserOfGivenSourcesDropsOnlyThose() {
+        java.util.UUID a = java.util.UUID.randomUUID();
+        cache.evictUser(a, java.util.List.of(EnrichmentSource.BLIZZARD_SC2_PROFILE, EnrichmentSource.BLIZZARD_HS_SETS));
+
+        verify(repository).deleteByKeyOfSources(java.util.List.of("blizzard-sc2-profile"),
+                "u:" + a, "u:" + a + ":%");
+    }
+
+    @Test
     void evictUserDropsOnlyThatMembersPersonalEntries() {
         java.util.UUID a = java.util.UUID.randomUUID();
         cache.evictUser(a);
@@ -275,8 +284,10 @@ class EnrichmentCacheTest {
         verify(repository).deleteByKeyOfSources(sources.capture(), org.mockito.ArgumentMatchers.eq("u:" + a),
                 org.mockito.ArgumentMatchers.eq("u:" + a + ":%"));
         assertThat(sources.getValue()).contains("steam-library", "steam-achievements", "xbox-titles",
-                "xbox-achievements", "xbox-playtime", "ra-user", "ra-progress", "ra-recent")
-                .doesNotContain("steam-schema", "steam-rarity", "hltb", "speedrun-user");
+                "xbox-achievements", "xbox-playtime", "ra-user", "ra-progress", "ra-recent",
+                "blizzard-wow-character", "blizzard-wow-achievements", "blizzard-sc2-profile",
+                "blizzard-d3-profile")
+                .doesNotContain("blizzard-wow-token", "blizzard-hs-sets", "blizzard-hs-deck", "blizzard-d3-season", "steam-schema", "steam-rarity", "hltb", "speedrun-user");
     }
 
     @Test
@@ -304,6 +315,34 @@ class EnrichmentCacheTest {
         cache.get(EnrichmentSource.STEAM_SCHEMA, "app:440:english", Payload.class, FetchBudget.UNLIMITED,
                 () -> { fetches.incrementAndGet(); return Optional.empty(); });
         assertThat(fetches).hasValue(1);
+    }
+
+    @Test
+    void blizzardSourcesHaveTheirDefaultsAndPersonalFlags() {
+        assertThat(properties.source(EnrichmentSource.BLIZZARD_WOW_CHARACTER).ttl()).isEqualTo(Duration.ofMinutes(10));
+        assertThat(properties.source(EnrichmentSource.BLIZZARD_WOW_ACHIEVEMENTS).ttl())
+                .isEqualTo(Duration.ofMinutes(30));
+        assertThat(properties.source(EnrichmentSource.BLIZZARD_SC2_PROFILE).ttl()).isEqualTo(Duration.ofMinutes(10));
+        assertThat(properties.source(EnrichmentSource.BLIZZARD_D3_PROFILE).ttl()).isEqualTo(Duration.ofMinutes(15));
+        assertThat(properties.source(EnrichmentSource.BLIZZARD_WOW_TOKEN).ttl()).isEqualTo(Duration.ofMinutes(20));
+        assertThat(properties.source(EnrichmentSource.BLIZZARD_HS_SETS).ttl()).isEqualTo(Duration.ofDays(1));
+        assertThat(properties.source(EnrichmentSource.BLIZZARD_HS_DECK).ttl()).isEqualTo(Duration.ofDays(7));
+        assertThat(properties.source(EnrichmentSource.BLIZZARD_D3_SEASON).ttl()).isEqualTo(Duration.ofDays(1));
+        assertThat(EnrichmentSource.BLIZZARD_WOW_CHARACTER.key()).isEqualTo("blizzard-wow-character");
+        assertThat(EnrichmentSource.BLIZZARD_WOW_TOKEN.personal()).isFalse();
+        assertThat(EnrichmentSource.BLIZZARD_HS_DECK.personal()).isFalse();
+        assertThat(EnrichmentSource.BLIZZARD_D3_PROFILE.personal()).isTrue();
+        assertThat(properties.blizzardPerHour()).isEqualTo(30_000);
+        assertThat(properties.blizzardPerSecond()).isEqualTo(20);
+        assertThat(properties.blizzardDefaultRegion())
+                .isEqualTo(fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion.EU);
+    }
+
+    @Test
+    void notFoundStatusSerializes() {
+        assertThat(tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(
+                fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Status.NOT_FOUND))
+                .isEqualTo("\"not_found\"");
     }
 
     @Test

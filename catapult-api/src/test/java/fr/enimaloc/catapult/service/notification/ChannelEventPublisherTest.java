@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
@@ -155,6 +156,18 @@ class ChannelEventPublisherTest {
 
         assertThat(published(ChannelEvents.MINECRAFT_LINK_CHANGED)).isEqualTo(
                 new ChannelEvents.MinecraftLinkChanged(ownerId.toString(), "streamername", "PENDING", "jeb_"));
+    }
+
+    @Test
+    void blizzardAccountChanged_publishesTheCardsData() {
+        var account = new BlizzardStatsData(true, "eu", true,
+                List.of(new BlizzardStatsData.WowCharacterOption("eu:1", "A")),
+                "eu:1", true);
+
+        publisher.blizzardAccountChanged(ownerId, account);
+
+        assertThat(published(ChannelEvents.BLIZZARD_ACCOUNT_CHANGED)).isEqualTo(
+                new ChannelEvents.BlizzardAccountChanged(ownerId.toString(), "streamername", account));
     }
 
     @Test

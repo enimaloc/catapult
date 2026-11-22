@@ -1,5 +1,12 @@
 package fr.enimaloc.catapult.simulation.external;
 
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardAppTokenService;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardClient;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardNotFoundException;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRateLimiter;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
+import fr.enimaloc.catapult.service.enrichment.blizzard.HttpBlizzardClient;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardUnavailableException;
 import fr.enimaloc.catapult.service.enrichment.opencritic.HttpOpenCriticClient;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticClient;
 import fr.enimaloc.catapult.service.enrichment.pcgw.HttpPcGamingWikiClient;
@@ -57,12 +64,18 @@ class SimulatedEnrichmentClientsWiringTest {
         @Bean HttpSteamStatsClient steamStats() { return mock(HttpSteamStatsClient.class); }
         @Bean HttpXboxStatsClient xboxStats() { return mock(HttpXboxStatsClient.class); }
         @Bean HttpRetroAchievementsClient raStats() { return mock(HttpRetroAchievementsClient.class); }
+        @Bean HttpBlizzardClient blizzard() { return mock(HttpBlizzardClient.class); }
+        @Bean org.springframework.web.client.RestClient.Builder restClientBuilder() {
+            return org.springframework.web.client.RestClient.builder();
+        }
+        @Bean BlizzardRateLimiter blizzardLimiter() { return mock(BlizzardRateLimiter.class); }
+        @Bean BlizzardAppTokenService blizzardTokens() { return mock(BlizzardAppTokenService.class); }
     }
 
     @Configuration(proxyBeanMethods = false)
     @ComponentScan(basePackageClasses = SimulatedProtonDbClient.class, useDefaultFilters = false,
             includeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
-                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity|SteamStats|XboxStats|RetroAchievements)Client"))
+                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity|SteamStats|XboxStats|RetroAchievements|Blizzard)Client|.*SimulatedBlizzardAppTokenService"))
     static class SimulatedClients {
     }
 
@@ -84,6 +97,9 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(XboxStatsClient.class)).isInstanceOf(SimulatedXboxStatsClient.class);
             assertThat(ctx.getBean(RetroAchievementsClient.class))
                     .isInstanceOf(SimulatedRetroAchievementsClient.class);
+            assertThat(ctx.getBean(BlizzardClient.class)).isInstanceOf(SimulatedBlizzardClient.class);
+            assertThat(ctx.getBean(BlizzardAppTokenService.class))
+                    .isInstanceOf(SimulatedBlizzardAppTokenService.class);
         });
     }
 
@@ -101,6 +117,7 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(SteamStatsClient.class)).isInstanceOf(HttpSteamStatsClient.class);
             assertThat(ctx.getBean(XboxStatsClient.class)).isInstanceOf(HttpXboxStatsClient.class);
             assertThat(ctx.getBean(RetroAchievementsClient.class)).isInstanceOf(HttpRetroAchievementsClient.class);
+            assertThat(ctx.getBean(BlizzardClient.class)).isInstanceOf(HttpBlizzardClient.class);
         });
     }
 
@@ -206,5 +223,44 @@ class SimulatedEnrichmentClientsWiringTest {
         assertThatThrownBy(() -> ra.profile("simulated", new RaCredentials("other", false)))
                 .isInstanceOf(RaKeyRejectedException.class);
         assertThat(new SimulatedRetroAchievementsClient()).isNotNull();
+    }
+
+    @Test
+    void simulatedBlizzard_answersDeterministically() {
+        var bz = new SimulatedBlizzardClient();
+        var mage = bz.wowCharacter(BlizzardRegion.EU, "realm", "SimulatedMage", "en_US");
+        assertThat(mage.level()).isEqualTo(90);
+        assertThat(mage.achievementPoints()).isEqualTo(28_755);
+        assertThat(mage.mythicRating()).isEqualTo(2_410.0);
+        assertThat(bz.wowCharacter(BlizzardRegion.EU, "realm", "alt", "en_US").level()).isEqualTo(70);
+        assertThatThrownBy(() -> bz.wowCharacter(BlizzardRegion.EU, "realm", "gone", "en_US"))
+                .isInstanceOf(BlizzardNotFoundException.class);
+        assertThat(bz.wowAchievements(BlizzardRegion.EU, "realm", "alt", "en_US").recent()).isNotEmpty();
+        assertThat(bz.wowUserCharacters(BlizzardRegion.EU, "t", "en_US")).hasSize(2);
+        var ref = bz.sc2Profiles(bz.userAccountId("t")).getFirst();
+        assertThat(ref.regionId()).isEqualTo(2);
+        var sc2 = bz.sc2Profile(BlizzardRegion.EU, ref, "en_US", true);
+        assertThat(sc2.modes().get("1v1")).satisfies(m -> {
+            assertThat(m.leagueName()).isEqualTo("Diamond");
+            assertThat(m.rank()).isEqualTo(12);
+            assertThat(m.totalGames()).isEqualTo(40);
+            assertThat(m.totalWins()).isEqualTo(25);
+        });
+        assertThat(bz.sc2Profile(BlizzardRegion.EU, ref, "en_US", false).ladder()).isEmpty();
+        var d3 = bz.d3Profile(BlizzardRegion.EU, "Sim#1234", "en_US");
+        assertThat(d3.paragonLevel()).isEqualTo(1_633);
+        assertThat(d3.paragonLevelSeason()).isEqualTo(900);
+        assertThat(d3.heroes().getFirst()).satisfies(h -> {
+            assertThat(h.className()).isEqualTo("barbarian");
+            assertThat(h.level()).isEqualTo(70);
+            assertThat(h.seasonal()).isTrue();
+        });
+        assertThat(bz.wowToken(BlizzardRegion.EU).gold()).isEqualTo(470_531L);
+        assertThat(bz.hearthstoneSets("en_US")).hasSize(1);
+        assertThat(bz.hearthstoneDeck(SimulatedBlizzardClient.DECK_CODE, "en_US").cards()).isNotEmpty();
+        assertThatThrownBy(() -> bz.hearthstoneDeck("AAAA", "en_US"))
+                .isInstanceOf(BlizzardUnavailableException.class);
+        assertThat(bz.d3CurrentSeason(BlizzardRegion.EU)).isPositive();
+        assertThat(java.util.Base64.getDecoder().decode(SimulatedBlizzardClient.DECK_CODE)).isNotEmpty();
     }
 }

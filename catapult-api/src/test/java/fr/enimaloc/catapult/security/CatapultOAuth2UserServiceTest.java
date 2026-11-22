@@ -13,6 +13,9 @@ import fr.enimaloc.catapult.service.access.WhitelistService;
 import fr.enimaloc.catapult.service.account.AdminMigrationService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetFriendService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
+import fr.enimaloc.catapult.service.blizzard.BlizzardImportRefusedException;
+import fr.enimaloc.catapult.service.blizzard.BlizzardWowImportService;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardUnavailableException;
 import fr.enimaloc.catapult.service.epic.EpicEnrollmentException;
 import fr.enimaloc.catapult.service.epic.EpicFriendService;
 import fr.enimaloc.catapult.service.epic.EpicGateService;
@@ -23,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -40,6 +44,7 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -71,6 +76,8 @@ class CatapultOAuth2UserServiceTest {
     @Mock private EpicFriendService epicFriends;
     @Mock private ObjectProvider<EpicFriendService> epicFriendsProvider;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private BlizzardWowImportService wowImport;
+    @Mock private ObjectProvider<BlizzardWowImportService> wowImportProvider;
 
     @Mock private RestClient.RequestHeadersUriSpec getSpec;
     @Mock private RestClient.RequestHeadersSpec headersSpec;
@@ -84,7 +91,7 @@ class CatapultOAuth2UserServiceTest {
             userAccountRepository, oAuthTokenRepository, userSettingsRepository,
             getterConfigRepository, tokenEncryptionService, eventPublisher, restClient, whitelistService,
             adminMigrationService, inviteService, battleNetGate, battleNetFriendsProvider,
-            epicGate, epicFriendsProvider, new TransactionTemplate(transactionManager)
+            epicGate, epicFriendsProvider, new TransactionTemplate(transactionManager), wowImportProvider
         );
         ReflectionTestUtils.setField(service, "ownerId", "");
         ReflectionTestUtils.setField(service, "defaultNoGameName", "");
@@ -96,6 +103,7 @@ class CatapultOAuth2UserServiceTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+        LocaleContextHolder.resetLocaleContext();
     }
 
     private OAuth2UserRequest buildRequest() {
@@ -383,6 +391,108 @@ class CatapultOAuth2UserServiceTest {
 
         verifyNoInteractions(oAuthTokenRepository);
         verifyNoInteractions(transactionManager);
+    }
+
+    private OAuth2UserRequest battleNetStatsRequest() {
+        ClientRegistration reg = ClientRegistration.withRegistrationId("battlenet-stats")
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .clientId("client-id")
+            .redirectUri("http://localhost/callback")
+            .scope("wow.profile")
+            .authorizationUri("https://oauth.battle.net/authorize")
+            .tokenUri("https://oauth.battle.net/token")
+            .userInfoUri("https://oauth.battle.net/userinfo")
+            .userNameAttributeName("sub")
+            .build();
+        OAuth2AccessToken token = new OAuth2AccessToken(
+            OAuth2AccessToken.TokenType.BEARER, "wow-token", Instant.now(), Instant.now().plusSeconds(3600));
+        return new OAuth2UserRequest(reg, token);
+    }
+
+    private UserAccount statsStreamer(boolean gateOpen) {
+        // The callback request's language (RequestContextFilter sets it in a real request)
+        LocaleContextHolder.setLocale(Locale.FRENCH);
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        signedInStreamer(account);
+        ReflectionTestUtils.setField(service, "delegate", battleNetUserInfo);
+        lenient().when(wowImportProvider.getIfAvailable()).thenReturn(wowImport);
+        lenient().when(battleNetGate.isAvailableFor(account)).thenReturn(gateOpen);
+        return account;
+    }
+
+    @Test
+    void statsConsentNeverEnrolls() {
+        UserAccount account = statsStreamer(true);
+        CatapultOAuth2User principal = (CatapultOAuth2User) SecurityContextHolder.getContext()
+            .getAuthentication().getPrincipal();
+
+        var user = service.loadUser(battleNetStatsRequest());
+
+        verify(wowImport).importFor(account, "wow-token", Locale.FRENCH);
+        assertThat(user).isSameAs(principal);
+        verifyNoInteractions(battleNetFriends, battleNetFriendsProvider, battleNetUserInfo);
+        verifyNoInteractions(oAuthTokenRepository, transactionManager);
+    }
+
+    @Test
+    void statsConsentLeavesTheCharacterCountForTheRedirect() {
+        UserAccount account = statsStreamer(true);
+        when(wowImport.importFor(account, "wow-token", Locale.FRENCH)).thenReturn(0);
+        var web = new org.springframework.mock.web.MockHttpServletRequest();
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(web));
+        try {
+            service.loadUser(battleNetStatsRequest());
+        } finally {
+            org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+        }
+
+        assertThat(web.getAttribute(TwitchLoginSuccessHandler.WOW_IMPORT_COUNT_ATTRIBUTE)).isEqualTo(0);
+    }
+
+    @Test
+    void statsConsentWithoutTwitchSessionIsUnauthorized() {
+        lenient().when(wowImportProvider.getIfAvailable()).thenReturn(wowImport);
+
+        assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("unauthorized");
+        verifyNoInteractions(wowImport);
+    }
+
+    @Test
+    void statsConsentWithBattleNetOffOrAClosedGateIsUnavailable() {
+        UserAccount account = statsStreamer(false);
+        assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_unavailable");
+
+        lenient().when(battleNetGate.isAvailableFor(account)).thenReturn(true);
+        when(wowImportProvider.getIfAvailable()).thenReturn(null);
+        assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_unavailable");
+        verifyNoInteractions(wowImport, battleNetFriends);
+    }
+
+    @Test
+    void statsConsentRefusalsAndFailuresHaveTheirCodes() {
+        UserAccount account = statsStreamer(true);
+
+        when(wowImport.importFor(account, "wow-token", Locale.FRENCH)).thenThrow(
+            new BlizzardImportRefusedException(BlizzardImportRefusedException.Reason.NOT_LINKED));
+        assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_unavailable");
+
+        reset(wowImport);
+        when(wowImport.importFor(account, "wow-token", Locale.FRENCH)).thenThrow(
+            new BlizzardImportRefusedException(BlizzardImportRefusedException.Reason.OTHER_ACCOUNT));
+        assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_mismatch");
+
+        reset(wowImport);
+        when(wowImport.importFor(account, "wow-token", Locale.FRENCH))
+            .thenThrow(new BlizzardUnavailableException("down"));
+        assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_failed");
+
+        reset(wowImport);
+        when(wowImport.importFor(account, "wow-token", Locale.FRENCH))
+            .thenThrow(new IllegalStateException("boom"));
+        assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_failed");
+        verifyNoInteractions(battleNetFriends, oAuthTokenRepository);
     }
 
     private OAuth2UserRequest epicRequest() {

@@ -108,6 +108,8 @@ class ChannelDashboardAssemblerTest {
             mock(fr.enimaloc.catapult.service.epic.EpicLinkStateService.class);
     private final fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService speedrunAccounts =
             mock(fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService.class);
+    private final fr.enimaloc.catapult.service.blizzard.BlizzardAccountService blizzardAccounts =
+            mock(fr.enimaloc.catapult.service.blizzard.BlizzardAccountService.class);
     private final fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService raAccounts =
             mock(fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService.class);
     private final MinecraftLinkStateService minecraftStates =
@@ -141,7 +143,7 @@ class ChannelDashboardAssemblerTest {
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumService.class)), categoryCache,
-                streamTitle, dropsGate, dropsCatalog, speedrunAccounts, raAccounts);
+                streamTitle, dropsGate, dropsCatalog, speedrunAccounts, raAccounts, java.util.Optional.of(blizzardAccounts));
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }
@@ -568,6 +570,26 @@ class ChannelDashboardAssemblerTest {
             assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData.class
                     .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
                     .containsExactly("username", "profileUrl", "hasApiKey", "keyInvalid", "poolAvailable");
+        }
+
+        @Test
+        void dashboardCarriesTheBlizzardSettingsForTheOwnerOnly() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(true, "eu", true,
+                    List.of(new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData.WowCharacterOption(
+                            "eu:1", "Thrall")), "eu:1", true, java.time.Instant.parse("2026-11-20T10:00:00Z"));
+            when(blizzardAccounts.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).blizzardStats()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).blizzardStats()).isNull();
+            verify(blizzardAccounts, never()).data(moderator);
+        }
+
+        @Test
+        void blizzardDashboardDataNeverCarriesInternalIdsOrTokens() {
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("linked", "region", "wowImported", "characters", "wowMainKey", "available",
+                            "wowImportedAt");
         }
 
         @Test

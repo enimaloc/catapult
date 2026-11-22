@@ -831,6 +831,30 @@ class RealApiServiceTest {
     }
 
     @Test
+    void blizzardSettings_areSavedAndForgottenOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/blizzard/region", "{\"region\":\"us\"}");
+        expectPut(channel("enimaloc") + "/settings/blizzard/wow-main", "{\"region\":\"eu\",\"characterId\":1001}");
+        expectDelete(channel("enimaloc") + "/settings/blizzard/wow-characters");
+
+        assertThat(service.saveBlizzardRegion("enimaloc", "us")).isEqualTo(204);
+        assertThat(service.saveBlizzardWowMain("enimaloc", "eu", 1001L)).isEqualTo(204);
+        assertThat(service.deleteBlizzardWowCharacters("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void blizzardRefusals_keepTheirStatus() {
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/blizzard/region")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/blizzard/wow-main")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.NOT_FOUND));
+
+        assertThat(service.saveBlizzardRegion("enimaloc", "xx")).isEqualTo(400);
+        assertThat(service.saveBlizzardWowMain("enimaloc", "eu", 9L)).isEqualTo(404);
+    }
+
+    @Test
     void retroAchievementsRefusals_keepTheirStatus() {
         expect(HttpMethod.PUT, channel("enimaloc") + "/settings/retroachievements/api-key")
                 .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(

@@ -15,6 +15,9 @@ import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
+import fr.enimaloc.catapult.api.error.ApiProblem;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardRegionRequest;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardWowMainRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
@@ -42,6 +45,9 @@ import fr.enimaloc.catapult.service.notification.TwitchatEventActionService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService;
+import fr.enimaloc.catapult.common.error.ErrorCode;
+import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
 import fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService;
 import fr.enimaloc.catapult.service.steam.SteamPersonalTokenService;
 import lombok.RequiredArgsConstructor;
@@ -63,6 +69,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -92,6 +99,8 @@ public class ApiChannelActionsController {
     private final EmergencyStopService emergencyStopService;
     private final SpeedrunAccountService speedrunAccountService;
     private final RetroAchievementsAccountService retroAchievementsAccountService;
+    /** Absent unless {@code battlenet.enabled}: the Blizzard routes are then a 404. */
+    private final Optional<BlizzardAccountService> blizzardAccountService;
 
 
     // ── Binding actions ───────────────────────────────────────────────────────
@@ -419,6 +428,44 @@ public class ApiChannelActionsController {
             @PathVariable UUID userId) {
 
         speedrunAccountService.deleteApiKey(userResolver.user(userId));
+    }
+
+    /** 400 for an unknown region, 404 without a Battle.net link (or without Battle.net on this instance). */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/blizzard/region")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveBlizzardRegion(
+            @PathVariable UUID userId,
+            @RequestBody BlizzardRegionRequest body) {
+
+        blizzard().setRegion(userResolver.user(userId), body.region());
+    }
+
+    /** 400 when the region is unknown or the character is not one of the imported ones. */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/blizzard/wow-main")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveBlizzardWowMain(
+            @PathVariable UUID userId,
+            @RequestBody BlizzardWowMainRequest body) {
+
+        BlizzardRegion region = BlizzardRegion.parse(body.region())
+                .orElseThrow(() -> new ApiProblem(ErrorCode.BAD_REQUEST, "Unknown Blizzard region"));
+        blizzard().setWowMain(userResolver.user(userId), region, body.characterId());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/blizzard/wow-characters")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteBlizzardWowCharacters(
+            @PathVariable UUID userId) {
+
+        blizzard().deleteWowCharacters(userResolver.user(userId));
+    }
+
+    private BlizzardAccountService blizzard() {
+        return blizzardAccountService.orElseThrow(
+                () -> new ApiProblem(ErrorCode.NOT_FOUND, "Blizzard settings are not available"));
     }
 
     /** 400 when RetroAchievements does not know the name, 503 when it cannot be asked (or no key can ask it). */

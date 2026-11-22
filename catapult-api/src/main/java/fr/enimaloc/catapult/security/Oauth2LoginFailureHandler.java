@@ -41,13 +41,22 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
     private static final Set<String> BUSINESS_ERROR_CODES = Set.of(
             "not_whitelisted", "invalid_invite", "alpha_full",
             "system_account_login_forbidden", "unauthorized", "battlenet_unavailable", "battlenet_full",
-            "epic_unavailable", "epic_full", "epic_already_linked");
+            "epic_unavailable", "epic_full", "epic_already_linked",
+            "battlenet_stats_unavailable", "battlenet_stats_failed", "battlenet_stats_mismatch",
+            "battlenet_stats_cancelled");
     /**
      * Refusals of a link the member started from their channel's integrations tab: they go back there, the code as
      * {@code error}, for the card to tell why (TwitchLoginSuccessHandler sends a successful link to the same tab).
      */
     private static final Set<String> CHANNEL_LINK_ERROR_CODES = Set.of(
-            "epic_unavailable", "epic_full", "epic_already_linked");
+            "epic_unavailable", "epic_full", "epic_already_linked",
+            "battlenet_stats_unavailable", "battlenet_stats_failed", "battlenet_stats_mismatch",
+            "battlenet_stats_cancelled");
+    /** The World of Warcraft import: a failure that is not one of its refusals is a failed import on the card. */
+    private static final String WOW_IMPORT = "battlenet-stats";
+    private static final Set<String> WOW_IMPORT_ERROR_CODES = Set.of(
+            "battlenet_stats_unavailable", "battlenet_stats_failed", "battlenet_stats_mismatch",
+            "battlenet_stats_cancelled");
 
     @Value("${app.web-url:http://localhost:8080}")
     private String webUrl;
@@ -59,6 +68,14 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
         log.error("OAuth2 login failed: [{}] {}", exception.getClass().getSimpleName(), exception.getMessage(), exception);
 
         String registrationId = registrationIdOf(request);
+        if (WOW_IMPORT.equals(registrationId) && "access_denied".equals(errorCode)) {
+            // The member declined on Blizzard's consent page: not a failure
+            errorCode = "battlenet_stats_cancelled";
+        }
+        if (WOW_IMPORT.equals(registrationId) && !"unauthorized".equals(errorCode)
+                && !WOW_IMPORT_ERROR_CODES.contains(errorCode)) {
+            errorCode = "battlenet_stats_failed";
+        }
         if ("twitch".equals(registrationId) && !BUSINESS_ERROR_CODES.contains(errorCode) && !alreadyRetried(request)) {
             markRetried(request, response);
             if (request.getSession(false) != null) {

@@ -140,7 +140,7 @@ class ApiRelayControllerTest {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(ApiClient.SESSION_JWT_KEY, "session-jwt");
 
-        for (String provider : List.of("battlenet", "xbox", "steam")) {
+        for (String provider : List.of("battlenet", "battlenet-stats", "xbox", "steam")) {
             mvc.perform(get("/oauth2/authorization/" + provider).session(session)
                             .header("Authorization", "Bearer forged"))
                     .andExpect(status().isOk());
@@ -253,7 +253,9 @@ class ApiRelayControllerTest {
     @Test
     void relaysThePublicApiByResource() throws Exception {
         for (String path : List.of("/api/me/game", "/api/me/game/summary", "/api/me/bindings/x1",
-                "/api/games/igdb/1", "/api/games/steam/2", "/api/games/xbox/9N", "/api/games/dtdd/3")) {
+                "/api/games/igdb/1", "/api/games/steam/2", "/api/games/xbox/9N", "/api/games/dtdd/3",
+                "/api/me/stats/blizzard/wow", "/api/games/blizzard/wow/token/eu",
+                "/api/games/blizzard/hearthstone/deck/AAECAR8GxwPJBLsF")) {
             mvc.perform(get(path).queryParam("token", "catr_READ")).andExpect(status().isOk());
             assertThat(RECEIVED.get().uri()).isEqualTo(path + "?token=catr_READ");
         }

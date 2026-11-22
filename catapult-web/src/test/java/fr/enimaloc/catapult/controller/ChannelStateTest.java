@@ -112,6 +112,27 @@ class ChannelStateTest {
     }
 
     @Test
+    void blizzardSettings_asItsEvent() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(true, "eu", true,
+                        List.of(new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData.WowCharacterOption("eu:1", "Thrall")), "eu:1", true,
+                        java.time.Instant.parse("2026-11-20T23:30:00Z")));
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent("enimaloc", true, "eu", true, true, "eu:1", "2026-11-20", true));
+    }
+
+    @Test
+    void noBlizzardSettings_noEvent() {
+        ChannelPageData ch = page(null, new PagedBindings(0, 0, 0, List.of()), null, null, null, null);
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .noneMatch(event -> event instanceof fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent);
+    }
+
+    @Test
     void noRetroAchievementsAccount_noEvent() {
         ChannelPageData ch = page(null, new PagedBindings(0, 0, 0, List.of()), null, null, null, null);
 

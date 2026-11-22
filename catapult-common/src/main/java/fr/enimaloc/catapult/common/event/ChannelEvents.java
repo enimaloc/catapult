@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 
 import java.util.List;
@@ -42,6 +43,7 @@ public final class ChannelEvents {
     public static final String EPIC_LINK_CHANGED = "epic.link.changed";
     public static final String SPEEDRUN_ACCOUNT_CHANGED = "speedrun.account.changed";
     public static final String RETROACHIEVEMENTS_ACCOUNT_CHANGED = "retroachievements.account.changed";
+    public static final String BLIZZARD_ACCOUNT_CHANGED = "blizzard.account.changed";
     public static final String CUSTOM_BINDING_CHANGED = "custom.binding.changed";
     public static final String CUSTOM_BINDINGS_UPDATED = "custom.bindings.updated";
 
@@ -124,6 +126,12 @@ public final class ChannelEvents {
      * names only, never the personal API key.
      */
     public record SpeedrunAccountChanged(String channelId, String channelLogin, SpeedrunData account) {}
+
+    /**
+     * The owner's Blizzard settings changed: {@code account} is how the settings card stands now (names only, no
+     * token is ever held).
+     */
+    public record BlizzardAccountChanged(String channelId, String channelLogin, BlizzardStatsData account) {}
 
     /**
      * The owner's RetroAchievements settings changed: {@code account} is how the settings card stands now. It

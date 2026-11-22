@@ -162,4 +162,32 @@ class HttpTraceLoggingInterceptorTest {
 
         assertThat(logs.list).isEmpty();
     }
+
+    @Test
+    void tokenResponseIsMasked() throws IOException {
+        MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.POST,
+                URI.create("https://oauth.battle.net/token"));
+
+        ClientHttpResponse response = interceptor.intercept(request, "grant_type=client_credentials".getBytes(),
+                respondWith("{\"access_token\":\"SECRETTOKEN\",\"token_type\":\"bearer\",\"expires_in\":86399}"));
+
+        assertThat(messages()).doesNotContain("SECRETTOKEN").contains("token_type");
+        assertThat(new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8)).contains("SECRETTOKEN");
+    }
+
+    @Test
+    void everyProvidersTokenExchangeIsMasked() throws IOException {
+        MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.POST,
+                URI.create("https://id.twitch.tv/oauth2/token?client_id=cid&client_secret=QSECRET&grant_type=x"));
+
+        interceptor.intercept(request, "client_id=cid&client_secret=BSECRET&refresh_token=RSECRET".getBytes(),
+                respondWith("{\"access_token\":\"ATOKEN\",\"refresh_token\":\"RTOKEN\",\"expires_in\":1432}"));
+
+        assertThat(messages())
+                .contains("client_id=cid&client_secret=***&grant_type=x")
+                .contains("body=client_id=cid&client_secret=***&refresh_token=***")
+                .contains("expires_in")
+                .doesNotContain("QSECRET").doesNotContain("BSECRET").doesNotContain("RSECRET")
+                .doesNotContain("ATOKEN").doesNotContain("RTOKEN");
+    }
 }

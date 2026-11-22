@@ -40,7 +40,8 @@ import java.util.regex.Pattern;
  *
  * <p>{@code Authorization} / {@code X-API-KEY} values are never echoed — only
  * their presence is reported. Neither are the values of the {@code key},
- * {@code api_key}, {@code apikey} and {@code token} query parameters (any case),
+ * {@code api_key}, {@code apikey}, {@code token}, {@code y}, {@code client_secret}, {@code access_token} and
+ * {@code refresh_token} query parameters (any case),
  * masked in the logged URI.</p>
  *
  * <p>The same exchange also feeds the per-member debug mode: it joins the active
@@ -55,7 +56,17 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
     static final int MAX_BODY_CHARS = 4096;
     /** A credential query parameter: its name and {@code =} (group 1), then its value up to the next one. */
     private static final Pattern SECRET_QUERY_PARAM =
-            Pattern.compile("([?&](?:key|api_key|apikey|token|y)=)[^&#]*", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("([?&](?:key|api_key|apikey|token|y|client_secret|access_token|refresh_token)=)[^&#]*",
+                    Pattern.CASE_INSENSITIVE);
+
+    /** A credential field of a form-encoded request body (an OAuth token request): its name and {@code =}. */
+    private static final Pattern SECRET_FORM_FIELD =
+            Pattern.compile("((?:^|&)(?:client_secret|access_token|refresh_token|password)=)[^&]*",
+                    Pattern.CASE_INSENSITIVE);
+
+    /** An OAuth token answer, from any provider: its tokens are credentials (they never reach the log). */
+    private static final Pattern ACCESS_TOKEN_FIELD =
+            Pattern.compile("(\"(?:access_token|refresh_token|id_token)\"\\s*:\\s*\")(?:[^\"\\\\]|\\\\.)*(\")");
 
     private final DebugMemberRegistry registry;
     private final DebugExchangeRecorder recorder;
@@ -83,7 +94,7 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
                     request.getMethod(),
                     masked(request.getURI()),
                     redactAuth(request),
-                    truncate(body));
+                    truncate(loggedRequest(body)));
         }
         ClientHttpResponse response;
         try {
@@ -124,7 +135,7 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
                     request.getMethod(),
                     masked(request.getURI()),
                     elapsedMs,
-                    truncate(respBody));
+                    truncate(logged(respBody)));
         }
         if (debug != null) {
             debug.emit(raw(at, request, body, response, respBody, null, elapsedMs));
@@ -219,6 +230,24 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
     /** {@code uri} with the value of every credential query parameter replaced by {@code ***}. */
     static String masked(URI uri) {
         return SECRET_QUERY_PARAM.matcher(uri.toString()).replaceAll("$1***");
+    }
+
+    /** The request body as it may be logged: the credentials of a form-encoded token request are masked. */
+    private static byte[] loggedRequest(byte[] body) {
+        if (body == null || body.length == 0) {
+            return body;
+        }
+        String masked = SECRET_FORM_FIELD.matcher(new String(body, StandardCharsets.UTF_8)).replaceAll("$1***");
+        return masked.getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** The response body as it may be logged: the tokens of an OAuth token answer are masked. */
+    private static byte[] logged(byte[] respBody) {
+        if (respBody == null || respBody.length == 0) {
+            return respBody;
+        }
+        String masked = ACCESS_TOKEN_FIELD.matcher(new String(respBody, StandardCharsets.UTF_8)).replaceAll("$1***$2");
+        return masked.getBytes(StandardCharsets.UTF_8);
     }
 
     private static String redactAuth(HttpRequest request) {

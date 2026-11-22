@@ -35,12 +35,17 @@ window.CatapultChannel = (function () {
     }
 
     /** Shows `message` in a snackbar, removed from the page once it closes. */
-    function showError(message) {
+    function showMessage(message) {
         const snackbar = document.createElement("mdui-snackbar");
         snackbar.textContent = message;
         snackbar.addEventListener("closed", () => snackbar.remove());
         snackbar.open = true;
         document.body.appendChild(snackbar);
+    }
+
+    /** Shows an error in a snackbar. */
+    function showError(message) {
+        showMessage(message);
     }
 
     /** What a refused action says (index.html's body carries it in the page's language), with its status. */
@@ -142,7 +147,7 @@ window.CatapultChannel = (function () {
     // No handler is needed here for any Steam, Minecraft, Battle.net, Ankama or Epic event.
 
     return {
-        username, baseUrl, refresh, postJson, postSwitch, showError, actionFailed, unreachable,
+        username, baseUrl, refresh, postJson, postSwitch, showError, showMessage, actionFailed, unreachable,
         on, checkedValues,
         getBindingsElements, getBindingElement,
         setCurrentGame,

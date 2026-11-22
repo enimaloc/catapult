@@ -6,7 +6,13 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardGameDataService;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardPublisher;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStats;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStatsService;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
+import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BlizzardGame;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticService;
@@ -110,6 +116,8 @@ class GameEnrichmentAssemblerTest {
     private final SteamStatsService steamStats = mock(SteamStatsService.class);
     private final XboxStatsService xboxStats = mock(XboxStatsService.class);
     private final RetroAchievementsStatsService raStats = mock(RetroAchievementsStatsService.class);
+    private final BlizzardStatsService blizzardStats = mock(BlizzardStatsService.class);
+    private final BlizzardGameDataService blizzardData = mock(BlizzardGameDataService.class);
     private final EnrichmentProperties properties = new EnrichmentProperties();
 
     private GameEnrichmentAssembler assembler;
@@ -119,7 +127,7 @@ class GameEnrichmentAssemblerTest {
         properties.setAggregateTimeout(Duration.ofSeconds(2));
         assembler = new GameEnrichmentAssembler(hltb, protonDb, steamGridDb, steamDeck, pcgw, prices, openCritic,
                 twitch, speedrunGames, speedrunIdentity, speedrunPersonal, igdbService, igdbGameDetailsService,
-                trailers, steamStats, xboxStats, raStats, properties);
+                trailers, steamStats, xboxStats, raStats, blizzardStats, blizzardData, properties);
         when(hltb.timeToBeat(any(), any())).thenReturn(Optional.of(TTB));
         when(protonDb.summary(anyString(), any())).thenReturn(Optional.of(PROTON));
         when(steamGridDb.bySteamAppId(anyString(), any())).thenReturn(Optional.of(SGDB));
@@ -350,6 +358,8 @@ class GameEnrichmentAssemblerTest {
                 .withBean(SteamStatsService.class, () -> steamStats)
                 .withBean(XboxStatsService.class, () -> xboxStats)
                 .withBean(RetroAchievementsStatsService.class, () -> raStats)
+                .withBean(BlizzardStatsService.class, () -> blizzardStats)
+                .withBean(BlizzardGameDataService.class, () -> blizzardData)
                 .withBean(EnrichmentProperties.class)
                 .withUserConfiguration(GameEnrichmentAssembler.class)
                 .run(ctx -> assertThat(ctx).hasSingleBean(GameEnrichmentAssembler.class));
@@ -514,7 +524,7 @@ class GameEnrichmentAssemblerTest {
         GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
                 null, LINKS, Optional.of(user), Locale.FRENCH);
 
-        assertThat(result.stats()).isEqualTo(new PersonalStatsEnrichment(STEAM_OK, XBOX_OK, RA_OK,
+        assertThat(result.stats()).isEqualTo(new PersonalStatsEnrichment(STEAM_OK, XBOX_OK, RA_OK, null,
                 GameBinding.SourceType.STEAM));
         verify(steamStats).forGame(user, "620", Locale.FRENCH, FetchBudget.UNLIMITED, false);
         verify(xboxStats).forTitle(user, "1144039928", Locale.FRENCH, FetchBudget.UNLIMITED, false);
@@ -597,9 +607,125 @@ class GameEnrichmentAssemblerTest {
         PersonalStatsEnrichment stats = assembler.personalStats(PORTAL, Optional.of("72"), Optional.of("620"),
                 "Portal 2", user, Locale.ENGLISH);
 
-        assertThat(stats).isEqualTo(new PersonalStatsEnrichment(STEAM_OK, XBOX_OK, RA_OK,
+        assertThat(stats).isEqualTo(new PersonalStatsEnrichment(STEAM_OK, XBOX_OK, RA_OK, null,
                 GameBinding.SourceType.STEAM));
         verifyNoInteractions(hltb, protonDb, prices);
+    }
+
+    // ---------------------------------------------------------------- Blizzard
+
+    private static final DetectedGame WOW = new DetectedGame("WoW", GameBinding.SourceType.BATTLENET,
+            "World of Warcraft");
+    private static final BlizzardStats WOW_STATS = new BlizzardStats(Status.OK, BlizzardGame.WOW, "Name#1234", "eu",
+            null, null, null, null);
+    private static final BlizzardPublisher WOW_PUBLIC = new BlizzardPublisher(BlizzardGame.WOW, "eu",
+            new BlizzardPublisher.Wow(470_531L, null), null, null, null);
+
+    @Test
+    void publicAggregateHasNoBlizzardStats() {
+        when(blizzardData.available()).thenReturn(true);
+        when(blizzardData.forGame(eq(BlizzardGame.WOW), eq(BlizzardRegion.EU), any(), any()))
+                .thenReturn(Optional.of(WOW_PUBLIC));
+
+        GameEnrichment result = assembler.enrich(WOW, Optional.of("123"), Optional.empty(), "World of Warcraft",
+                "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
+
+        assertThat(result.stats()).isNull();
+        verifyNoInteractions(blizzardStats);
+        // the public data of the game is there, in the default region, without a member
+        assertThat(result.publisher()).isEqualTo(new PublisherEnrichment(WOW_PUBLIC));
+    }
+
+    @Test
+    void memberBlizzardStatsAndPublisherInTheMembersRegion() {
+        UserAccount user = member();
+        when(blizzardData.available()).thenReturn(true);
+        when(blizzardStats.forDetected(eq(user), eq(WOW), eq("123"), eq(Locale.FRENCH), any()))
+                .thenReturn(Optional.of(WOW_STATS));
+        when(blizzardStats.region(user)).thenReturn(BlizzardRegion.US);
+        BlizzardPublisher us = new BlizzardPublisher(BlizzardGame.WOW, "us",
+                new BlizzardPublisher.Wow(200_000L, null), null, null, null);
+        when(blizzardData.forGame(eq(BlizzardGame.WOW), eq(BlizzardRegion.US), any(), any()))
+                .thenReturn(Optional.of(us));
+
+        GameEnrichment result = assembler.enrich(WOW, Optional.of("123"), Optional.empty(), "World of Warcraft",
+                "FR", null, LINKS, Optional.of(user), Locale.FRENCH);
+
+        assertThat(result.stats().blizzard()).isEqualTo(WOW_STATS);
+        assertThat(result.stats().detectedOn()).isEqualTo(GameBinding.SourceType.BATTLENET);
+        assertThat(result.publisher().blizzard()).isEqualTo(us);
+        verify(blizzardStats).forDetected(user, WOW, "123", Locale.FRENCH, FetchBudget.UNLIMITED);
+    }
+
+    @Test
+    void noBlizzardGameIsNoPublisher() {
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
+                null, LINKS, Optional.empty(), Locale.ENGLISH);
+
+        assertThat(result.publisher()).isNull();
+        verifyNoInteractions(blizzardData);
+    }
+
+    @Test
+    void slowBlizzardDoesNotBlockOthers() {
+        properties.setAggregateTimeout(Duration.ofMillis(500));
+        UserAccount user = member();
+        statsEverywhere(user);
+        when(blizzardStats.forDetected(any(), any(), any(), any(), any()))
+                .thenAnswer(slow(Duration.ofSeconds(3), Optional.of(WOW_STATS)));
+
+        long start = System.nanoTime();
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
+                null, LINKS, Optional.of(user), Locale.ENGLISH);
+        Duration took = Duration.ofNanos(System.nanoTime() - start);
+
+        assertThat(result.stats().blizzard()).isNull();
+        assertThat(result.stats().steam()).isEqualTo(STEAM_OK);
+        assertThat(result.hltb()).isEqualTo(TTB);
+        assertThat(took).isLessThan(Duration.ofMillis(1500));
+    }
+
+    @Test
+    void slowBlizzardStatsDoNotBlockTheBlizzardPublisher() {
+        properties.setAggregateTimeout(Duration.ofMillis(500));
+        UserAccount user = member();
+        when(blizzardData.available()).thenReturn(true);
+        when(blizzardStats.region(user)).thenReturn(BlizzardRegion.EU);
+        when(blizzardData.forGame(eq(BlizzardGame.WOW), eq(BlizzardRegion.EU), any(), any()))
+                .thenReturn(Optional.of(WOW_PUBLIC));
+        when(blizzardStats.forDetected(any(), any(), any(), any(), any()))
+                .thenAnswer(slow(Duration.ofSeconds(3), Optional.of(WOW_STATS)));
+
+        GameEnrichment result = assembler.enrich(WOW, Optional.of("123"), Optional.empty(), "World of Warcraft",
+                "FR", null, LINKS, Optional.of(user), Locale.ENGLISH);
+
+        assertThat(result.stats()).isNull();
+        assertThat(result.publisher().blizzard()).isEqualTo(WOW_PUBLIC);
+    }
+
+    @Test
+    void sourceOffSkipsTheRegionRead() {
+        UserAccount user = member();
+        when(blizzardData.available()).thenReturn(false);
+
+        GameEnrichment result = assembler.enrich(WOW, Optional.of("123"), Optional.empty(), "World of Warcraft",
+                "FR", null, LINKS, Optional.of(user), Locale.ENGLISH);
+
+        assertThat(result.publisher()).isNull();
+        org.mockito.Mockito.verify(blizzardStats, org.mockito.Mockito.never()).region(any());
+    }
+
+    @Test
+    void personalStatsAlone_includeBlizzard() {
+        UserAccount user = member();
+        when(blizzardStats.forDetected(eq(user), eq(WOW), eq("123"), any(), any()))
+                .thenReturn(Optional.of(WOW_STATS));
+
+        PersonalStatsEnrichment stats = assembler.personalStats(WOW, Optional.of("123"), Optional.empty(),
+                "World of Warcraft", user, Locale.ENGLISH);
+
+        assertThat(stats.blizzard()).isEqualTo(WOW_STATS);
+        verifyNoInteractions(blizzardData);
     }
 
     private static Answer<Object> slow(Duration delay, Object value) {

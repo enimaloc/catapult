@@ -234,6 +234,52 @@ class TwitchLoginSuccessHandlerTest {
     }
 
     @Test
+    void userTokenIsForgottenAfterImport() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("battlenet-stats");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(authorizedClientRepository).removeAuthorizedClient("battlenet-stats", authToken, request, response);
+        verify(authorizedClientRepository, never()).removeAuthorizedClient(eq("battlenet"), any(), any(), any());
+        verify(authorizedClientRepository, never()).loadAuthorizedClient(any(), any(), any());
+        verify(oAuthTokenRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("https://web.example.com/channel/jeb_?imported=wow#integrations");
+    }
+
+    @Test
+    void anImportThatFoundNoCharacterIsToldApart() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        request.setAttribute(TwitchLoginSuccessHandler.WOW_IMPORT_COUNT_ATTRIBUTE, 0);
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("battlenet-stats");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("https://web.example.com/channel/jeb_?imported=wow-empty#integrations");
+    }
+
+    @Test
+    void userTokenIsForgottenEvenWithoutTheWeb() throws Exception {
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("battlenet-stats");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(authorizedClientRepository).removeAuthorizedClient("battlenet-stats", authToken, request, response);
+        assertThat(response.getRedirectedUrl()).isEqualTo("/dashboard");
+    }
+
+    @Test
     void epicAuthorizedClient_isRemovedAfterTheLink() throws Exception {
         ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
         userAccount.setTwitchUsername("jeb_");

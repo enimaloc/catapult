@@ -17,6 +17,7 @@ import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
@@ -131,6 +132,14 @@ public class MockData {
     /** The RetroAchievements card is offered to every mock session too; the mock has a shared key. */
     private String retroAchievementsUsername;
     private boolean retroAchievementsKeySaved;
+    /** The Blizzard card too: a region and two imported World of Warcraft characters, the first the main. */
+    static final List<String> BLIZZARD_REGIONS = List.of("eu", "us", "kr", "tw");
+    private static final List<BlizzardStatsData.WowCharacterOption> MOCK_WOW_CHARACTERS = List.of(
+            new BlizzardStatsData.WowCharacterOption("eu:1001", "Thrall — Draenor (80, Shaman)"),
+            new BlizzardStatsData.WowCharacterOption("eu:1002", "Jaina — Archimonde (70, Mage)"));
+    private String blizzardRegion = "eu";
+    private List<BlizzardStatsData.WowCharacterOption> blizzardCharacters = MOCK_WOW_CHARACTERS;
+    private String blizzardWowMain = "eu:1001";
     private ObsData obsData;
     private String obsPassword;
     private String twitchatBranch = TwitchatData.AUTO;
@@ -376,7 +385,7 @@ public class MockData {
                 obsData == null ? null : TwitchatData.of(twitchatBranch),
                 username.equals(channelDto.twitchUsername()) ? customBindings.state() : null,
                 // drops: the mock has no experiments, they are offered
-                drops(), ankamaData(), epicData(), speedrunData(), retroAchievementsData());
+                drops(), ankamaData(), epicData(), speedrunData(), retroAchievementsData(), blizzardStatsData());
     }
 
     /** The mock's one running drops campaign, on the first binding's category. */
@@ -424,6 +433,30 @@ public class MockData {
 
     public void deleteSpeedrunKey() {
         speedrunKeySaved = false;
+    }
+
+    public BlizzardStatsData blizzardStatsData() {
+        return new BlizzardStatsData(!List.of("NONE", "REMOVED").contains(battleNetLink.status()), blizzardRegion,
+                !blizzardCharacters.isEmpty(), blizzardCharacters, blizzardWowMain, true,
+                blizzardCharacters.isEmpty() ? null : java.time.Instant.parse("2026-11-20T10:00:00Z"));
+    }
+
+    public void saveBlizzardRegion(String region) {
+        blizzardRegion = region;
+    }
+
+    /** Picks {@code key} as the main; false when it is not one of the imported characters. */
+    public boolean saveBlizzardWowMain(String key) {
+        if (blizzardCharacters.stream().noneMatch(c -> c.key().equals(key))) {
+            return false;
+        }
+        blizzardWowMain = key;
+        return true;
+    }
+
+    public void deleteBlizzardWowCharacters() {
+        blizzardCharacters = List.of();
+        blizzardWowMain = null;
     }
 
     public RetroAchievementsData retroAchievementsData() {

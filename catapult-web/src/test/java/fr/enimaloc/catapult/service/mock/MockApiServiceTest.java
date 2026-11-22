@@ -502,6 +502,30 @@ class MockApiServiceTest {
     }
 
     @Test
+    void blizzardSettings_followTheChoicesAndTellThePage() {
+        assertThat(data.blizzardStatsData().region()).isEqualTo("eu");
+        assertThat(data.blizzardStatsData().characters()).hasSize(2);
+        assertThat(data.blizzardStatsData().characters()).extracting(c -> c.label())
+                .containsExactly("Thrall — Draenor (80, Shaman)", "Jaina — Archimonde (70, Mage)");
+
+        assertThat(service.saveBlizzardRegion(username, "us")).isEqualTo(204);
+        assertThat(service.saveBlizzardRegion(username, "xx")).isEqualTo(400);
+        assertThat(data.blizzardStatsData().region()).isEqualTo("us");
+
+        assertThat(service.saveBlizzardWowMain(username, "eu", 1002)).isEqualTo(204);
+        assertThat(service.saveBlizzardWowMain(username, "eu", 5)).isEqualTo(400);
+        assertThat(data.blizzardStatsData().wowMainKey()).isEqualTo("eu:1002");
+
+        assertThat(service.deleteBlizzardWowCharacters(username)).isEqualTo(204);
+        assertThat(data.blizzardStatsData().wowImported()).isFalse();
+        assertThat(data.blizzardStatsData().characters()).isEmpty();
+        assertThat(data.blizzardStatsData().wowMainKey()).isNull();
+
+        assertThat(events).hasSize(3).allSatisfy(event -> assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent.class));
+        assertThat(events.getLast()).isEqualTo(new fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent(username, false, "us", false, false, null, "", true));
+    }
+
+    @Test
     void retroAchievementsAccount_followsTheSettingsAndTellsThePage() {
         assertThat(data.retroAchievementsData().username()).isNull();
         assertThat(data.retroAchievementsData().poolAvailable()).isTrue();

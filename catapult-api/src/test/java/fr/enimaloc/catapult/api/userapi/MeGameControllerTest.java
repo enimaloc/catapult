@@ -10,6 +10,10 @@ import fr.enimaloc.catapult.service.account.ApiTokenOwner;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
 import fr.enimaloc.catapult.service.enrichment.PersonalStatsEnrichment;
+import fr.enimaloc.catapult.service.enrichment.PublisherEnrichment;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardPublisher;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStats;
+import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BlizzardGame;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
@@ -172,7 +176,7 @@ class MeGameControllerTest {
                 "400", null, null, null, null, new PersonalStatsEnrichment(new PlatformStats(Status.OK, "400", 610L,
                         null, null, AchievementSummary.of(List.of(new Achievement("A1", "First", "d", "i", true,
                                 Instant.parse("2026-11-20T10:00:00Z"), new BigDecimal("3.2"), null, false))), null,
-                        Map.of()), null, null, GameBinding.SourceType.STEAM));
+                        Map.of()), null, null, null, GameBinding.SourceType.STEAM), null);
         when(games.gameInfoV3(eq(user), any(Locale.class), any(), any())).thenReturn(GameInfoV3Response.of(base, enrichment,
                 new MoreLinks("http://localhost", GameInfoAssembler.LinkStyle.CURRENT), Optional.of("1942")));
     }
@@ -214,6 +218,38 @@ class MeGameControllerTest {
                 .andExpect(jsonPath("$.achievements.unlocked").value(1))
                 .andExpect(jsonPath("$.lastAchievement.name").value("First"))
                 .andExpect(jsonPath("$.lastAchievement.unlockedAt").value("2026-11-20T10:00:00Z"))
+                .andExpect(jsonPath("$.stats").doesNotExist());
+    }
+
+    @Test
+    void meGame_v3_hasBlizzardStatsAndPublicData() throws Exception {
+        GameInfoResponse base = new GameInfoResponse(true, null, null, null, null, null, "World of Warcraft");
+        BlizzardStats.WowStats wow = new BlizzardStats.WowStats(Status.OK, "Inspectordob", "Ravencrest", 90,
+                "Evoker", "Preservation", "Dracthyr", "ALLIANCE", null, 28_755, 290, 288, null, null, null,
+                List.of(new Achievement("40219", "Battleground Blitzest", null, null, true,
+                        Instant.parse("2026-11-21T10:00:00Z"), null, null, false)), null);
+        GameEnrichment enrichment = new GameEnrichment(null, null, null, null, null, null, null, null, null, null,
+                null, new PersonalStatsEnrichment(null, null, null, new BlizzardStats(Status.OK, BlizzardGame.WOW,
+                        "Name#1234", "eu", wow, null, null, null), GameBinding.SourceType.BATTLENET),
+                new PublisherEnrichment(new BlizzardPublisher(BlizzardGame.WOW, "eu",
+                        new BlizzardPublisher.Wow(470_531L, null), null, null, null)));
+        when(games.gameInfoV3(eq(user), any(Locale.class), any(), any())).thenReturn(GameInfoV3Response.of(base,
+                enrichment, new MoreLinks("http://localhost", GameInfoAssembler.LinkStyle.CURRENT),
+                Optional.of("123")));
+
+        mvc.perform(withToken(get("/api/me/game")).header(ApiV2.VERSION_HEADER, "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stats.blizzard.account").value("Name#1234"))
+                .andExpect(jsonPath("$.stats.blizzard.wow.level").value(90))
+                .andExpect(jsonPath("$.stats.blizzard.more")
+                        .value("http://localhost/api/me/stats/blizzard/wow?version=3"))
+                .andExpect(jsonPath("$.publisher.blizzard.wow.tokenGold").value(470531))
+                .andExpect(jsonPath("$.publisher.blizzard.account").doesNotExist());
+        mvc.perform(withToken(get("/api/me/game/summary")).header(ApiV2.VERSION_HEADER, "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lastAchievement.platform").value("blizzard"))
+                .andExpect(jsonPath("$.playtime").doesNotExist())
+                .andExpect(jsonPath("$.publisher").doesNotExist())
                 .andExpect(jsonPath("$.stats").doesNotExist());
     }
 

@@ -312,6 +312,39 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void blizzardSettings_areSavedAndForgottenThroughTheApi() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/blizzard/region").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"region\":\"us\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/blizzard/wow-main").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"region\":\"eu\",\"characterId\":1001}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/blizzard/wow-characters/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveBlizzardRegion("enimaloc", "us");
+        verify(apiService).saveBlizzardWowMain("enimaloc", "eu", 1001L);
+        verify(apiService).deleteBlizzardWowCharacters("enimaloc");
+    }
+
+    @Test
+    void blizzardSettings_refusalsKeepTheirStatus() throws Exception {
+        when(apiService.saveBlizzardRegion("enimaloc", "xx")).thenReturn(400);
+        when(apiService.saveBlizzardWowMain("enimaloc", "eu", 9L)).thenReturn(404);
+
+        mvc.perform(post("/channel/enimaloc/settings/blizzard/region").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"region\":\"xx\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/channel/enimaloc/settings/blizzard/wow-main").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"region\":\"eu\",\"characterId\":9}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void refreshSteamProfileCache_callsApiService() throws Exception {
         mvc.perform(post("/channel/enimaloc/steam/refresh-profile-cache").with(csrf()))
                 .andExpect(status().isNoContent());
