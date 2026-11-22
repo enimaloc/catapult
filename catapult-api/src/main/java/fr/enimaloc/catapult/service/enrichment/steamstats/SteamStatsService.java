@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Achievem
 import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.PlatformStats;
 import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Status;
 import fr.enimaloc.catapult.service.steam.SteamLanguage;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -99,6 +100,11 @@ public class SteamStatsService {
             return Optional.of(PlatformStats.of(Status.NOT_OWNED, appId));
         }
 
+        if (!properties.source(EnrichmentSource.STEAM_ACHIEVEMENTS).enabled()
+                || !properties.source(EnrichmentSource.STEAM_SCHEMA).enabled()) {
+            // Not knowing the achievements is not "the game has none": the play time is still served.
+            return Optional.of(stats(Status.UNAVAILABLE, appId, owned, null, null));
+        }
         CompletableFuture<Looked<SteamPlayerAchievements>> unlocked = CompletableFuture.supplyAsync(() ->
                 look(EnrichmentSource.STEAM_ACHIEVEMENTS, member + ":app:" + appId, SteamPlayerAchievements.class,
                         budget, () -> Optional.of(client.playerAchievements(steamId, appId, lang, personalKey))),
@@ -135,6 +141,12 @@ public class SteamStatsService {
         return Optional.of(stats(Status.OK, appId, owned, AchievementSummary.of(all), detail ? all : null));
     }
 
+    /** Stops the workers of the parallel lookups. */
+    @PreDestroy
+    void close() {
+        executor.shutdown();
+    }
+
     private static PlatformStats stats(Status status, String appId, SteamLibrary.Entry owned,
                                        AchievementSummary summary, List<Achievement> all) {
         return new PlatformStats(status, appId, owned.playtimeMinutes(), owned.playtimeTwoWeeksMinutes(),
@@ -169,7 +181,7 @@ public class SteamStatsService {
         Optional<T> value = cache.get(source, key, type, budget, () -> {
             try {
                 return fetch.get();
-            } catch (SteamStatsUnavailableException e) {
+            } catch (RuntimeException e) {
                 failed.set(true);
                 throw e;
             }

@@ -195,6 +195,22 @@ class HttpSteamStatsClientTest {
     }
 
     @Test
+    void wellFormedButWrongShapedAnswersAreErrors() {
+        String schemaUrl = STATS + "/GetSchemaForGame/v2/?key=poolkey&appid=1&l=english";
+        server.expect(once(), requestTo(schemaUrl)).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        server.expect(once(), requestTo(STATS + "/GetPlayerAchievements/v1/?key=poolkey&steamid=7656&appid=1"
+                        + "&l=english")).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        server.expect(once(), requestTo(API + "/IPlayerService/GetOwnedGames/v1/?key=poolkey&steamid=7656"
+                        + "&include_appinfo=0&include_played_free_games=1"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.schema("1", "english")).isInstanceOf(SteamStatsUnavailableException.class);
+        assertThatThrownBy(() -> client.playerAchievements("7656", "1", "english", null))
+                .isInstanceOf(SteamStatsUnavailableException.class);
+        assertThatThrownBy(() -> client.library("7656", null)).isInstanceOf(SteamStatsUnavailableException.class);
+    }
+
+    @Test
     void serverErrorIsAnError() {
         server.expect(once(), requestTo(STATS + "/GetSchemaForGame/v2/?key=poolkey&appid=440&l=english"))
                 .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));

@@ -28,6 +28,7 @@ public final class PersonalStats {
     /**
      * One achievement. A locked secret one carries no name nor description; {@code rarity} is the percentage of
      * players who unlocked it, {@code points} the platform's own score for it (null when it has none).
+     * {@code secret} is the platform's hidden flag, kept even once the achievement is unlocked (on every platform).
      */
     public record Achievement(String id, String name, String description, String iconUrl, boolean unlocked,
                               Instant unlockedAt, BigDecimal rarity, Integer points, boolean secret) {

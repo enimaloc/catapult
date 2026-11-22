@@ -226,6 +226,27 @@ class SteamStatsServiceTest {
     }
 
     @Test
+    void anyFailureOfTheFetchIsUnavailableNotPrivate() {
+        when(client.library(anyString(), any())).thenThrow(new IllegalStateException("boom"));
+
+        assertThat(stats(false).orElseThrow().status()).isEqualTo(Status.UNAVAILABLE);
+    }
+
+    @Test
+    void disabledAchievementsSourceIsUnavailableButKeepsThePlaytime() {
+        EnrichmentProperties properties = new EnrichmentProperties();
+        properties.getSteamSchema().setEnabled(false);
+        service = new SteamStatsService(new EnrichmentCache(repository, properties, MAPPER), client, encryption,
+                properties);
+
+        PlatformStats result = stats(false).orElseThrow();
+
+        assertThat(result.status()).isEqualTo(Status.UNAVAILABLE);
+        assertThat(result.playtimeMinutes()).isEqualTo(7320);
+        assertThat(result.achievements()).isNull();
+    }
+
+    @Test
     void noSteamIdMeansNothing() {
         user.setSteamId(null);
 

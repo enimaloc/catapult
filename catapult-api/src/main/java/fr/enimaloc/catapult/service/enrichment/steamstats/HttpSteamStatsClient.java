@@ -107,6 +107,9 @@ public class HttpSteamStatsClient implements SteamStatsClient {
                     () -> new SteamStatsUnavailableException("Steam answered " + status));
         }
         JsonNode stats = json(requireSuccess(answer)).path("playerstats");
+        if (!stats.isObject()) {
+            throw new SteamStatsUnavailableException("Steam answered no playerstats object");
+        }
         if (!stats.path("success").asBoolean(true)) {
             return refusal(stats.path("error").asString("")).orElseThrow(
                     () -> new SteamStatsUnavailableException("Steam reported a failure"));
@@ -127,8 +130,11 @@ public class HttpSteamStatsClient implements SteamStatsClient {
     @Override
     public Optional<SteamAchievementSchema> schema(String appId, String lang) {
         Answer answer = get(null, STATS + "/GetSchemaForGame/v2/?key={key}&appid={app}&l={lang}", appId, lang);
-        JsonNode achievements = json(requireSuccess(answer)).path("game").path("availableGameStats")
-                .path("achievements");
+        JsonNode game = json(requireSuccess(answer)).path("game");
+        if (!game.isObject()) {
+            throw new SteamStatsUnavailableException("Steam answered no game object");
+        }
+        JsonNode achievements = game.path("availableGameStats").path("achievements");
         if (!achievements.isArray()) {
             return Optional.empty();
         }
