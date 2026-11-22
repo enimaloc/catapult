@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.enrichment.steamgriddb;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import fr.enimaloc.catapult.getter.steamgriddb.SteamGridDbApiKeyRotator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -26,6 +27,8 @@ public class HttpSteamGridDbClient implements SteamGridDbClient {
 
     private static final String BASE = "https://www.steamgriddb.com/api/v2";
     private static final String GAME_URL = "https://www.steamgriddb.com/game/";
+    /** The grid sizes asked for, best first: the portrait cover shape of the UI (the IGDB cover it replaces). */
+    static final String COVER_DIMENSIONS = "600x900,342x482,660x930";
     private static final Duration DEFAULT_BLOCK = Duration.ofSeconds(60);
 
     private final JsonMapper mapper = JsonMapper.builder().build();
@@ -33,7 +36,7 @@ public class HttpSteamGridDbClient implements SteamGridDbClient {
     private final Optional<SteamGridDbApiKeyRotator> rotator;
 
     public HttpSteamGridDbClient(RestClient.Builder builder, Optional<SteamGridDbApiKeyRotator> rotator) {
-        this.restClient = builder.build();
+        this.restClient = builder.defaultHeader(HttpHeaders.USER_AGENT, EnrichmentUserAgent.VALUE).build();
         this.rotator = rotator;
     }
 
@@ -52,10 +55,52 @@ public class HttpSteamGridDbClient implements SteamGridDbClient {
 
     @Override
     public Optional<SteamGridDbAssets> fetchByName(String name) {
-        return get("/search/autocomplete/{term}", name)
-                .map(json -> json.path("data"))
-                .filter(data -> data.isArray() && !data.isEmpty() && data.get(0).hasNonNull("id"))
-                .flatMap(data -> fetchAssets(data.get(0).get("id").asLong(), data.get(0).path("name").asString(null)));
+        String full = SteamGridDbNames.fullTerm(name);
+        if (full.isEmpty()) {
+            return Optional.empty();
+        }
+        Optional<JsonNode> match = search(full, name);
+        String stripped = SteamGridDbNames.strippedTerm(name);
+        if (match.isEmpty() && !stripped.equals(full)) {
+            match = search(stripped, name);
+        }
+        return match.flatMap(hit -> fetchAssets(hit.get("id").asLong(), hit.path("name").asString(null)));
+    }
+
+    private Optional<JsonNode> search(String term, String name) {
+        return get("/search/autocomplete/{term}", term).flatMap(json -> bestMatch(json.path("data"), name));
+    }
+
+    /**
+     * Among the results, the one named as {@code name} (accents, case and punctuation aside, edition kept), else the
+     * one that only differs by an edition marker ("Mafia" for "Mafia: Definitive Edition"), else the first result
+     * (SteamGridDB ranks them).
+     */
+    private static Optional<JsonNode> bestMatch(JsonNode results, String name) {
+        if (!results.isArray()) {
+            return Optional.empty();
+        }
+        String full = SteamGridDbNames.key(name);
+        String stripped = SteamGridDbNames.strippedKey(name);
+        JsonNode first = null;
+        JsonNode sameWithoutEdition = null;
+        for (JsonNode hit : results) {
+            if (!hit.hasNonNull("id")) {
+                continue;
+            }
+            first = first == null ? hit : first;
+            if (!hit.hasNonNull("name")) {
+                continue;
+            }
+            String hitName = hit.get("name").asString();
+            if (SteamGridDbNames.key(hitName).equals(full)) {
+                return Optional.of(hit);
+            }
+            if (sameWithoutEdition == null && SteamGridDbNames.strippedKey(hitName).equals(stripped)) {
+                sameWithoutEdition = hit;
+            }
+        }
+        return Optional.ofNullable(sameWithoutEdition != null ? sameWithoutEdition : first);
     }
 
     @Override
@@ -71,15 +116,29 @@ public class HttpSteamGridDbClient implements SteamGridDbClient {
     }
 
     private Optional<SteamGridDbAssets> fetchAssets(long gameId, String name) {
-        List<SteamGridDbAssets.Asset> grids = assets("grids", gameId).orElse(List.of());
+        List<SteamGridDbAssets.Asset> grids = grids(gameId);
         List<SteamGridDbAssets.Asset> heroes = assets("heroes", gameId).orElse(List.of());
         List<SteamGridDbAssets.Asset> logos = assets("logos", gameId).orElse(List.of());
         List<SteamGridDbAssets.Asset> icons = assets("icons", gameId).orElse(List.of());
         return Optional.of(new SteamGridDbAssets(gameId, name, GAME_URL + gameId, grids, heroes, logos, icons));
     }
 
+    /**
+     * The portrait grids the UI shows as the game's cover (600x900, and Steam's 342x482 and 660x930 library
+     * capsules); every grid when none has such a size, so a game that only has odd sizes still gets an image.
+     */
+    private List<SteamGridDbAssets.Asset> grids(long gameId) {
+        List<SteamGridDbAssets.Asset> portrait = assetsAt("/grids/game/{id}?dimensions=" + COVER_DIMENSIONS, gameId)
+                .orElse(List.of());
+        return portrait.isEmpty() ? assetsAt("/grids/game/{id}", gameId).orElse(List.of()) : portrait;
+    }
+
     private Optional<List<SteamGridDbAssets.Asset>> assets(String kind, long gameId) {
-        return get("/" + kind + "/game/{id}", gameId).map(json -> {
+        return assetsAt("/" + kind + "/game/{id}", gameId);
+    }
+
+    private Optional<List<SteamGridDbAssets.Asset>> assetsAt(String pathTemplate, long gameId) {
+        return get(pathTemplate, gameId).map(json -> {
             List<SteamGridDbAssets.Asset> out = new ArrayList<>();
             for (JsonNode node : json.path("data")) {
                 if (node.hasNonNull("url")) {

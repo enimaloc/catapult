@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.steam;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import fr.enimaloc.catapult.domain.steam.SteamAppParentEntry;
 import fr.enimaloc.catapult.getter.steam.SteamPlaytestRedirectResolver;
 import fr.enimaloc.catapult.ratelimit.LearnedRateLimiter;
@@ -265,6 +266,7 @@ public class SteamStoreServiceImpl implements SteamStoreService {
             try {
                 Map<String, AppDetailsEntry> response = restClient.get()
                         .uri(APP_DETAILS_URL + "?appids={appId}&l={lang}", effectiveAppId, lang)
+                        .header("User-Agent", EnrichmentUserAgent.VALUE)
                         .retrieve()
                         .body(new ParameterizedTypeReference<>() {});
                 AppDetailsEntry entry = response == null ? null : response.get(effectiveAppId);
@@ -291,6 +293,7 @@ public class SteamStoreServiceImpl implements SteamStoreService {
             try {
                 String response = restClient.get()
                         .uri("https://" + STORE_HOST + "/app/{appId}?l={lang}", effectiveAppId, lang)
+                        .header("User-Agent", EnrichmentUserAgent.VALUE)
                         .retrieve()
                         .body(String.class);
                 if (response == null || response.isBlank()) return Optional.empty();

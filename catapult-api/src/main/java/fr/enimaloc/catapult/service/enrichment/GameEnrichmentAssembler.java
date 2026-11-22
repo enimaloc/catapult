@@ -407,6 +407,9 @@ public class GameEnrichmentAssembler {
         } catch (UpstreamBudgetExceededException e) {
             log.debug("Enrichment source {} skipped: upstream budget spent", source);
             return null;
+        } catch (EnrichmentUnavailableException e) {
+            log.debug("Enrichment source {} unavailable: {}", source, e.getMessage());
+            return null;
         } catch (RuntimeException e) {
             log.warn("Enrichment source {} failed: {}", source, e.getMessage(), e);
             return null;

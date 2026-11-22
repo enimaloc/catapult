@@ -49,7 +49,13 @@ final class FrozenSnapshot {
         assertThat(actual.get("headers")).as("%s headers", name).isEqualTo(expected.get("headers"));
         String actualBody = actual.get("body").asString();
         String expectedBody = expected.get("body").asString();
-        if (volatilePointers.length == 0) {
+        if (name.startsWith("api-docs")) {
+            // springdoc lists a record's derived getters in reflection order, which the JVM does not fix: the
+            // document is pinned as a tree, member order aside
+            assertThat(JSON.readTree(mask(actualBody, volatilePointers)))
+                    .as("%s body, volatile members masked, member order aside", name)
+                    .isEqualTo(JSON.readTree(mask(expectedBody, volatilePointers)));
+        } else if (volatilePointers.length == 0) {
             assertThat(actualBody).as("%s body", name).isEqualTo(expectedBody);
         } else {
             assertThat(mask(actualBody, volatilePointers))

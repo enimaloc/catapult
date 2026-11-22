@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUnavailableException;
 import fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ProblemDetail;
@@ -24,6 +25,16 @@ class UpstreamBudgetAdviceTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getStatus()).isEqualTo(429);
         assertThat(response.getBody().getProperties()).containsEntry("code", "too_many_requests");
+    }
+
+    @Test
+    void aFailingSource_mapsTo503_withRetryAfter_notA404() {
+        ResponseEntity<ProblemDetail> response = advice.sourceUnavailable(
+                new EnrichmentUnavailableException(Duration.ofSeconds(42)));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(503);
+        assertThat(response.getHeaders().getFirst("Retry-After")).isEqualTo("42");
+        assertThat(response.getBody().getProperties()).containsEntry("code", "service_unavailable");
     }
 
     @Test

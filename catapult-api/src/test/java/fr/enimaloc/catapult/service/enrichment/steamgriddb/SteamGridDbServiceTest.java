@@ -83,7 +83,7 @@ class SteamGridDbServiceTest {
     @SuppressWarnings("unchecked")
     void byName_usesNormalisedKey() {
         when(cache.get(any(), any(), any(), any(), any())).thenReturn(Optional.empty());
-        when(client.fetchByName("dota 2")).thenReturn(Optional.of(ASSETS));
+        when(client.fetchByName("  Dota   2 ")).thenReturn(Optional.of(ASSETS));
 
         assertThat(service.byName("  Dota   2 ", FetchBudget.UNLIMITED)).isEmpty();
 
@@ -92,6 +92,19 @@ class SteamGridDbServiceTest {
                 any(), fetch.capture());
         assertThat(fetch.getValue().get()).contains(ASSETS);
         verify(cache).put(EnrichmentSource.STEAMGRIDDB, "sgdb:5248", ASSETS);
+    }
+
+    @Test
+    void byName_keepsTheEditionInTheKey_soARemakeNeverSharesTheOriginalsEntry() {
+        when(cache.get(any(), any(), any(), any(), any())).thenReturn(Optional.empty());
+
+        service.byName("Mafia\u2122: Definitive Edition", FetchBudget.UNLIMITED);
+        service.byName("Mafia", FetchBudget.UNLIMITED);
+
+        verify(cache).get(eq(EnrichmentSource.STEAMGRIDDB), eq("name:mafia: definitive edition"),
+                eq(SteamGridDbAssets.class), any(), any());
+        verify(cache).get(eq(EnrichmentSource.STEAMGRIDDB), eq("name:mafia"), eq(SteamGridDbAssets.class), any(),
+                any());
     }
 
     @Test

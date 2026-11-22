@@ -6,7 +6,6 @@ import fr.enimaloc.catapult.service.enrichment.FetchBudget;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -36,9 +35,9 @@ public class SteamGridDbService {
         if (!client.isConfigured()) {
             return Optional.empty();
         }
-        String normalized = normalize(name);
-        return cache.get(EnrichmentSource.STEAMGRIDDB, "name:" + normalized, SteamGridDbAssets.class, budget,
-                alsoByGameId(() -> client.fetchByName(normalized)));
+        // keyed by the cleaned full name (edition kept): a remake never shares the original's entry
+        return cache.get(EnrichmentSource.STEAMGRIDDB, "name:" + normalize(name), SteamGridDbAssets.class, budget,
+                alsoByGameId(() -> client.fetchByName(name)));
     }
 
     /** Artwork for a SteamGridDB game id. */
@@ -60,6 +59,6 @@ public class SteamGridDbService {
     }
 
     static String normalize(String name) {
-        return name.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        return SteamGridDbNames.fullTerm(name);
     }
 }

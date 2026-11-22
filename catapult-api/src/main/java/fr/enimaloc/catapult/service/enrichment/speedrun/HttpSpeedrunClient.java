@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.enrichment.speedrun;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import fr.enimaloc.catapult.service.enrichment.FetchBudget;
 import fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException;
 import lombok.extern.slf4j.Slf4j;
@@ -206,7 +207,8 @@ public class HttpSpeedrunClient implements SpeedrunClient {
     }
 
     private Answer send(RestClient.RequestHeadersSpec<?> request, String apiKey) {
-        RestClient.RequestHeadersSpec<?> spec = request.header(HttpHeaders.ACCEPT, "application/json");
+        RestClient.RequestHeadersSpec<?> spec = request.header(HttpHeaders.ACCEPT, "application/json")
+                .header(HttpHeaders.USER_AGENT, EnrichmentUserAgent.VALUE);
         if (apiKey != null) {
             spec = spec.header("X-API-Key", apiKey);
         }

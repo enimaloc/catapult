@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.enrichment.protondb;
 
+import org.springframework.http.HttpHeaders;
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -22,7 +24,7 @@ public class HttpProtonDbClient implements ProtonDbClient {
     private final RestClient restClient;
 
     public HttpProtonDbClient(RestClient.Builder builder) {
-        this.restClient = builder.build();
+        this.restClient = builder.defaultHeader(HttpHeaders.USER_AGENT, EnrichmentUserAgent.VALUE).build();
     }
 
     @Override

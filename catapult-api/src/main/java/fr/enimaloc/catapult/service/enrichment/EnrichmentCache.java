@@ -15,6 +15,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -29,6 +31,27 @@ public class EnrichmentCache {
     private final EnrichmentProperties properties;
     private final JsonMapper mapper;
     private final Clock clock;
+
+    /** First wait after a failed fetch of a key; doubled by each further failure up to {@link #MAX_BACKOFF}. */
+    static final Duration MIN_BACKOFF = Duration.ofMinutes(1);
+    static final Duration MAX_BACKOFF = Duration.ofMinutes(15);
+    private static final int PRUNE_ABOVE = 1_000;
+
+    /** A key's consecutive failures and the instant its upstream may be asked again. */
+    private record Failure(int count, Instant retryAt) {
+    }
+
+    /**
+     * What a shared fetch ended with: the value served, a failure with nothing to serve in its place (how long to
+     * wait: {@code unavailableFor}), or a request to start over (its leader was refused).
+     */
+    private record Shared(Optional<?> value, boolean retry, Duration unavailableFor) {
+    }
+
+    private static final Shared RETRY = new Shared(Optional.empty(), true, null);
+
+    private final ConcurrentHashMap<String, Failure> failures = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CompletableFuture<Shared>> inFlight = new ConcurrentHashMap<>();
 
     @Autowired
     public EnrichmentCache(GameEnrichmentCacheRepository repository, EnrichmentProperties properties,
@@ -67,6 +90,9 @@ public class EnrichmentCache {
                 }
             }
         }
+        if (source.backsOff()) {
+            return fetchShared(source, lookupKey, type, budget, fetch, cached, now);
+        }
         if (!budget.tryAcquire()) {
             // The budget only gates the upstream call: a stale value is still the last known one.
             if (cached.isPresent()) {
@@ -83,6 +109,89 @@ public class EnrichmentCache {
         }
         store(source, lookupKey, fetched.map(mapper::writeValueAsString).orElse(null), now);
         return fetched;
+    }
+
+    /**
+     * The fetch of a source that {@linkplain EnrichmentSource#backsOff() backs off}. A key whose last fetch failed is
+     * not asked again until its backoff is over: the stale value is served when there is one, else the lookup is
+     * {@link EnrichmentUnavailableException unavailable} (a failure is never reported as "absent" nor cached).
+     * Concurrent callers of one key share the call of the first: the others wait for its answer without spending
+     * any budget, and share its failure too. Two races are accepted, each costing at most one more upstream call: a
+     * caller that read the repository just before the leader stored, and one that checked the failures just before
+     * the leader recorded its own, both arriving after the leader is gone.
+     */
+    @SuppressWarnings("unchecked")
+    private <T> Optional<T> fetchShared(EnrichmentSource source, String lookupKey, Class<T> type, FetchBudget budget,
+                                        Supplier<Optional<T>> fetch, Optional<GameEnrichmentCacheEntry> cached,
+                                        Instant now) {
+        String key = source.key() + '\0' + lookupKey;
+        Optional<Optional<T>> stale = cached.flatMap(entry -> read(entry, type));
+        while (true) {
+            Failure failure = failures.get(key);
+            if (failure != null && failure.retryAt().isAfter(clock.instant())) {
+                log.debug("Enrichment fetch of {} {} skipped: failed {} time(s), next try at {}", source.key(),
+                        lookupKey, failure.count(), failure.retryAt());
+                return staleOrUnavailable(stale, Duration.between(clock.instant(), failure.retryAt()));
+            }
+            CompletableFuture<Shared> mine = new CompletableFuture<>();
+            CompletableFuture<Shared> leader = inFlight.putIfAbsent(key, mine);
+            if (leader != null) {
+                Shared shared = leader.join();
+                if (shared.retry()) {
+                    continue;
+                }
+                if (shared.unavailableFor() != null) {
+                    return staleOrUnavailable(stale, shared.unavailableFor());
+                }
+                return (Optional<T>) shared.value();
+            }
+            try {
+                if (!budget.tryAcquire()) {
+                    if (cached.isPresent()) {
+                        return read(cached.get(), type).orElse(Optional.empty());
+                    }
+                    throw new UpstreamBudgetExceededException(budget.retryAfter());
+                }
+                Optional<T> fetched;
+                try {
+                    fetched = fetch.get();
+                } catch (RuntimeException e) {
+                    Duration wait = recordFailure(key);
+                    log.warn("Enrichment fetch failed for {} {}: {}", source.key(), lookupKey, e.toString());
+                    mine.complete(new Shared(Optional.empty(), false, wait));
+                    return staleOrUnavailable(stale, wait);
+                }
+                store(source, lookupKey, fetched.map(mapper::writeValueAsString).orElse(null), now);
+                failures.remove(key);
+                mine.complete(new Shared(fetched, false, null));
+                return fetched;
+            } finally {
+                inFlight.remove(key, mine);
+                mine.complete(RETRY); // no-op once answered; otherwise the waiters start over
+            }
+        }
+    }
+
+    private static <T> Optional<T> staleOrUnavailable(Optional<Optional<T>> stale, Duration retryAfter) {
+        return stale.orElseThrow(() -> new EnrichmentUnavailableException(retryAfter));
+    }
+
+    /** Records a failure of {@code key}; returns how long it is left alone. */
+    private Duration recordFailure(String key) {
+        Instant now = clock.instant();
+        if (failures.size() >= PRUNE_ABOVE) {
+            failures.values().removeIf(f -> f.retryAt().plus(MAX_BACKOFF).isBefore(now));
+        }
+        Failure recorded = failures.merge(key, new Failure(1, now.plus(MIN_BACKOFF)), (old, ignored) -> {
+            // a key quiet for longer than the cap since its last wait starts over, like one that succeeded
+            if (old.retryAt().plus(MAX_BACKOFF).isBefore(now)) {
+                return new Failure(1, now.plus(MIN_BACKOFF));
+            }
+            int count = old.count() + 1;
+            long millis = Math.min(MAX_BACKOFF.toMillis(), MIN_BACKOFF.toMillis() << Math.min(count - 1, 10));
+            return new Failure(count, now.plusMillis(millis));
+        });
+        return Duration.between(now, recorded.retryAt());
     }
 
     /** How long a "known absent" answer of {@code source} is trusted. */

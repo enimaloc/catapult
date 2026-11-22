@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.enrichment.rastats;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import fr.enimaloc.catapult.getter.retroachievements.RetroAchievementsApiKeyRotator;
 import fr.enimaloc.catapult.service.enrichment.FetchBudget;
 import fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException;
@@ -60,7 +61,7 @@ public class HttpRetroAchievementsClient implements RetroAchievementsClient {
                                        Optional<RetroAchievementsApiKeyRotator> rotator,
                                        @Value("${app.base-url}") String baseUrl) {
         this(builder.requestFactory(requestFactory())
-                .defaultHeader(HttpHeaders.USER_AGENT, "Catapult/1.0 (+" + baseUrl + ")").build(), limiter, rotator);
+                .defaultHeader(HttpHeaders.USER_AGENT, EnrichmentUserAgent.of(baseUrl)).build(), limiter, rotator);
     }
 
     HttpRetroAchievementsClient(RestClient restClient, RetroAchievementsRateLimiter limiter,

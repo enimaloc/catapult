@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.http.HttpHeaders;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestClient;
 
@@ -75,6 +76,7 @@ class TwitchTokenServiceTest {
         when(postUriSpec.uri(anyString())).thenReturn(postBodySpec);
         doReturn(postBodySpec).when(postBodySpec).contentType(any());
         doReturn(postBodySpec).when(postBodySpec).body(any(Object.class));
+        doReturn(postBodySpec).when(postBodySpec).header(eq(HttpHeaders.USER_AGENT), any(String[].class));
         when(postBodySpec.retrieve()).thenReturn(postResponseSpec);
 
         ReflectionTestUtils.setField(service, "twitchClientId", "test-client-id");
@@ -197,6 +199,18 @@ class TwitchTokenServiceTest {
         String token = service.getAppAccessToken();
 
         assertThat(token).isEqualTo("app-token-abc");
+    }
+
+    @Test
+    void tokenRequests_identifyCatapult() {
+        token.setRefreshToken("encrypted-refresh");
+        when(tokenEncryptionService.decrypt("encrypted-refresh")).thenReturn("plain-refresh");
+        when(postResponseSpec.body(Map.class)).thenReturn(Map.of("access_token", "a", "expires_in", 3600));
+
+        service.refreshAccessToken(token, user);
+        service.getAppAccessToken();
+
+        verify(postBodySpec, times(2)).header(HttpHeaders.USER_AGENT, "Catapult/1.0 (+https://catapult.enimaloc.fr)");
     }
 
     @Test

@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.enrichment.steamdeck;
 
+import org.springframework.http.HttpHeaders;
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility.Category;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility.TestedItem;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +26,7 @@ public class HttpSteamDeckClient implements SteamDeckClient {
     private final JsonMapper mapper = JsonMapper.builder().build();
 
     public HttpSteamDeckClient(RestClient.Builder builder) {
-        this.restClient = builder.build();
+        this.restClient = builder.defaultHeader(HttpHeaders.USER_AGENT, EnrichmentUserAgent.VALUE).build();
     }
 
     @Override

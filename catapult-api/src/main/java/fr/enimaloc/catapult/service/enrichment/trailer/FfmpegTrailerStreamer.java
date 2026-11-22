@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.enrichment.trailer;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import fr.enimaloc.catapult.service.enrichment.ClientKeys;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentProperties;
 import jakarta.annotation.PreDestroy;
@@ -178,6 +179,7 @@ public class FfmpegTrailerStreamer {
     static List<String> command(URI hls) {
         return List.of("ffmpeg", "-hide_banner", "-loglevel", "error",
                 "-protocol_whitelist", PROTOCOLS,
+                "-user_agent", EnrichmentUserAgent.VALUE,
                 "-i", hls.toString(),
                 "-c", "copy", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", "pipe:1");
     }

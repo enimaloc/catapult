@@ -271,6 +271,53 @@ class OpenApiDocsTest {
         assertThat(schemas.at("/BlizzardStats/properties").has("more")).isTrue();
     }
 
+    /**
+     * The version 3 answer of {@code /api/me/game} is documented next to the version 2 one (springdoc merges the two
+     * versions of a path into one operation): an anyOf, with the enrichment objects and the version 3 parameters.
+     */
+    @Test
+    void docs_describeTheVersion3AnswerOfTheMemberGame() throws Exception {
+        JsonNode docs = docs();
+
+        JsonNode schema = docs.at("/paths/~1api~1me~1game/get/responses/200/content/application~1json/schema");
+        assertThat(schema.has("oneOf")).as("a v3 payload also fits the v2 schema: anyOf, not oneOf").isFalse();
+        assertThat(docs.at("/paths/~1api~1me~1game/get/responses/200/content/text~1plain/schema/type").asString())
+                .isEqualTo("string");
+        List<String> alternatives = new ArrayList<>();
+        schema.get("anyOf").forEach(alternative -> alternatives.add(alternative.get("$ref").asString()));
+        assertThat(alternatives).containsExactly("#/components/schemas/GameInfoResponse",
+                "#/components/schemas/GameInfoV3Response");
+        JsonNode v3 = docs.at("/components/schemas/GameInfoV3Response/properties");
+        assertThat(v3.propertyNames()).contains("inGame", "igdb", "hltb", "protondb", "steamgriddb", "steamDeck",
+                "pcgamingwiki", "prices", "opencritic", "twitch", "speedrun", "stats", "trailer");
+        assertThat(docs.at("/components/schemas/GameInfoResponse/properties").propertyNames())
+                .doesNotContain("hltb", "stats");
+        // the objects it nests are components of their own, every reference resolves
+        assertThat(v3.at("/hltb/$ref").asString()).isEqualTo("#/components/schemas/HltbObject");
+        assertThat(docs.at("/components/schemas").has("HltbObject")).isTrue();
+        assertThat(docs.at("/components/schemas").has("StatsObject")).isTrue();
+        List<String> parameters = new ArrayList<>();
+        docs.at("/paths/~1api~1me~1game/get/parameters").forEach(p -> parameters.add(p.get("name").asString()));
+        assertThat(parameters).contains("country", "language", "lang", "f", ApiV2.VERSION_HEADER);
+        for (JsonNode parameter : docs.at("/paths/~1api~1me~1game/get/parameters")) {
+            if ("language".equals(parameter.get("name").asString())) {
+                assertThat(parameter.at("/schema/type").asString()).isEqualTo("string");
+            }
+        }
+    }
+
+    /** The version 2 and summary operations keep their documentation. */
+    @Test
+    void docs_keepTheVersion2MemberGameDocumentation() throws Exception {
+        JsonNode docs = docs();
+
+        assertThat(docs.at("/paths/~1api~1me~1game/get/summary").asString()).contains("fully aggregated");
+        assertThat(docs.at("/paths/~1api~1me~1game/get/operationId").asString()).isEqualTo("gameInfo");
+        assertThat(docs.at("/paths/~1api~1me~1game~1summary/get/summary").asString()).contains("compact summary");
+        assertThat(docs.at("/paths/~1api~1me~1game/get/responses/200/description").asString())
+                .contains("GameInfoResponse for version 2");
+    }
+
     private static JsonNode versionHeader(JsonNode docs, String parametersPointer) {
         for (JsonNode parameter : docs.at(parametersPointer)) {
             if (ApiV2.VERSION_HEADER.equals(parameter.get("name").asString())) {

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.enrichment.opencritic;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import fr.enimaloc.catapult.getter.opencritic.OpenCriticApiKeyRotator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -35,7 +36,7 @@ public class HttpOpenCriticClient implements OpenCriticClient {
     private final Optional<OpenCriticApiKeyRotator> rotator;
 
     public HttpOpenCriticClient(RestClient.Builder builder, Optional<OpenCriticApiKeyRotator> rotator) {
-        this.restClient = builder.build();
+        this.restClient = builder.defaultHeader(HttpHeaders.USER_AGENT, EnrichmentUserAgent.VALUE).build();
         this.rotator = rotator;
     }
 

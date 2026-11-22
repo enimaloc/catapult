@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.enrichment.pcgw;
 
+import org.springframework.http.HttpHeaders;
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -38,7 +40,7 @@ public class HttpPcGamingWikiClient implements PcGamingWikiClient {
 
     public HttpPcGamingWikiClient(RestClient.Builder builder, JsonMapper mapper,
                                   @Value("${app.base-url}") String baseUrl) {
-        this.restClient = builder.defaultHeader("User-Agent", "Catapult/1.0 (+" + baseUrl + ")").build();
+        this.restClient = builder.defaultHeader(HttpHeaders.USER_AGENT, EnrichmentUserAgent.of(baseUrl)).build();
         this.mapper     = mapper;
     }
 
