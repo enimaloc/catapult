@@ -14,6 +14,9 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.EpicData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsApiKeyRequest;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
@@ -293,6 +296,29 @@ class DtoBehaviourTest {
 
     private static java.util.Map.Entry<String, Object> entry(String key, Object value) {
         return new java.util.AbstractMap.SimpleEntry<>(key, value);
+    }
+
+    @Nested
+    class RetroAchievementsSettings {
+        @Test
+        void toStringNeverShowsTheKey() {
+            assertThat(new RetroAchievementsApiKeyRequest("s3cretKey").toString())
+                    .doesNotContain("s3cretKey").isEqualTo("RetroAchievementsApiKeyRequest[apiKey=***]");
+            assertThat(new RetroAchievementsApiKeyRequest(null).toString())
+                    .isEqualTo("RetroAchievementsApiKeyRequest[apiKey=null]");
+        }
+
+        @Test
+        void theCardAndTheUsernameRequestKeepTheirValues() {
+            RetroAchievementsData data = new RetroAchievementsData("Name", "https://retroachievements.org/user/Name",
+                    true, false, true);
+            assertThat(data.username()).isEqualTo("Name");
+            assertThat(data.profileUrl()).endsWith("/user/Name");
+            assertThat(data.hasApiKey()).isTrue();
+            assertThat(data.keyInvalid()).isFalse();
+            assertThat(data.poolAvailable()).isTrue();
+            assertThat(new RetroAchievementsUsernameRequest("Name").username()).isEqualTo("Name");
+        }
     }
 
     @Nested

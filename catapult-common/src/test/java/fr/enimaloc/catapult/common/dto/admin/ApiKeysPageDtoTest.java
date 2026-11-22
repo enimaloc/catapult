@@ -36,7 +36,20 @@ class ApiKeysPageDtoTest {
     }
 
     @Test
+    void retroAchievementsPageKeepsItsFlagAndKeys() {
+        ApiKeysPageDto dto = ApiKeysPageDto.of(new RetroAchievementsKeysPageData(List.of(KEY), true));
+
+        assertThat(dto.enabled()).isTrue();
+        assertThat(dto.keys()).containsExactly(new ApiKeysPageDto.Key("k1", "ab…yz", "owner", true, 42));
+        assertThat(ApiKeysPageDto.of(new RetroAchievementsKeysPageData(null, false)))
+                .isEqualTo(new ApiKeysPageDto(false, List.of()));
+        assertThat(ApiKeysPageDto.of(new RetroAchievementsKeysPageData(Arrays.asList(null, KEY), true)).keys())
+                .hasSize(1);
+    }
+
+    @Test
     void anUnreachablePageGivesNull() {
+        assertThat(ApiKeysPageDto.of((RetroAchievementsKeysPageData) null)).isNull();
         assertThat(ApiKeysPageDto.of((ItadKeysPageData) null)).isNull();
         assertThat(ApiKeysPageDto.of((OpenCriticKeysPageData) null)).isNull();
         assertThat(ApiKeysPageDto.of((SteamGridDbKeysPageData) null)).isNull();
