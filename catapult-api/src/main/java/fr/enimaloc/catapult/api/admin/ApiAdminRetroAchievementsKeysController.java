@@ -28,7 +28,7 @@ public class ApiAdminRetroAchievementsKeysController {
     @PostMapping
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void add(@RequestBody AddKeyRequest body) {
-        String trimmed = body.apiKey().trim();
+        String trimmed = body == null || body.apiKey() == null ? "" : body.apiKey().trim();
         if (!KEY_PATTERN.matcher(trimmed).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid RetroAchievements API key format");
         }

@@ -53,6 +53,14 @@ class ApiAdminRetroAchievementsKeysControllerTest {
     }
 
     @Test
+    void add_rejectsAMissingKey_with400() {
+        assertThatThrownBy(() -> controller.add(new AddKeyRequest(null)))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void add_acceptsAnAlphanumericKeyTrimmed() {
         when(repository.existsById(RAW)).thenReturn(false);
 
