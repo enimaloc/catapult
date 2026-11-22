@@ -230,7 +230,8 @@ public class EnrichmentGamesController {
 
     @Operation(summary = "Get a Hearthstone deck from its code", description = "The deck a Hearthstone deck code "
             + "stands for (format, hero, class, every card with its mana cost and image), from Blizzard, with the "
-            + "names in the language asked. Public game data, nothing personal." + BUDGET_NOTE)
+            + "names in the language asked. The code goes in the path in its URL-safe base64 form: replace each '/' " +
+            "with '_' (and optionally each '+' with '-'). Public game data, nothing personal." + BUDGET_NOTE)
     @ApiResponse(responseCode = "200", description = "The deck.")
     @ApiResponse(responseCode = "400", description = "Malformed deck code.", content = @Content)
     @ApiResponse(responseCode = "404", description = "Source disabled, or no deck for that code.",
@@ -239,15 +240,19 @@ public class EnrichmentGamesController {
             + "Retry-After seconds.", content = @Content)
     @GetMapping("/blizzard/hearthstone/deck/{code}")
     public HearthstoneDeck hearthstoneDeck(
-            @Parameter(description = "Hearthstone deck code, as the game copies it.", in = ParameterIn.PATH,
+            @Parameter(description = "Hearthstone deck code, URL-safe: '/' written '_' (and optionally '+' written '-').", in = ParameterIn.PATH,
                     example = "AAECAR8GxwPJBLsFmQfZB_gIDI0B2AGoArUDhwSSBe0G6wfbCe0JgQr-DAA=")
             @PathVariable @Pattern(regexp = ApiV2.HEARTHSTONE_DECK_CODE) String code,
             @Parameter(description = RequestLocale.LANG_DESCRIPTION, example = "fr",
                     schema = @Schema(defaultValue = "en"))
             @RequestParam(name = "lang", required = false) String lang,
             HttpServletRequest request) {
-        return found(blizzardGameDataService.hearthstoneDeck(code, RequestLocale.parse(lang, null),
-                budget(request)), "Unknown Hearthstone deck");
+        String language = language(lang);
+        Locale locale = language == null ? RequestLocale.parse(null, null) : Locale.forLanguageTag(language);
+        // the URL-safe base64 form back to the standard one the game copies, which Blizzard and the cache know
+        String standard = code.replace('_', '/').replace('-', '+');
+        return found(blizzardGameDataService.hearthstoneDeck(standard, locale, budget(request)),
+                "Unknown Hearthstone deck");
     }
 
     @Operation(summary = "Get the WoW Token price of a region", description = "The current price of the World of "

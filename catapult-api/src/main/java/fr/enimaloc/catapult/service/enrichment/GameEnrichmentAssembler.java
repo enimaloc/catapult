@@ -171,11 +171,12 @@ public class GameEnrichmentAssembler {
      */
     private BlizzardPublisher blizzardPublisher(DetectedGame detected, String igdb, Optional<UserAccount> member,
                                                 Locale locale) {
-        return PublisherGames.blizzard(detected, igdb).flatMap(game -> {
+        return PublisherGames.blizzard(detected, igdb).filter(game -> blizzardGameDataService.available())
+                .flatMap(game -> {
             BlizzardRegion region = member.map(blizzardStatsService::region)
                     .orElseGet(properties::blizzardDefaultRegion);
             return blizzardGameDataService.forGame(game, region, locale, FetchBudget.UNLIMITED);
-        }).orElse(null);
+                }).orElse(null);
     }
 
     /**

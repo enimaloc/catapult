@@ -198,9 +198,8 @@ public class MeStatsController {
             case "sc2" -> BlizzardGame.SC2;
             default -> BlizzardGame.D3;
         };
-        String notFound = blizzardGame == BlizzardGame.WOW
-                ? "No World of Warcraft stats for you: link Battle.net and import your WoW characters"
-                : "No Blizzard stats for you on that game: link Battle.net";
+        String notFound = "No Blizzard stats for you on that game: Battle.net not linked (for World of Warcraft, "
+                + "no character imported), or Blizzard stats unavailable";
         BlizzardStats stats = detail(userId, notFound, (user, budget) -> blizzardStatsService.forGame(user,
                 blizzardGame, RequestLocale.parse(lang, acceptLanguage), budget, true));
         return GameInfoV3Response.blizzardStats(stats, links());

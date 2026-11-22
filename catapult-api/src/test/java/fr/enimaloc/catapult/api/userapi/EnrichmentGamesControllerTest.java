@@ -355,12 +355,14 @@ class EnrichmentGamesControllerTest {
     // ---------------------------------------------------------------- Blizzard
 
     private static final String DECK_CODE = "AAECAR8GxwPJBLsFmQfZB_gIDI0B2AGoArUDhwSSBe0G6wfbCe0JgQr-DAA=";
+    /** The same code in the standard base64 form the game copies and Blizzard reads. */
+    private static final String STANDARD_CODE = DECK_CODE.replace('_', '/').replace('-', '+');
 
     @Test
     void deckIsPublicUnderTheIpBudget() throws Exception {
         HearthstoneDeck deck = new HearthstoneDeck(DECK_CODE, "standard", "Rexxar", "Hunter", 30,
                 List.of(new HearthstoneDeck.Card(1L, "Arcane Shot", 1, "https://img/1.png")));
-        when(blizzard.hearthstoneDeck(eq(DECK_CODE), any(), any(FetchBudget.class))).thenAnswer(call -> {
+        when(blizzard.hearthstoneDeck(eq(STANDARD_CODE), any(), any(FetchBudget.class))).thenAnswer(call -> {
             FetchBudget budget = call.getArgument(2);
             if (!budget.tryAcquire()) {
                 throw new UpstreamBudgetExceededException(budget.retryAfter());
@@ -374,7 +376,7 @@ class EnrichmentGamesControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.heroName").value("Rexxar"))
                 .andExpect(jsonPath("$.cards[0].name").value("Arcane Shot"));
-        org.mockito.Mockito.verify(blizzard).hearthstoneDeck(eq(DECK_CODE),
+        org.mockito.Mockito.verify(blizzard).hearthstoneDeck(eq(STANDARD_CODE),
                 eq(java.util.Locale.FRENCH), any(FetchBudget.class));
         for (int i = 1; i < 10; i++) {
             mvc.perform(v3(get("/api/games/blizzard/hearthstone/deck/" + DECK_CODE), "198.51.100.30"))
@@ -392,6 +394,26 @@ class EnrichmentGamesControllerTest {
         mvc.perform(v3(get("/api/games/blizzard/hearthstone/deck/" + DECK_CODE), "203.0.113.7"))
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith("application/problem+json"));
+    }
+
+    @Test
+    void deckCodeWithASlashOnceConvertedReachesTheService() throws Exception {
+        // 'ZB_gI' stands for 'ZB/gI', 'Qr-DAA=' for 'Qr+DAA='
+        org.assertj.core.api.Assertions.assertThat(STANDARD_CODE).contains("/").contains("+");
+        when(blizzard.hearthstoneDeck(eq(STANDARD_CODE), any(), any(FetchBudget.class))).thenReturn(
+                Optional.of(new HearthstoneDeck(STANDARD_CODE, "standard", "Rexxar", "Hunter", 30, List.of())));
+
+        mvc.perform(v3(get("/api/games/blizzard/hearthstone/deck/" + DECK_CODE), "198.51.100.31"))
+                .andExpect(status().isOk());
+        org.mockito.Mockito.verify(blizzard).hearthstoneDeck(eq(STANDARD_CODE), any(), any(FetchBudget.class));
+    }
+
+    @Test
+    void malformedDeckLanguageIs400() throws Exception {
+        mvc.perform(v3(get("/api/games/blizzard/hearthstone/deck/" + DECK_CODE), "198.51.100.32")
+                        .param("lang", "x!!"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(blizzard);
     }
 
     @Test

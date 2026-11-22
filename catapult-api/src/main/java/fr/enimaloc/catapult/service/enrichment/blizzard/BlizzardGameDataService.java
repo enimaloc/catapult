@@ -43,6 +43,11 @@ public class BlizzardGameDataService {
         this.tokens = tokens;
     }
 
+    /** Whether the Blizzard source is on (a client id and secret, and enabled). */
+    public boolean available() {
+        return tokens.available();
+    }
+
     /** The public data of {@code game}; empty when the source is off, Blizzard fails, or there is none (SC2). */
     public Optional<BlizzardPublisher> forGame(BlizzardGame game, BlizzardRegion region, Locale locale,
                                                FetchBudget budget) {

@@ -242,8 +242,8 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
     }
 
     /**
-     * The member's latest unlocked achievement on the game, every platform taken together (Blizzard: the recent
-     * achievements of the main WoW character, {@code platform} "blizzard"); null if none is known.
+     * The member's latest unlocked achievement on the game, every platform taken together (Blizzard: the
+     * recent achievements of the main WoW character, {@code platform} "blizzard"); null if none is known.
      */
     @JsonView(GameInfoResponse.Summary.class)
     public LastAchievement lastAchievement() {

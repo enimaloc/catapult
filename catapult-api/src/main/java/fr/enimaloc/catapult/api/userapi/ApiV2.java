@@ -64,7 +64,7 @@ public final class ApiV2 {
     static final String SPEEDRUN_GAME_ID = "[A-Za-z0-9]{1,16}";
     static final String BLIZZARD_GAME = "wow|sc2|d3";
     static final String BLIZZARD_REGION = "eu|us|kr|tw";
-    static final String HEARTHSTONE_DECK_CODE = "[A-Za-z0-9+/=_-]{8,200}";
+    static final String HEARTHSTONE_DECK_CODE = "[A-Za-z0-9+=_-]{8,200}";
 
     // Shapes of the optional "country" and "language" query parameters of the enrichment routes.
     static final String COUNTRY = "[A-Za-z]{2}";
