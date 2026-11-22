@@ -34,6 +34,7 @@ import java.util.function.Predicate;
 @Component
 public class HttpBlizzardClient implements BlizzardClient {
 
+    static final String USERINFO = "https://oauth.battle.net/userinfo";
     static final String USER_AGENT = "Catapult/1.0 (+https://catapult.enimaloc.fr)";
     private static final Duration PAUSE = Duration.ofSeconds(60);
     static final int MAX_BYTES = 4 * 1024 * 1024;
@@ -131,6 +132,17 @@ public class HttpBlizzardClient implements BlizzardClient {
         }
         recent.sort(Comparator.comparing(WowAchievements.Recent::unlockedAt).reversed());
         return new WowAchievements(json.get("total_points").asInt(), recent.subList(0, Math.min(RECENT, recent.size())));
+    }
+
+    /** The userinfo's {@code id}, else its {@code sub} (the same value as text); neither is an error. */
+    @Override
+    public long userAccountId(String userAccessToken) {
+        JsonNode json = object(interpret(send(USERINFO, userAccessToken, MAX_BYTES), none()));
+        Long id = json.path("id").isNumber() ? Long.valueOf(json.get("id").asLong()) : number(json.path("sub"));
+        if (id == null) {
+            throw garbled();
+        }
+        return id;
     }
 
     @Override

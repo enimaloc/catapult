@@ -140,7 +140,7 @@ class ApiRelayControllerTest {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(ApiClient.SESSION_JWT_KEY, "session-jwt");
 
-        for (String provider : List.of("battlenet", "xbox", "steam")) {
+        for (String provider : List.of("battlenet", "battlenet-stats", "xbox", "steam")) {
             mvc.perform(get("/oauth2/authorization/" + provider).session(session)
                             .header("Authorization", "Bearer forged"))
                     .andExpect(status().isOk());

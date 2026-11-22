@@ -62,6 +62,44 @@ class OAuth2ClientConfigTest {
     }
 
     @Test
+    void statsRegistrationOnlyWhenBattleNetIsConfigured() {
+        ReflectionTestUtils.setField(config, "battleNetEnabled", true);
+        assertThat(config.clientRegistrationRepository().findByRegistrationId("battlenet-stats")).isNull();
+
+        ReflectionTestUtils.setField(config, "battleNetClientId", "bn-id");
+        assertThat(config.clientRegistrationRepository().findByRegistrationId("battlenet-stats")).isNull();
+
+        ReflectionTestUtils.setField(config, "battleNetClientSecret", "bn-secret");
+        ReflectionTestUtils.setField(config, "battleNetEnabled", false);
+        ClientRegistrationRepository disabled = config.clientRegistrationRepository();
+        assertThat(disabled.findByRegistrationId("battlenet-stats")).isNull();
+        // The Battle.net link itself does not depend on battlenet.enabled (unchanged)
+        assertThat(disabled.findByRegistrationId("battlenet")).isNotNull();
+    }
+
+    @Test
+    void statsRegistrationAsksWowProfileOnly() {
+        ReflectionTestUtils.setField(config, "battleNetEnabled", true);
+        ReflectionTestUtils.setField(config, "battleNetClientId", "bn-id");
+        ReflectionTestUtils.setField(config, "battleNetClientSecret", "bn-secret");
+
+        ClientRegistrationRepository repository = config.clientRegistrationRepository();
+
+        ClientRegistration stats = repository.findByRegistrationId("battlenet-stats");
+        assertThat(stats.getScopes()).containsExactly("wow.profile");
+        assertThat(stats.getClientId()).isEqualTo("bn-id");
+        assertThat(stats.getClientSecret()).isEqualTo("bn-secret");
+        assertThat(stats.getRedirectUri()).isEqualTo("https://api.test/login/oauth2/code/{registrationId}");
+        assertThat(stats.getProviderDetails().getAuthorizationUri()).isEqualTo("https://oauth.battle.net/authorize");
+        assertThat(stats.getProviderDetails().getTokenUri()).isEqualTo("https://oauth.battle.net/token");
+        assertThat(stats.getProviderDetails().getUserInfoEndpoint().getUri()).isEqualTo("https://oauth.battle.net/userinfo");
+        assertThat(stats.getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName()).isEqualTo("sub");
+        // The bot's link stays as it was: no scope at all, so no wow.profile and no openid
+        ClientRegistration battlenet = repository.findByRegistrationId("battlenet");
+        assertThat(battlenet.getScopes()).isEmpty();
+    }
+
+    @Test
     void epicClient_isRegisteredOnlyWhenConfigured_withoutOpenid() {
         ReflectionTestUtils.setField(config, "epicClientId", "ep-id");
         assertThat(config.clientRegistrationRepository().findByRegistrationId("epic")).isNull();

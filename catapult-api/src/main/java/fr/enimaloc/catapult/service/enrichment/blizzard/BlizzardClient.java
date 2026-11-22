@@ -14,6 +14,9 @@ public interface BlizzardClient {
 
     WowAchievements wowAchievements(BlizzardRegion region, String realmSlug, String name, String locale);
 
+    /** The Battle.net account id {@code userAccessToken} belongs to (never kept), from the OAuth userinfo. */
+    long userAccountId(String userAccessToken);
+
     /** The characters of the account that {@code userAccessToken} belongs to (never kept); empty on a 404. */
     List<WowUserCharacter> wowUserCharacters(BlizzardRegion region, String userAccessToken);
 

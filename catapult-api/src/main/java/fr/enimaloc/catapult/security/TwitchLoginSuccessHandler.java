@@ -89,6 +89,15 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                     response.sendRedirect(channelIntegrationsUrl(catUser));
                     return;
                 }
+            } else if ("battlenet-stats".equals(registrationId)) {
+                // The World of Warcraft import read the characters with this token: it is forgotten at once, and
+                // the card says the import is done.
+                authorizedClientRepository.removeAuthorizedClient("battlenet-stats", authentication, request, response);
+                if (webUrl != null && !webUrl.isBlank()) {
+                    response.sendRedirect(UriComponentsBuilder.fromUriString(channelIntegrationsUrl(catUser))
+                            .replaceQueryParam("imported", "wow").toUriString());
+                    return;
+                }
             } else if ("epic".equals(registrationId)) {
                 // Like Battle.net: the bot befriends the account, so the EOS access token is forgotten at once.
                 authorizedClientRepository.removeAuthorizedClient("epic", authentication, request, response);

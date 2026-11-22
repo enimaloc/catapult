@@ -39,6 +39,9 @@ public class OAuth2ClientConfig {
     @Value("${battlenet.client-secret:}")
     private String battleNetClientSecret;
 
+    @Value("${battlenet.enabled:false}")
+    private boolean battleNetEnabled;
+
     @Value("${epic.client-id:}")
     private String epicClientId;
 
@@ -81,6 +84,19 @@ public class OAuth2ClientConfig {
         if (configured(battleNetClientId, battleNetClientSecret)) {
             // No "openid": it would switch Spring to the OIDC flow and bypass CatapultOAuth2UserService; Blizzard's userinfo needs no scope.
             registrations.add(authorizationCode("battlenet", battleNetClientId, battleNetClientSecret)
+                .authorizationUri("https://oauth.battle.net/authorize")
+                .tokenUri("https://oauth.battle.net/token")
+                .userInfoUri("https://oauth.battle.net/userinfo")
+                .userNameAttributeName("sub")
+                .build());
+        }
+
+        if (battleNetEnabled && configured(battleNetClientId, battleNetClientSecret)) {
+            // The World of Warcraft import: a consent of its own, so that the link above (and the bot's enrolment)
+            // never changes. Its user token is read once and forgotten (TwitchLoginSuccessHandler). No "openid", as
+            // above. Its callback, <base>/login/oauth2/code/battlenet-stats, must be declared on Blizzard's portal.
+            registrations.add(authorizationCode("battlenet-stats", battleNetClientId, battleNetClientSecret)
+                .scope("wow.profile")
                 .authorizationUri("https://oauth.battle.net/authorize")
                 .tokenUri("https://oauth.battle.net/token")
                 .userInfoUri("https://oauth.battle.net/userinfo")

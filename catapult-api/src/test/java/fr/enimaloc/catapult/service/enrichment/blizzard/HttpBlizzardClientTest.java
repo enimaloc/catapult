@@ -346,6 +346,45 @@ class HttpBlizzardClientTest {
     }
 
     @Test
+    void userAccountIdReadsTheUserinfoWithTheUserTokenCharged() {
+        server.expect(requestTo("https://oauth.battle.net/userinfo")).andExpect(method(HttpMethod.GET))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer user-token"))
+                .andRespond(withSuccess("{\"sub\":\"123456\",\"id\":123456,\"battletag\":\"Inspector#1234\"}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.userAccountId("user-token")).isEqualTo(123456L);
+        assertThat(acquired.get()).isEqualTo(1);
+        verify(tokens, never()).token();
+        server.verify();
+    }
+
+    @Test
+    void userAccountIdFallsBackToTheSub() {
+        server.expect(requestTo("https://oauth.battle.net/userinfo"))
+                .andRespond(withSuccess("{\"sub\":\"42\"}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.userAccountId("user-token")).isEqualTo(42L);
+    }
+
+    @Test
+    void userAccountIdWithoutAnIdOrRefusedIsAnError() {
+        String url = "https://oauth.battle.net/userinfo";
+        server.expect(requestTo(url)).andRespond(withSuccess("{\"battletag\":\"x#1\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url)).andRespond(withSuccess("{\"sub\":\"abc\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.NOT_FOUND));
+        server.expect(requestTo(url)).andRespond(withStatus(HttpStatus.FOUND)
+                .header(HttpHeaders.LOCATION, "https://elsewhere.example"));
+
+        for (int i = 0; i < 5; i++) {
+            assertThatThrownBy(() -> client.userAccountId("user-token"))
+                    .isInstanceOf(BlizzardUnavailableException.class)
+                    .satisfies(e -> assertThat(e.getMessage()).doesNotContain("user-token"));
+        }
+        verify(tokens, never()).invalidate(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void userCharactersWithoutAccountsIsAnError() {
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(EU + "/profile/user/wow")))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
