@@ -109,8 +109,7 @@ public class BlizzardStatsService {
             return Optional.empty();
         }
         Optional<BlizzardAccount> row = accounts.findById(user.getId());
-        BlizzardRegion region = row.flatMap(r -> BlizzardRegion.parse(r.getRegion()))
-                .orElse(properties.blizzardDefaultRegion());
+        BlizzardRegion region = regionOf(row);
         String battleTag = link.get().getBattleTag();
         String member = "u:" + user.getId();
         return switch (game) {
@@ -134,12 +133,20 @@ public class BlizzardStatsService {
             return forGame(user, game.get(), locale, budget, false);
         }
         if (PublisherGames.isBlizzardVariant(detected)) {
-            return linkIfServable(user, EnrichmentSource.BLIZZARD_WOW_CHARACTER).map(link -> new BlizzardStats(Status.UNSUPPORTED, BlizzardGame.WOW,
-                    link.getBattleTag(), accounts.findById(user.getId())
-                    .flatMap(r -> BlizzardRegion.parse(r.getRegion()))
-                    .orElse(properties.blizzardDefaultRegion()).key(), null, null, null));
+            return linkIfServable(user, EnrichmentSource.BLIZZARD_WOW_CHARACTER).map(link -> new BlizzardStats(
+                    Status.UNSUPPORTED, BlizzardGame.WOW, link.getBattleTag(), region(user).key(), null, null, null,
+                    null));
         }
         return Optional.empty();
+    }
+
+    /** The member's Blizzard region (the one they chose or their first WoW import set), else the default one. */
+    public BlizzardRegion region(UserAccount user) {
+        return regionOf(accounts.findById(user.getId()));
+    }
+
+    private BlizzardRegion regionOf(Optional<BlizzardAccount> row) {
+        return row.flatMap(r -> BlizzardRegion.parse(r.getRegion())).orElse(properties.blizzardDefaultRegion());
     }
 
     private Optional<BlizzardStats> wow(UserAccount user, Optional<BlizzardAccount> row, BlizzardRegion region,
@@ -275,7 +282,7 @@ public class BlizzardStatsService {
     private static BlizzardStats of(BlizzardGame game, String battleTag, BlizzardRegion region, WowStats wow,
                                     Sc2Stats sc2, D3Stats d3) {
         Status status = wow != null ? wow.status() : sc2 != null ? sc2.status() : d3.status();
-        return new BlizzardStats(status, game, battleTag, region.key(), wow, sc2, d3);
+        return new BlizzardStats(status, game, battleTag, region.key(), wow, sc2, d3, null);
     }
 
     private static EnrichmentSource profileSource(BlizzardGame game) {

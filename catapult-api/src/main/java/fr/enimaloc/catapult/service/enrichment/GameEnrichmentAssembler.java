@@ -5,6 +5,11 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.domain.igdb.IgdbGameDetails;
 import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardGameDataService;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardPublisher;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStats;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStatsService;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticService;
@@ -13,6 +18,7 @@ import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiService;
 import fr.enimaloc.catapult.service.enrichment.prices.GamePrices;
 import fr.enimaloc.catapult.service.enrichment.prices.PricesService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbService;
+import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames;
 import fr.enimaloc.catapult.service.enrichment.rastats.RaUnavailableException;
 import fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsStatsService;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunEnrichment;
@@ -70,9 +76,13 @@ import java.util.function.Supplier;
  * verification on that game; all of it within the same deadline. Without records there is no speedrun.com object;
  * without an identified account (no member, none found, or too late) the personal parts are null.
  *
- * <p>The member's own stats (Steam, Xbox, RetroAchievements) are only asked when there is a member: Steam once the
- * app id is known, Xbox and RetroAchievements at once, each platform on its own, within the same deadline. A
+ * <p>The member's own stats (Steam, Xbox, RetroAchievements, Blizzard) are only asked when there is a member: Steam
+ * once the app id is known, the others at once, each platform on its own, within the same deadline. A
  * platform that is too late is null; one whose upstream is down says {@code unavailable}.
+ *
+ * <p>The publishers' public game data (Blizzard: WoW Token price, latest Hearthstone set, Diablo III season) is
+ * asked with or without a member, in the member's Blizzard region when there is one, else the default region. It
+ * never carries anything about the member.
  */
 @Slf4j
 @Component
@@ -99,6 +109,8 @@ public class GameEnrichmentAssembler {
     private final SteamStatsService steamStatsService;
     private final XboxStatsService xboxStatsService;
     private final RetroAchievementsStatsService retroAchievementsStatsService;
+    private final BlizzardStatsService blizzardStatsService;
+    private final BlizzardGameDataService blizzardGameDataService;
     private final EnrichmentProperties properties;
 
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -134,6 +146,8 @@ public class GameEnrichmentAssembler {
         String searched = searchName(igdb, name);
         Speedrun speedrun = speedrun(searched, member);
         Stats stats = member.map(user -> stats(detected, igdb, appId, searched, locale, user)).orElse(null);
+        var blizzardPublisher = supply("blizzard publisher", () -> blizzardPublisher(detected, igdb, member,
+                locale));
 
         return new GameEnrichment(
                 await(hltb, deadline, "hltb"),
@@ -147,7 +161,21 @@ public class GameEnrichmentAssembler {
                 await(opencritic, deadline, "opencritic"),
                 await(twitch, deadline, "twitch"),
                 speedrun.await(deadline),
-                stats == null ? null : stats.await(deadline));
+                stats == null ? null : stats.await(deadline),
+                PublisherEnrichment.of(await(blizzardPublisher, deadline, "blizzard publisher")));
+    }
+
+    /**
+     * The public data of the Blizzard game {@code detected} is, in the member's region (else the default one); null
+     * when it is not a Blizzard game or there is none.
+     */
+    private BlizzardPublisher blizzardPublisher(DetectedGame detected, String igdb, Optional<UserAccount> member,
+                                                Locale locale) {
+        return PublisherGames.blizzard(detected, igdb).flatMap(game -> {
+            BlizzardRegion region = member.map(blizzardStatsService::region)
+                    .orElseGet(properties::blizzardDefaultRegion);
+            return blizzardGameDataService.forGame(game, region, locale, FetchBudget.UNLIMITED);
+        }).orElse(null);
     }
 
     /**
@@ -173,7 +201,8 @@ public class GameEnrichmentAssembler {
 
     /**
      * Starts the member's stats lookups: Steam once {@code appId} is known, Xbox (its title found by the detected
-     * id, the Store id IGDB gives, else by name) and RetroAchievements (among the games played lately) at once.
+     * id, the Store id IGDB gives, else by name), RetroAchievements (among the games played lately) and Blizzard (by
+     * the Battle.net product code, else the IGDB id) at once.
      */
     private Stats stats(DetectedGame detected, String igdb, CompletableFuture<String> appId, String searched,
                         Locale locale, UserAccount user) {
@@ -183,7 +212,9 @@ public class GameEnrichmentAssembler {
                 locale));
         CompletableFuture<PlatformStats> retro = supply("retroachievements stats", () -> retroStats(user, detected,
                 searched));
-        return new Stats(steam, xbox, retro, detected.getSourceType());
+        CompletableFuture<BlizzardStats> blizzard = supply("blizzard stats", () -> blizzardStatsService
+                .forDetected(user, detected, igdb, locale, FetchBudget.UNLIMITED).orElse(null));
+        return new Stats(steam, xbox, retro, blizzard, detected.getSourceType());
     }
 
     private PlatformStats xboxStats(UserAccount user, DetectedGame detected, String igdb, String searched,
@@ -214,13 +245,15 @@ public class GameEnrichmentAssembler {
 
     /** The member's stats lookups under way. */
     private record Stats(CompletableFuture<PlatformStats> steam, CompletableFuture<PlatformStats> xbox,
-                         CompletableFuture<PlatformStats> retroachievements, GameBinding.SourceType detectedOn) {
+                         CompletableFuture<PlatformStats> retroachievements,
+                         CompletableFuture<BlizzardStats> blizzard, GameBinding.SourceType detectedOn) {
 
         /** What arrived before {@code deadline}; null when no platform applies. */
         PersonalStatsEnrichment await(long deadline) {
             return PersonalStatsEnrichment.of(GameEnrichmentAssembler.await(steam, deadline, "steam stats"),
                     GameEnrichmentAssembler.await(xbox, deadline, "xbox stats"),
                     GameEnrichmentAssembler.await(retroachievements, deadline, "retroachievements stats"),
+                    GameEnrichmentAssembler.await(blizzard, deadline, "blizzard stats"),
                     detectedOn);
         }
     }

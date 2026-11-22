@@ -512,6 +512,8 @@ GET,/api/games/prices/{itadId},itadId=018d937f-590c-70fa-bd4f-b95ee2c2e2f1;?vers
 GET,/api/games/opencritic/{ocId},ocId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/games/twitch/{twitchGameId},twitchGameId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/games/speedrun/{srcGameId},srcGameId=o1y9j9v6;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/blizzard/hearthstone/deck/{code},code=AAECAR8GxwPJBLsFmQfZB_gIDI0B2AGoArUDhwSSBe0G6wfbCe0JgQr-DAA;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/blizzard/wow/token/{region},region=eu;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 # trailer.mp4 (version 3): public per platform, the current game's by personal token
 GET,/api/games/steam/{appId}/trailer.mp4,appId=990000;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 HEAD,/api/games/steam/{appId}/trailer.mp4,appId=990000;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
@@ -524,4 +526,5 @@ GET,/api/me/stats,?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/steam/{appId},appId=440;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/xbox/{titleId},titleId=1144039928;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/retroachievements/{gameId},gameId=228;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/blizzard/{game},game=wow;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/retroachievements,?version=3,,401,401,401,401,401,401,PASS

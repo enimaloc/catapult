@@ -2,6 +2,10 @@ package fr.enimaloc.catapult.api.userapi;
 
 import fr.enimaloc.catapult.service.enrichment.FetchBudget;
 import fr.enimaloc.catapult.service.enrichment.IpFetchBudgets;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardGameDataService;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
+import fr.enimaloc.catapult.service.enrichment.blizzard.HearthstoneDeck;
+import fr.enimaloc.catapult.service.enrichment.blizzard.WowTokenPrice;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
@@ -24,6 +28,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,7 +49,7 @@ import java.util.Optional;
 
 /**
  * Public detail of the enrichment sources (HowLongToBeat, ProtonDB, Steam Deck, SteamGridDB, PCGamingWiki, prices,
- * OpenCritic, Twitch activity, speedrun.com world records), keyed by
+ * OpenCritic, Twitch activity, speedrun.com world records, Blizzard's public game data), keyed by
  * each source's own id: the targets of the "more" links of the v3 {@code /api/me/game}. Version 3 and later only.
  * Open to anyone, from any origin, so a cache miss may cost an upstream call: those calls are capped per client IP
  * ({@link IpFetchBudgets}), a spent budget answering {@code 429} with {@code Retry-After}
@@ -71,6 +76,7 @@ public class EnrichmentGamesController {
     private final OpenCriticService openCriticService;
     private final TwitchActivityService twitchActivityService;
     private final SpeedrunGameService speedrunGameService;
+    private final BlizzardGameDataService blizzardGameDataService;
 
     @Operation(summary = "Get how long an IGDB game takes to beat", description = "HowLongToBeat durations, in "
             + "seconds (rushed, normal, completionist; null when unknown), as IGDB serves them." + BUDGET_NOTE)
@@ -220,6 +226,47 @@ public class EnrichmentGamesController {
             @PathVariable @Pattern(regexp = ApiV2.SPEEDRUN_GAME_ID) String srcGameId,
             HttpServletRequest request) {
         return found(speedrunGameService.publicRecords(srcGameId, budget(request)), "Unknown speedrun.com game");
+    }
+
+    @Operation(summary = "Get a Hearthstone deck from its code", description = "The deck a Hearthstone deck code "
+            + "stands for (format, hero, class, every card with its mana cost and image), from Blizzard, with the "
+            + "names in the language asked. Public game data, nothing personal." + BUDGET_NOTE)
+    @ApiResponse(responseCode = "200", description = "The deck.")
+    @ApiResponse(responseCode = "400", description = "Malformed deck code.", content = @Content)
+    @ApiResponse(responseCode = "404", description = "Source disabled, or no deck for that code.",
+            content = @Content)
+    @ApiResponse(responseCode = "429", description = "Too many live fetches from this IP; retry after "
+            + "Retry-After seconds.", content = @Content)
+    @GetMapping("/blizzard/hearthstone/deck/{code}")
+    public HearthstoneDeck hearthstoneDeck(
+            @Parameter(description = "Hearthstone deck code, as the game copies it.", in = ParameterIn.PATH,
+                    example = "AAECAR8GxwPJBLsFmQfZB_gIDI0B2AGoArUDhwSSBe0G6wfbCe0JgQr-DAA=")
+            @PathVariable @Pattern(regexp = ApiV2.HEARTHSTONE_DECK_CODE) String code,
+            @Parameter(description = RequestLocale.LANG_DESCRIPTION, example = "fr",
+                    schema = @Schema(defaultValue = "en"))
+            @RequestParam(name = "lang", required = false) String lang,
+            HttpServletRequest request) {
+        return found(blizzardGameDataService.hearthstoneDeck(code, RequestLocale.parse(lang, null),
+                budget(request)), "Unknown Hearthstone deck");
+    }
+
+    @Operation(summary = "Get the WoW Token price of a region", description = "The current price of the World of "
+            + "Warcraft Token in a region, in gold, and when Blizzard last updated it. Public game data, nothing "
+            + "personal." + BUDGET_NOTE)
+    @ApiResponse(responseCode = "200", description = "The region's WoW Token price.")
+    @ApiResponse(responseCode = "400", description = "Unknown region (eu, us, kr or tw).", content = @Content)
+    @ApiResponse(responseCode = "404", description = "Source disabled, or no price for that region.",
+            content = @Content)
+    @ApiResponse(responseCode = "429", description = "Too many live fetches from this IP; retry after "
+            + "Retry-After seconds.", content = @Content)
+    @GetMapping("/blizzard/wow/token/{region}")
+    public WowTokenPrice wowToken(
+            @Parameter(description = "Blizzard region: eu, us, kr or tw.", in = ParameterIn.PATH, example = "eu")
+            @PathVariable @Pattern(regexp = ApiV2.BLIZZARD_REGION) String region,
+            HttpServletRequest request) {
+        BlizzardRegion parsed = BlizzardRegion.parse(region)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown Blizzard region"));
+        return found(blizzardGameDataService.wowToken(parsed, budget(request)), "No WoW Token price");
     }
 
     /** The lower-cased two-letter language (so FR and fr share a cache entry); null when absent; 400 otherwise. */

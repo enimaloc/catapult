@@ -90,7 +90,7 @@ class GameInfoAssemblerV3Test {
         DetectedGame detected = playing(Duration.ZERO);
         ProtonDbSummary proton = new ProtonDbSummary("gold", "gold", "gold", "good", 0.7, 10, "https://p");
         when(enrichmentAssembler.enrichAsync(any(), any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(
-                CompletableFuture.completedFuture(new GameEnrichment(null, proton, null, null, null, null, "620", null, null, null, null, null)));
+                CompletableFuture.completedFuture(new GameEnrichment(null, proton, null, null, null, null, "620", null, null, null, null, null, null)));
 
         GameInfoV3Response response = assembler.gameInfoV3(user, Locale.FRENCH, null, null);
 
@@ -155,11 +155,30 @@ class GameInfoAssemblerV3Test {
     }
 
     @Test
+    void widgetRoutesHaveNoBlizzardStats() {
+        DetectedGame wow = new DetectedGame("WoW", GameBinding.SourceType.BATTLENET, "World of Warcraft");
+        when(gameStateService.getLastKnownGame(user)).thenReturn(Optional.of(wow));
+        when(igdbService.resolveDetected(any(), any(), any())).thenReturn(Optional.empty());
+        UUID widget = UUID.randomUUID();
+        when(widgetTokens.resolve(widget)).thenReturn(Optional.of(user));
+        JsonMapper mapper = JsonMapper.builder().build();
+
+        String byWidget = mapper.writeValueAsString(assembler.gameInfo(widget, Locale.ENGLISH).orElseThrow());
+        String v2 = mapper.writeValueAsString(assembler.gameInfo(user, Locale.ENGLISH));
+
+        for (String answer : List.of(byWidget, v2)) {
+            assertThat(answer).contains("\"inGame\":true").doesNotContain("\"stats\"")
+                    .doesNotContain("\"blizzard\"").doesNotContain("\"publisher\"");
+        }
+        verifyNoInteractions(enrichmentAssembler);
+    }
+
+    @Test
     void currentStats_ofTheGamePlayedNow() {
         DetectedGame detected = playing(Duration.ZERO);
         PlatformStats steam = PlatformStats.of(Status.OK, "620");
         when(enrichmentAssembler.personalStats(any(), any(), any(), any(), any(), any()))
-                .thenReturn(new PersonalStatsEnrichment(steam, null, null, GameBinding.SourceType.STEAM));
+                .thenReturn(new PersonalStatsEnrichment(steam, null, null, null, GameBinding.SourceType.STEAM));
 
         MeStatsController.CurrentStats current = assembler.currentStats(user, Locale.FRENCH);
 

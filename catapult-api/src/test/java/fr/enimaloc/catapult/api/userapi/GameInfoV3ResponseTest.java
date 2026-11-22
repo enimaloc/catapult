@@ -3,6 +3,11 @@ package fr.enimaloc.catapult.api.userapi;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
 import fr.enimaloc.catapult.service.enrichment.PersonalStatsEnrichment;
+import fr.enimaloc.catapult.service.enrichment.PublisherEnrichment;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardPublisher;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStats;
+import fr.enimaloc.catapult.service.enrichment.blizzard.HearthstoneSet;
+import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BlizzardGame;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
@@ -64,7 +69,7 @@ class GameInfoV3ResponseTest {
 
     @Test
     void summaryView_containsNewDerivedFields_notObjects() {
-        GameEnrichment enrichment = new GameEnrichment(TTB, PROTON, SGDB, DECK, PCGW, TRAILER, "620", null, null, null, null, null);
+        GameEnrichment enrichment = new GameEnrichment(TTB, PROTON, SGDB, DECK, PCGW, TRAILER, "620", null, null, null, null, null, null);
         GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.of("72"));
 
         JsonNode summary = MAPPER.readTree(MAPPER.writerWithView(GameInfoResponse.Summary.class)
@@ -103,11 +108,11 @@ class GameInfoV3ResponseTest {
     void coverUrl_fallsBackToIgdbCover() {
         GameEnrichment noGrid = new GameEnrichment(null, null, new SteamGridDbAssets(5L, "Portal 2",
                 "https://www.steamgriddb.com/game/5", List.of(), List.of(), List.of(), List.of()),
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
         assertThat(GameInfoV3Response.of(BASE_V2, noGrid, LINKS, Optional.of("72")).coverUrl())
                 .isEqualTo("https://images.igdb.com/cover.jpg");
 
-        GameEnrichment nothing = new GameEnrichment(null, null, null, null, null, null, null, null, null, null, null, null);
+        GameEnrichment nothing = new GameEnrichment(null, null, null, null, null, null, null, null, null, null, null, null, null);
         GameInfoV3Response bare = GameInfoV3Response.of(BASE_V2, nothing, LINKS, Optional.of("72"));
         assertThat(bare.coverUrl()).isEqualTo("https://images.igdb.com/cover.jpg");
         assertThat(bare.timeToBeat()).isNull();
@@ -122,7 +127,7 @@ class GameInfoV3ResponseTest {
 
     @Test
     void hltbWithoutIgdbId_hasNoMoreLink() {
-        GameEnrichment enrichment = new GameEnrichment(TTB, null, null, null, null, null, null, null, null, null, null, null);
+        GameEnrichment enrichment = new GameEnrichment(TTB, null, null, null, null, null, null, null, null, null, null, null, null);
 
         GameInfoV3Response response = GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.empty());
 
@@ -143,7 +148,7 @@ class GameInfoV3ResponseTest {
     private static GameEnrichment withNewSources(GamePrices prices) {
         return new GameEnrichment(null, null, null, null, null, null, "620", prices,
                 new OpenCriticGame(7L, "Portal 2", 88, 95, "Mighty", 50, "https://opencritic.com/game/7/portal-2"),
-                new TwitchActivity("490377", "Portal 2", 3, 1234L, false, List.of(), List.of()), null, null);
+                new TwitchActivity("490377", "Portal 2", 3, 1234L, false, List.of(), List.of()), null, null, null);
     }
 
     @Test
@@ -229,7 +234,7 @@ class GameInfoV3ResponseTest {
             category("any", "Any%", "1484.083"), category("arb", "ARB", "1700"), category("100", "100%", "5000")));
 
     private static GameEnrichment withSpeedrun(SpeedrunEnrichment speedrun) {
-        return new GameEnrichment(null, null, null, null, null, null, null, null, null, null, speedrun, null);
+        return new GameEnrichment(null, null, null, null, null, null, null, null, null, null, speedrun, null, null);
     }
 
     @Test
@@ -359,7 +364,7 @@ class GameInfoV3ResponseTest {
     private static GameInfoV3Response withStats(PlatformStats steam, PlatformStats xbox, PlatformStats ra,
                                                 GameBinding.SourceType detectedOn) {
         GameEnrichment enrichment = new GameEnrichment(null, null, null, null, null, null, null, null, null, null,
-                null, PersonalStatsEnrichment.of(steam, xbox, ra, detectedOn));
+                null, PersonalStatsEnrichment.of(steam, xbox, ra, null, detectedOn), null);
         return GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.of("72"));
     }
 
@@ -476,5 +481,105 @@ class GameInfoV3ResponseTest {
         assertThat(response.achievements()).isNull();
         assertThat(response.lastAchievement()).isNull();
         assertThat(GameInfoV3Response.notInGame().stats()).isNull();
+    }
+
+    // ---------------------------------------------------------------- Blizzard
+
+    private static BlizzardStats wow(BlizzardStats.WowStats wow) {
+        return new BlizzardStats(wow.status(), BlizzardGame.WOW, "Name#1234", "eu", wow, null, null, null);
+    }
+
+    private static BlizzardStats.WowStats wowOk(List<Achievement> recent) {
+        return new BlizzardStats.WowStats(Status.OK, "Inspectordob", "Ravencrest", 90, "Evoker", "Preservation",
+                "Dracthyr", "ALLIANCE", "Guild", 28_755, 290, 288, Instant.parse("2026-11-14T10:00:00Z"), null,
+                "https://render/avatar.jpg", recent, null);
+    }
+
+    private static GameInfoV3Response withBlizzard(PlatformStats steam, BlizzardStats blizzard,
+                                                   PublisherEnrichment publisher) {
+        PersonalStatsEnrichment stats = PersonalStatsEnrichment.of(steam, null, null, blizzard,
+                GameBinding.SourceType.BATTLENET);
+        GameEnrichment enrichment = new GameEnrichment(null, null, null, null, null, null, null, null, null, null,
+                null, stats, publisher);
+        return GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.of("123"));
+    }
+
+    @Test
+    void blizzardStatsCarryTheirMoreLink() {
+        JsonNode stats = MAPPER.readTree(MAPPER.writeValueAsString(withBlizzard(null, wow(wowOk(List.of())), null)))
+                .path("stats");
+
+        JsonNode blizzard = stats.path("blizzard");
+        assertThat(blizzard.path("status").asString()).isEqualTo("ok");
+        assertThat(blizzard.path("game").asString()).isEqualTo("wow");
+        assertThat(blizzard.path("account").asString()).isEqualTo("Name#1234");
+        assertThat(blizzard.path("wow").path("name").asString()).isEqualTo("Inspectordob");
+        assertThat(blizzard.path("more").asString()).isEqualTo(BASE + "/api/me/stats/blizzard/wow?version=3");
+        // detail-only fields stay out of the aggregate
+        assertThat(blizzard.path("wow").has("characters")).isFalse();
+    }
+
+    @Test
+    void notFoundSerializesInStats() {
+        BlizzardStats.WowStats notFound = new BlizzardStats.WowStats(Status.NOT_FOUND, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null);
+
+        JsonNode blizzard = MAPPER.readTree(MAPPER.writeValueAsString(withBlizzard(null, wow(notFound), null)))
+                .path("stats").path("blizzard");
+
+        assertThat(blizzard.path("status").asString()).isEqualTo("not_found");
+        assertThat(blizzard.path("wow").path("status").asString()).isEqualTo("not_found");
+    }
+
+    @Test
+    void lastAchievementIncludesWow() {
+        Achievement wowRecent = new Achievement("40219", "Battleground Blitzest", null, null, true,
+                Instant.parse("2026-11-21T10:00:00Z"), null, null, false);
+
+        GameInfoV3Response response = withBlizzard(STEAM, wow(wowOk(List.of(wowRecent))), null);
+
+        assertThat(response.lastAchievement()).isEqualTo(new GameInfoV3Response.LastAchievement("blizzard",
+                "Battleground Blitzest", Instant.parse("2026-11-21T10:00:00Z"), null));
+        // Blizzard has no play time and no achievements summary in the summary
+        assertThat(response.playtime()).isEqualTo(7320L);
+    }
+
+    @Test
+    void publisherCarriesNoPersonalField() {
+        BlizzardPublisher wowPublic = new BlizzardPublisher(BlizzardGame.WOW, "eu",
+                new BlizzardPublisher.Wow(470_531L, Instant.parse("2026-11-22T10:00:00Z")), null, null, null);
+
+        GameInfoV3Response response = withBlizzard(null, wow(wowOk(List.of())),
+                new PublisherEnrichment(wowPublic));
+        JsonNode publisher = MAPPER.readTree(MAPPER.writeValueAsString(response)).path("publisher");
+        String json = publisher.toString();
+
+        assertThat(publisher.path("blizzard").path("game").asString()).isEqualTo("wow");
+        assertThat(publisher.path("blizzard").path("region").asString()).isEqualTo("eu");
+        assertThat(publisher.path("blizzard").path("wow").path("tokenGold").asLong()).isEqualTo(470_531L);
+        assertThat(json).doesNotContain("\"account\"").doesNotContain("battleTag").doesNotContain("Name#1234")
+                .doesNotContain("characters").doesNotContain("Inspectordob");
+    }
+
+    @Test
+    void hearthstonePublisher_noStats() {
+        BlizzardPublisher hs = new BlizzardPublisher(BlizzardGame.HEARTHSTONE, "eu", null,
+                new BlizzardPublisher.Hearthstone(new HearthstoneSet(1, "Set", "set", "expansion", 145)), null,
+                null);
+
+        GameInfoV3Response response = withBlizzard(null, null, new PublisherEnrichment(hs));
+
+        assertThat(response.stats()).isNull();
+        assertThat(response.publisher().blizzard().hearthstone().latestSet().name()).isEqualTo("Set");
+        JsonNode summary = MAPPER.readTree(MAPPER.writerWithView(GameInfoResponse.Summary.class)
+                .writeValueAsString(response));
+        assertThat(summary.has("publisher")).isFalse();
+    }
+
+    @Test
+    void noPublisher_noObject() {
+        assertThat(GameInfoV3Response.of(BASE_V2, GameEnrichment.EMPTY, LINKS, Optional.of("72")).publisher())
+                .isNull();
+        assertThat(GameInfoV3Response.notInGame().publisher()).isNull();
     }
 }

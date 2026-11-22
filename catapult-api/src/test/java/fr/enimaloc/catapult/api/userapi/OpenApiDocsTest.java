@@ -1,6 +1,8 @@
 package fr.enimaloc.catapult.api.userapi;
 
 import fr.enimaloc.catapult.service.enrichment.IpFetchBudgets;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardGameDataService;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStatsService;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticService;
 import fr.enimaloc.catapult.service.enrichment.MemberFetchBudgets;
@@ -113,6 +115,8 @@ class OpenApiDocsTest {
     @MockitoBean XboxStatsService xboxStatsService;
     @MockitoBean RetroAchievementsStatsService retroAchievementsStatsService;
     @MockitoBean MemberFetchBudgets memberFetchBudgets;
+    @MockitoBean BlizzardStatsService blizzardStatsService;
+    @MockitoBean BlizzardGameDataService blizzardGameDataService;
 
     private JsonNode docs() throws Exception {
         String body = mvc.perform(get("/api/v3/api-docs")).andExpect(status().isOk())
@@ -232,7 +236,8 @@ class OpenApiDocsTest {
         assertThat(paths).contains("/api/games/hltb/{igdbId}", "/api/games/protondb/{appId}",
                 "/api/games/steamdeck/{appId}", "/api/games/steamgriddb/{sgdbGameId}",
                 "/api/games/pcgamingwiki/{pageId}", "/api/games/prices/{itadId}", "/api/games/opencritic/{ocId}",
-                "/api/games/twitch/{twitchGameId}", "/api/games/speedrun/{srcGameId}");
+                "/api/games/twitch/{twitchGameId}", "/api/games/speedrun/{srcGameId}",
+                "/api/games/blizzard/hearthstone/deck/{code}", "/api/games/blizzard/wow/token/{region}");
     }
 
     /**
@@ -245,7 +250,7 @@ class OpenApiDocsTest {
 
         assertThat(paths(docs)).contains("/api/me/stats", "/api/me/stats/steam/{appId}",
                 "/api/me/stats/xbox/{titleId}", "/api/me/stats/retroachievements/{gameId}",
-                "/api/me/stats/retroachievements");
+                "/api/me/stats/retroachievements", "/api/me/stats/blizzard/{game}");
         assertThat(versionHeader(docs, "/paths/~1api~1me~1stats~1steam~1{appId}/get/parameters").get("schema")
                 .get("enum").toString()).isEqualTo("[\"3\"]");
         JsonNode schemas = docs.at("/components/schemas");
@@ -259,6 +264,11 @@ class OpenApiDocsTest {
         assertThat(schemas.has("PlatformStats")).isFalse();
         assertThat(docs.at("/paths/~1api~1me~1stats~1steam~1{appId}/get/responses/200/content").toString())
                 .contains("SteamStats");
+        // Blizzard: the detail answers the aggregate's own record; the public data has its own object
+        assertThat(docs.at("/paths/~1api~1me~1stats~1blizzard~1{game}/get/responses/200/content").toString())
+                .contains("BlizzardStats");
+        assertThat(schemas.at("/StatsObject/properties").has("blizzard")).isTrue();
+        assertThat(schemas.at("/BlizzardStats/properties").has("more")).isTrue();
     }
 
     private static JsonNode versionHeader(JsonNode docs, String parametersPointer) {

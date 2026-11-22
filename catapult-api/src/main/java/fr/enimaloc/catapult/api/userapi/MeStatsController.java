@@ -7,6 +7,9 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.service.enrichment.FetchBudget;
 import fr.enimaloc.catapult.service.enrichment.MemberFetchBudgets;
 import fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStats;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStatsService;
+import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BlizzardGame;
 import fr.enimaloc.catapult.service.enrichment.rastats.RaAccountView;
 import fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsStatsService;
 import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.PlatformStats;
@@ -40,8 +43,9 @@ import static fr.enimaloc.catapult.api.userapi.RequestLocale.ACCEPT_LANGUAGE_DES
 import static fr.enimaloc.catapult.api.userapi.RequestLocale.LANG_DESCRIPTION;
 
 /**
- * The token owner's own play time and achievements on Steam, Xbox and RetroAchievements: on the game their channel
- * plays now, on a game of their choice (every achievement), and their RetroAchievements account. Personal data: only
+ * The token owner's own play time and achievements on Steam, Xbox and RetroAchievements, and their Blizzard stats:
+ * on the game their channel plays now, on a game of their choice (every achievement; every character, the ladder or
+ * every hero on Blizzard), and their RetroAchievements account. Personal data: only
  * ever served here and in {@code /api/me/game}, never on the public routes. A game of their choice costs one of the
  * member's {@code catapult.enrichment.member-per-minute} refreshes, so that a token cannot walk a whole library and
  * drain the shared quotas. Version 3 and later only.
@@ -50,17 +54,19 @@ import static fr.enimaloc.catapult.api.userapi.RequestLocale.LANG_DESCRIPTION;
 @RequestMapping(path = ApiV2.ME_STATS_PATH, version = ApiV2.VERSION_3 + "+")
 @RequiredArgsConstructor
 @Tag(name = "Me — stats", description = "Your own play time and achievements on Steam, Xbox and "
-        + "RetroAchievements, by your personal API token (Authorization: Bearer cat_… or catr_…).")
+        + "RetroAchievements, and your Blizzard stats, by your personal API token (Authorization: Bearer cat_… or "
+        + "catr_…).")
 public class MeStatsController {
 
     private static final String BUDGET_NOTE = " Each call takes one of your refreshes (20 a minute by default).";
     private static final String STATUS_NOTE = " A status that is not ok (private, not_owned, no_achievements, "
-            + "unsupported, unavailable) is still a 200.";
+            + "not_found, unsupported, unavailable) is still a 200.";
 
     private final GameInfoAssembler gameInfoAssembler;
     private final SteamStatsService steamStatsService;
     private final XboxStatsService xboxStatsService;
     private final RetroAchievementsStatsService retroAchievementsStatsService;
+    private final BlizzardStatsService blizzardStatsService;
     private final MemberFetchBudgets memberFetchBudgets;
     private final ApiUserResolver userResolver;
     private final PublicBaseUrl publicBaseUrl;
@@ -71,10 +77,12 @@ public class MeStatsController {
 
     @GetMapping
     @Operation(summary = "Get your stats on the game your channel plays now",
-            description = "The stats object of GET /api/me/game (version 3): steam, xbox and retroachievements, each "
-                    + "null when the platform does not apply (not linked, game not found there), each with its "
-                    + "status, play time, achievements summary (unlocked, total, percent, the 5 latest, the rarest) "
-                    + "and a \"more\" link to every achievement. stats is null when no platform applies.")
+            description = "The stats object of GET /api/me/game (version 3): steam, xbox, retroachievements and "
+                    + "blizzard, each null when it does not apply (not linked, game not found there), each with its "
+                    + "status and a \"more\" link to its detail; the platforms with their play time and "
+                    + "achievements summary (unlocked, total, percent, the 5 latest, the rarest), blizzard with your "
+                    + "BattleTag, region and the game's object (wow main character, sc2 or d3 profile). stats is "
+                    + "null when nothing applies.")
     @ApiResponse(responseCode = "200", description = "inGame=false while no game is detected; otherwise your stats.")
     public CurrentStats current(
             @AuthenticationPrincipal UUID userId,
@@ -162,6 +170,42 @@ public class MeStatsController {
         return GameInfoV3Response.RaStats.of(stats, links(), true);
     }
 
+    @GetMapping("/blizzard/{game}")
+    @Operation(summary = "Get your stats on a Blizzard game",
+            description = "The blizzard object of GET /api/me/stats (status, game, account = your BattleTag, region, "
+                    + "and the object of the game: wow your main character, sc2 your profile, d3 your profile), "
+                    + "plus what only the detail has: wow.characters (every imported character, the main one "
+                    + "marked), sc2.ladder (your ladder summary), d3.heroes (every hero). Hearthstone has no "
+                    + "personal stats (its public data is in publisher.blizzard of GET /api/me/game)." + STATUS_NOTE
+                    + BUDGET_NOTE)
+    @ApiResponse(responseCode = "200", description = "Your stats on the game.")
+    @ApiResponse(responseCode = "400", description = "Unknown game (wow, sc2 or d3).", content = @Content)
+    @ApiResponse(responseCode = "404", description = "No Battle.net account linked, WoW characters not imported "
+            + "(wow), or Blizzard stats disabled.", content = @Content)
+    @ApiResponse(responseCode = "429", description = "Your refreshes are spent; retry after Retry-After seconds.",
+            content = @Content)
+    public BlizzardStats blizzard(
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "Blizzard game: wow, sc2 or d3.", in = ParameterIn.PATH, example = "wow")
+            @PathVariable @Pattern(regexp = ApiV2.BLIZZARD_GAME) String game,
+            @Parameter(description = LANG_DESCRIPTION, example = "fr", schema = @Schema(defaultValue = "en"))
+            @RequestParam(name = "lang", required = false) String lang,
+            @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER,
+                    example = "fr-FR,fr;q=0.9")
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        BlizzardGame blizzardGame = switch (game) {
+            case "wow" -> BlizzardGame.WOW;
+            case "sc2" -> BlizzardGame.SC2;
+            default -> BlizzardGame.D3;
+        };
+        String notFound = blizzardGame == BlizzardGame.WOW
+                ? "No World of Warcraft stats for you: link Battle.net and import your WoW characters"
+                : "No Blizzard stats for you on that game: link Battle.net";
+        BlizzardStats stats = detail(userId, notFound, (user, budget) -> blizzardStatsService.forGame(user,
+                blizzardGame, RequestLocale.parse(lang, acceptLanguage), budget, true));
+        return GameInfoV3Response.blizzardStats(stats, links());
+    }
+
     @GetMapping("/retroachievements")
     @Operation(summary = "Get your RetroAchievements account",
             description = "Your profile (points, rich presence, last game), the games you played lately and the "
@@ -177,8 +221,7 @@ public class MeStatsController {
     }
 
     /** The member's budget is asked before anything: one call is one refresh, however many upstream calls it makes. */
-    private PlatformStats detail(UUID userId, String notFound,
-                                 BiFunction<UserAccount, FetchBudget, Optional<PlatformStats>> read) {
+    private <T> T detail(UUID userId, String notFound, BiFunction<UserAccount, FetchBudget, Optional<T>> read) {
         UserAccount user = userResolver.tokenOwner(userId);
         FetchBudget budget = FetchBudget.once(memberFetchBudgets.forMember(user.getId()));
         if (!budget.tryAcquire()) {

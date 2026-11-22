@@ -6,6 +6,10 @@ import fr.enimaloc.catapult.service.enrichment.EnrichmentProperties;
 import fr.enimaloc.catapult.service.enrichment.FetchBudget;
 import fr.enimaloc.catapult.service.enrichment.IpFetchBudgets;
 import fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardGameDataService;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
+import fr.enimaloc.catapult.service.enrichment.blizzard.HearthstoneDeck;
+import fr.enimaloc.catapult.service.enrichment.blizzard.WowTokenPrice;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiService;
@@ -81,6 +85,7 @@ class EnrichmentGamesControllerTest {
     @MockitoBean OpenCriticService openCritic;
     @MockitoBean TwitchActivityService twitch;
     @MockitoBean SpeedrunGameService speedrun;
+    @MockitoBean BlizzardGameDataService blizzard;
 
     private static final String ITAD_ID = "018d937f-590c-70fa-bd4f-b95ee2c2e2f1";
 
@@ -345,6 +350,83 @@ class EnrichmentGamesControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(content().contentTypeCompatibleWith("application/problem+json"));
         org.mockito.Mockito.verify(speedrun).publicRecords(eq("o1y9j9v6"), any(FetchBudget.class));
+    }
+
+    // ---------------------------------------------------------------- Blizzard
+
+    private static final String DECK_CODE = "AAECAR8GxwPJBLsFmQfZB_gIDI0B2AGoArUDhwSSBe0G6wfbCe0JgQr-DAA=";
+
+    @Test
+    void deckIsPublicUnderTheIpBudget() throws Exception {
+        HearthstoneDeck deck = new HearthstoneDeck(DECK_CODE, "standard", "Rexxar", "Hunter", 30,
+                List.of(new HearthstoneDeck.Card(1L, "Arcane Shot", 1, "https://img/1.png")));
+        when(blizzard.hearthstoneDeck(eq(DECK_CODE), any(), any(FetchBudget.class))).thenAnswer(call -> {
+            FetchBudget budget = call.getArgument(2);
+            if (!budget.tryAcquire()) {
+                throw new UpstreamBudgetExceededException(budget.retryAfter());
+            }
+            return Optional.of(deck);
+        });
+
+        // no token at all
+        mvc.perform(v3(get("/api/games/blizzard/hearthstone/deck/" + DECK_CODE), "198.51.100.30")
+                        .param("lang", "fr"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.heroName").value("Rexxar"))
+                .andExpect(jsonPath("$.cards[0].name").value("Arcane Shot"));
+        org.mockito.Mockito.verify(blizzard).hearthstoneDeck(eq(DECK_CODE),
+                eq(java.util.Locale.FRENCH), any(FetchBudget.class));
+        for (int i = 1; i < 10; i++) {
+            mvc.perform(v3(get("/api/games/blizzard/hearthstone/deck/" + DECK_CODE), "198.51.100.30"))
+                    .andExpect(status().isOk());
+        }
+        mvc.perform(v3(get("/api/games/blizzard/hearthstone/deck/" + DECK_CODE), "198.51.100.30"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"));
+    }
+
+    @Test
+    void unknownDeckIs404() throws Exception {
+        when(blizzard.hearthstoneDeck(anyString(), any(), any(FetchBudget.class))).thenReturn(Optional.empty());
+
+        mvc.perform(v3(get("/api/games/blizzard/hearthstone/deck/" + DECK_CODE), "203.0.113.7"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"));
+    }
+
+    @Test
+    void malformedDeckCodeIs400() throws Exception {
+        for (String code : List.of("short", "a".repeat(201), "AAEC~AR8GxwPJ")) {
+            mvc.perform(v3(get("/api/games/blizzard/hearthstone/deck/" + code), "203.0.113.7"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentTypeCompatibleWith("application/problem+json"));
+        }
+        verifyNoInteractions(blizzard);
+    }
+
+    @Test
+    void wowTokenOfARegion() throws Exception {
+        when(blizzard.wowToken(eq(BlizzardRegion.US), any(FetchBudget.class))).thenReturn(Optional.of(
+                new WowTokenPrice(470_531L, java.time.Instant.parse("2026-11-22T10:00:00Z"))));
+        when(blizzard.wowToken(eq(BlizzardRegion.EU), any(FetchBudget.class))).thenReturn(Optional.empty());
+
+        mvc.perform(v3(get("/api/games/blizzard/wow/token/us"), "203.0.113.7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.gold").value(470531))
+                .andExpect(jsonPath("$.updatedAt").value("2026-11-22T10:00:00Z"));
+        mvc.perform(v3(get("/api/games/blizzard/wow/token/eu"), "203.0.113.7"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"));
+    }
+
+    @Test
+    void unknownRegionIs400() throws Exception {
+        for (String region : List.of("cn", "EU", "europe")) {
+            mvc.perform(v3(get("/api/games/blizzard/wow/token/" + region), "203.0.113.7"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentTypeCompatibleWith("application/problem+json"));
+        }
+        verifyNoInteractions(blizzard);
     }
 
     @TestConfiguration

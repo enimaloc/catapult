@@ -6,6 +6,9 @@ import com.fasterxml.jackson.annotation.JsonView;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
 import fr.enimaloc.catapult.service.enrichment.PersonalStatsEnrichment;
+import fr.enimaloc.catapult.service.enrichment.PublisherEnrichment;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardPublisher;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStats;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
@@ -32,6 +35,7 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -39,12 +43,13 @@ import java.util.stream.Stream;
 /**
  * The v3 aggregated game info: the v2 platform objects ({@link GameInfoResponse}, kept as {@code base}) plus the
  * enrichment ones (HowLongToBeat, ProtonDB, SteamGridDB, Steam Deck, PCGamingWiki, store prices, OpenCritic, Twitch
- * activity, speedrun.com) and the member's own stats (Steam, Xbox, RetroAchievements), each a short projection with a
- * "more" link to its detail route, null when unavailable. The {@link GameInfoResponse.Summary} view adds to the v2
- * derived fields {@code timeToBeat}, {@code protonTier}, {@code deckStatus}, {@code coverUrl}, {@code trailer}, {@code price},
+ * activity, speedrun.com), the member's own stats (Steam, Xbox, RetroAchievements, Blizzard) and the publishers'
+ * public game data (Blizzard), each a short projection with a "more" link to its detail route, null when
+ * unavailable. The {@link GameInfoResponse.Summary} view adds to the v2 derived fields {@code timeToBeat}, {@code protonTier}, {@code deckStatus}, {@code coverUrl}, {@code trailer}, {@code price},
  * {@code criticScore}, {@code liveViewers}, {@code worldRecord}, {@code personalBest}, {@code playtime},
  * {@code achievements} and {@code lastAchievement}; the enrichment objects never feed {@code name} or
- * {@code description}. The stats are personal: this answer is only ever served under {@code /api/me}.
+ * {@code description}. The stats are personal: this answer is only ever served under {@code /api/me}; the
+ * {@code publisher} object is public game data and never carries anything about the member.
  */
 public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boolean inGame,
                                  GameInfoResponse.IgdbObject igdb, GameInfoResponse.SteamObject steam,
@@ -53,14 +58,14 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
                                  SteamGridDbObject steamgriddb, SteamDeckObject steamDeck,
                                  PcGamingWikiObject pcgamingwiki, PricesObject prices,
                                  OpenCriticObject opencritic, TwitchObject twitch, SpeedrunObject speedrun,
-                                 StatsObject stats,
+                                 StatsObject stats, PublisherObject publisher,
                                  @JsonView(GameInfoResponse.Summary.class) Trailer trailer,
                                  @JsonIgnore GameInfoResponse base) {
 
     /** The answer while nothing is detected: inGame=false, every object null. */
     public static GameInfoV3Response notInGame() {
         return new GameInfoV3Response(false, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, new GameInfoResponse(false));
+                null, null, null, null, new GameInfoResponse(false));
     }
 
     /**
@@ -94,6 +99,7 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
                 TwitchObject.of(enrichment.twitch(), links, language),
                 SpeedrunObject.of(enrichment.speedrun(), links),
                 StatsObject.of(enrichment.stats(), links),
+                PublisherObject.of(enrichment.publisher()),
                 Trailer.of(enrichment.trailer()),
                 base);
     }
@@ -235,7 +241,10 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
         return new AchievementsSummary(main.platform(), main.achievements().unlocked(), main.achievements().total());
     }
 
-    /** The member's latest unlocked achievement on the game, every platform taken together; null if none is known. */
+    /**
+     * The member's latest unlocked achievement on the game, every platform taken together (Blizzard: the recent
+     * achievements of the main WoW character, {@code platform} "blizzard"); null if none is known.
+     */
     @JsonView(GameInfoResponse.Summary.class)
     public LastAchievement lastAchievement() {
         if (stats == null) {
@@ -243,13 +252,25 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
         }
         LastAchievement latest = null;
         for (PlatformObject platform : stats.platforms()) {
-            if (platform.achievements() == null || platform.achievements().recent() == null) {
-                continue;
+            if (platform.achievements() != null) {
+                latest = latest(latest, platform.platform(), platform.achievements().recent());
             }
-            for (Achievement a : platform.achievements().recent()) {
-                if (a.unlockedAt() != null && (latest == null || a.unlockedAt().isAfter(latest.unlockedAt()))) {
-                    latest = new LastAchievement(platform.platform(), a.name(), a.unlockedAt(), a.rarity());
-                }
+        }
+        if (stats.blizzard() != null && stats.blizzard().wow() != null) {
+            latest = latest(latest, BLIZZARD, stats.blizzard().wow().recentAchievements());
+        }
+        return latest;
+    }
+
+    private static final String BLIZZARD = "blizzard";
+
+    private static LastAchievement latest(LastAchievement latest, String platform, List<Achievement> recent) {
+        if (recent == null) {
+            return latest;
+        }
+        for (Achievement a : recent) {
+            if (a.unlockedAt() != null && (latest == null || a.unlockedAt().isAfter(latest.unlockedAt()))) {
+                latest = new LastAchievement(platform, a.name(), a.unlockedAt(), a.rarity());
             }
         }
         return latest;
@@ -283,11 +304,12 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
     }
 
     /**
-     * The member's own stats on the game: Steam, Xbox and RetroAchievements, each null when the platform does not
+     * The member's own stats on the game: Steam, Xbox, RetroAchievements and Blizzard, each null when it does not
      * apply, each with a {@code status} ({@code ok}, {@code private}, {@code not_owned}, {@code no_achievements},
-     * {@code unsupported}, {@code unavailable}) and a "more" link to its full achievement list. Personal data.
+     * {@code not_found}, {@code unsupported}, {@code unavailable}) and a "more" link to its detail route. Personal
+     * data.
      */
-    public record StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements,
+    public record StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
                               @JsonIgnore GameBinding.SourceType detectedOn) {
 
         static StatsObject of(PersonalStatsEnrichment s, MoreLinks links) {
@@ -295,7 +317,7 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
                 return null;
             }
             return new StatsObject(SteamStats.of(s.steam(), links), XboxStats.of(s.xbox(), links),
-                    RaStats.of(s.retroachievements(), links), s.detectedOn());
+                    RaStats.of(s.retroachievements(), links), blizzardStats(s.blizzard(), links), s.detectedOn());
         }
 
         List<PlatformObject> platforms() {
@@ -369,6 +391,28 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
         @Override
         public String platform() {
             return "xbox";
+        }
+    }
+
+    /**
+     * The member's Blizzard stats with the "more" link to {@code /api/me/stats/blizzard/<game>} (none for a game
+     * that is not the retail one, {@code unsupported}): the aggregate and the detail route serve this same record.
+     */
+    static BlizzardStats blizzardStats(BlizzardStats s, MoreLinks links) {
+        if (s == null) {
+            return null;
+        }
+        return s.withMore(s.game() == null || s.status() == Status.UNSUPPORTED ? null
+                : links.toMe(ApiV2.ME_STATS_PATH + "/blizzard/" + s.game().name().toLowerCase(Locale.ROOT)));
+    }
+
+    /**
+     * The publishers' public data on the game (Blizzard: WoW Token price, latest Hearthstone set, Diablo III
+     * season), null when no publisher applies. Public game data: never anything about the member.
+     */
+    public record PublisherObject(BlizzardPublisher blizzard) {
+        static PublisherObject of(PublisherEnrichment p) {
+            return p == null ? null : new PublisherObject(p.blizzard());
         }
     }
 

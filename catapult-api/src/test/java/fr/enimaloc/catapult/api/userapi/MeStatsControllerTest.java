@@ -9,6 +9,9 @@ import fr.enimaloc.catapult.service.account.ApiTokenOwner;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import fr.enimaloc.catapult.service.enrichment.FetchBudget;
 import fr.enimaloc.catapult.service.enrichment.MemberFetchBudgets;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStats;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStatsService;
+import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BlizzardGame;
 import fr.enimaloc.catapult.service.enrichment.rastats.RaAccountView;
 import fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsStatsService;
 import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Achievement;
@@ -82,6 +85,7 @@ class MeStatsControllerTest {
     @MockitoBean XboxStatsService xboxStats;
     @MockitoBean RetroAchievementsStatsService raStats;
     @MockitoBean MemberFetchBudgets budgets;
+    @MockitoBean BlizzardStatsService blizzardStats;
 
     private UserAccount user;
     private boolean budgetLeft = true;
@@ -113,7 +117,7 @@ class MeStatsControllerTest {
     void currentGameStats() throws Exception {
         GameInfoV3Response.StatsObject stats = new GameInfoV3Response.StatsObject(
                 new GameInfoV3Response.SteamStats(Status.OK, "440", 7320L, 95L, null, null, null,
-                        "http://localhost/api/me/stats/steam/440?version=3"), null, null, null);
+                        "http://localhost/api/me/stats/steam/440?version=3"), null, null, null, null);
         when(gameInfoAssembler.currentStats(user, Locale.FRENCH))
                 .thenReturn(new MeStatsController.CurrentStats(true, stats));
 
@@ -266,6 +270,70 @@ class MeStatsControllerTest {
     void withoutToken_401() throws Exception {
         mvc.perform(get(STATS + "/steam/440").header("X-API-Version", "3"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    // ---------------------------------------------------------------- Blizzard
+
+    private static final BlizzardStats.WowStats WOW_DETAIL = new BlizzardStats.WowStats(Status.OK, "Inspectordob",
+            "Ravencrest", 90, "Evoker", "Preservation", "Dracthyr", "ALLIANCE", null, 28_755, 290, 288, null, null,
+            null, List.of(), List.of(new BlizzardStats.WowStats.Character("eu", "Inspectordob", "Ravencrest", 90,
+                    "Evoker", "ALLIANCE", true)));
+
+    @Test
+    void blizzardDetailIsTheSameProjection() throws Exception {
+        when(blizzardStats.forGame(eq(user), eq(BlizzardGame.WOW), eq(Locale.FRENCH), any(), eq(true)))
+                .thenReturn(Optional.of(new BlizzardStats(Status.OK, BlizzardGame.WOW, "Name#1234", "eu",
+                        WOW_DETAIL, null, null, null)));
+
+        mvc.perform(v3(get(STATS + "/blizzard/wow")).param("lang", "fr"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ok"))
+                .andExpect(jsonPath("$.game").value("wow"))
+                .andExpect(jsonPath("$.account").value("Name#1234"))
+                .andExpect(jsonPath("$.region").value("eu"))
+                .andExpect(jsonPath("$.wow.name").value("Inspectordob"))
+                .andExpect(jsonPath("$.wow.characters[0].main").value(true))
+                .andExpect(jsonPath("$.wow.characters[0].id").doesNotExist())
+                .andExpect(jsonPath("$.more").value("http://localhost/api/me/stats/blizzard/wow?version=3"));
+        // the aggregate's record itself
+        org.assertj.core.api.Assertions.assertThat(MeStatsController.class.getMethod("blizzard", UUID.class,
+                String.class, String.class, String.class).getReturnType()).isEqualTo(BlizzardStats.class);
+    }
+
+    @Test
+    void blizzardBudgetSpentIs429() throws Exception {
+        budgetLeft = false;
+
+        mvc.perform(v3(get(STATS + "/blizzard/d3")))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "42"))
+                .andExpect(jsonPath("$.code").value("too_many_requests"));
+        verifyNoInteractions(blizzardStats);
+    }
+
+    @Test
+    void unknownBlizzardGameIs400() throws Exception {
+        // Hearthstone has no personal stats; Overwatch is not a Blizzard game of the enrichment
+        for (String game : List.of("hearthstone", "ow", "WOW")) {
+            mvc.perform(v3(get(STATS + "/blizzard/" + game)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().contentTypeCompatibleWith("application/problem+json"));
+        }
+        verifyNoInteractions(blizzardStats);
+    }
+
+    @Test
+    void noLinkIs404() throws Exception {
+        when(blizzardStats.forGame(any(), any(), any(), any(), anyBoolean())).thenReturn(Optional.empty());
+
+        for (String game : List.of("wow", "sc2", "d3")) {
+            mvc.perform(v3(get(STATS + "/blizzard/" + game)))
+                    .andExpect(status().isNotFound())
+                    .andExpect(header().string("Content-Type", "application/problem+json"))
+                    .andExpect(jsonPath("$.code").value("not_found"));
+        }
+        mvc.perform(v3(get(STATS + "/blizzard/wow")))
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("import")));
     }
 
     @TestConfiguration
