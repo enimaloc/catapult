@@ -30,10 +30,12 @@ class BlizzardGameDataServiceTest {
     private final GameEnrichmentCacheRepository repository = mock(GameEnrichmentCacheRepository.class);
     private final BlizzardClient client = mock(BlizzardClient.class);
     private final Map<String, GameEnrichmentCacheEntry> store = new ConcurrentHashMap<>();
+    private final BlizzardAppTokenService tokens = mock(BlizzardAppTokenService.class);
     private BlizzardGameDataService service;
 
     @BeforeEach
     void setUp() {
+        when(tokens.available()).thenReturn(true);
         when(repository.findBySourceAndLookupKey(anyString(), anyString())).thenAnswer(inv ->
                 Optional.ofNullable(store.get(inv.getArgument(0) + "|" + inv.getArgument(1))));
         when(repository.save(any(GameEnrichmentCacheEntry.class))).thenAnswer(inv -> {
@@ -42,7 +44,7 @@ class BlizzardGameDataServiceTest {
             return e;
         });
         service = new BlizzardGameDataService(new EnrichmentCache(repository, new EnrichmentProperties(),
-                JsonMapper.builder().build()), client);
+                JsonMapper.builder().build()), client, tokens);
     }
 
     @Test
@@ -112,5 +114,22 @@ class BlizzardGameDataServiceTest {
         assertThat(service.hearthstoneDeck("AAE", Locale.FRENCH, FetchBudget.UNLIMITED)).isPresent();
 
         verify(client, times(1)).hearthstoneDeck("AAE", "fr_FR");
+    }
+
+    @Test
+    void noCredentialsIsAbsentAndSpendsNothing() {
+        when(tokens.available()).thenReturn(false);
+        int[] spent = {0};
+        FetchBudget counting = () -> {
+            spent[0]++;
+            return true;
+        };
+
+        assertThat(service.forGame(BlizzardGame.WOW, BlizzardRegion.EU, Locale.FRENCH, counting)).isEmpty();
+        assertThat(service.wowToken(BlizzardRegion.EU, counting)).isEmpty();
+        assertThat(service.hearthstoneDeck("AAE", Locale.FRENCH, counting)).isEmpty();
+
+        assertThat(spent[0]).isZero();
+        org.mockito.Mockito.verifyNoInteractions(client);
     }
 }

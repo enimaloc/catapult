@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.getter.DetectedGame;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.repository.blizzard.BlizzardAccountRepository;
 import fr.enimaloc.catapult.repository.blizzard.BlizzardWowCharacterRepository;
+import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentCache;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentProperties;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentSource;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -46,6 +48,22 @@ public class BlizzardStatsService {
         }
     }
 
+    /**
+     * The cached shapes. A value that is null is a recognised "not found", cached as a value (so under the
+     * source's own TTL, not as a known absence).
+     */
+    public record CharacterCell(WowCharacter value) {
+    }
+
+    public record AchievementsCell(WowAchievements value) {
+    }
+
+    public record Sc2ProfileCell(Sc2Profile value) {
+    }
+
+    public record D3ProfileCell(D3Profile value) {
+    }
+
     /** A cached value, or the fact that the upstream call failed (an outage, as opposed to "nothing there"). */
     private record Looked<T>(Optional<T> value, boolean failed) {
     }
@@ -57,11 +75,13 @@ public class BlizzardStatsService {
     private final BattleNetFriendLinkRepository links;
     private final BlizzardAccountRepository accounts;
     private final BlizzardWowCharacterRepository characters;
+    private final boolean battleNetOn;
 
     @Autowired
     public BlizzardStatsService(EnrichmentCache cache, BlizzardClient client, BlizzardAppTokenService tokens,
                                 EnrichmentProperties properties, BattleNetFriendLinkRepository links,
-                                BlizzardAccountRepository accounts, BlizzardWowCharacterRepository characters) {
+                                BlizzardAccountRepository accounts, BlizzardWowCharacterRepository characters,
+                                Optional<BlizzardAccountService> battleNet) {
         this.cache = cache;
         this.client = client;
         this.tokens = tokens;
@@ -69,6 +89,7 @@ public class BlizzardStatsService {
         this.links = links;
         this.accounts = accounts;
         this.characters = characters;
+        this.battleNetOn = battleNet.isPresent();
     }
 
     /**
@@ -80,11 +101,10 @@ public class BlizzardStatsService {
      */
     public Optional<BlizzardStats> forGame(UserAccount user, BlizzardGame game, Locale locale, FetchBudget budget,
                                            boolean detail) {
-        if (game == BlizzardGame.HEARTHSTONE || !properties.source(profileSource(game)).enabled()
-                || !tokens.available()) {
+        if (game == BlizzardGame.HEARTHSTONE) {
             return Optional.empty();
         }
-        Optional<BattleNetFriendLink> link = activeLink(user);
+        Optional<BattleNetFriendLink> link = linkIfServable(user, profileSource(game));
         if (link.isEmpty()) {
             return Optional.empty();
         }
@@ -114,7 +134,7 @@ public class BlizzardStatsService {
             return forGame(user, game.get(), locale, budget, false);
         }
         if (PublisherGames.isBlizzardVariant(detected)) {
-            return activeLink(user).map(link -> new BlizzardStats(Status.UNSUPPORTED, BlizzardGame.WOW,
+            return linkIfServable(user, EnrichmentSource.BLIZZARD_WOW_CHARACTER).map(link -> new BlizzardStats(Status.UNSUPPORTED, BlizzardGame.WOW,
                     link.getBattleTag(), accounts.findById(user.getId())
                     .flatMap(r -> BlizzardRegion.parse(r.getRegion()))
                     .orElse(properties.blizzardDefaultRegion()).key(), null, null, null));
@@ -143,8 +163,8 @@ public class BlizzardStatsService {
         String key = member + ":wow:" + mainRegion + ":" + mainId;
         List<WowStats.Character> list = detail ? characterList(imported, mainRegion, mainId) : null;
 
-        Looked<WowCharacter> profile = look(EnrichmentSource.BLIZZARD_WOW_CHARACTER, key, WowCharacter.class,
-                budget, () -> client.wowCharacter(host, pick.getRealmSlug(), pick.getName(), blizzardLocale));
+        Looked<WowCharacter> profile = look(EnrichmentSource.BLIZZARD_WOW_CHARACTER, key, CharacterCell.class,
+                CharacterCell::new, CharacterCell::value, budget, () -> client.wowCharacter(host, pick.getRealmSlug(), pick.getName(), blizzardLocale));
         if (profile.value().isEmpty()) {
             return Optional.of(of(BlizzardGame.WOW, battleTag, region,
                     wowStatus(profile.failed() ? Status.UNAVAILABLE : Status.NOT_FOUND, list), null, null));
@@ -152,13 +172,10 @@ public class BlizzardStatsService {
         WowCharacter character = profile.value().get();
         WowAchievements achievements = null;
         if (properties.source(EnrichmentSource.BLIZZARD_WOW_ACHIEVEMENTS).enabled()) {
+            // The achievements are a part: without them the character is still served
             Looked<WowAchievements> got = look(EnrichmentSource.BLIZZARD_WOW_ACHIEVEMENTS, key,
-                    WowAchievements.class, budget,
+                    AchievementsCell.class, AchievementsCell::new, AchievementsCell::value, budget,
                     () -> client.wowAchievements(host, pick.getRealmSlug(), pick.getName(), blizzardLocale));
-            if (got.value().isEmpty() && got.failed()) {
-                return Optional.of(of(BlizzardGame.WOW, battleTag, region,
-                        wowStatus(Status.UNAVAILABLE, list), null, null));
-            }
             achievements = got.value().orElse(null);
         }
         List<Achievement> recent = achievements == null ? null : achievements.recent().stream()
@@ -191,7 +208,7 @@ public class BlizzardStatsService {
     private Sc2Stats sc2(long bnetAccountId, BlizzardRegion region, String member, Locale locale,
                          FetchBudget budget, boolean detail) {
         Looked<Sc2Refs> refs = look(EnrichmentSource.BLIZZARD_SC2_PROFILE, member + ":sc2:profiles", Sc2Refs.class,
-                budget, () -> new Sc2Refs(client.sc2Profiles(bnetAccountId)));
+                r -> r == null ? new Sc2Refs(List.of()) : r, r -> r, budget, () -> new Sc2Refs(client.sc2Profiles(bnetAccountId)));
         if (refs.value().isEmpty() && refs.failed()) {
             return sc2Status(Status.UNAVAILABLE);
         }
@@ -203,15 +220,30 @@ public class BlizzardStatsService {
                 .orElse(all.get(0));
         String key = member + ":sc2:" + ref.regionId() + ":" + ref.realmId() + ":" + ref.profileId()
                 + (detail ? ":ladder" : "");
-        String blizzardLocale = BlizzardLocale.of(locale, region);
-        Looked<Sc2Profile> profile = look(EnrichmentSource.BLIZZARD_SC2_PROFILE, key, Sc2Profile.class, budget,
-                () -> client.sc2Profile(region, ref, blizzardLocale, detail));
+        BlizzardRegion host = hostOf(ref, region);
+        String blizzardLocale = BlizzardLocale.of(locale, host);
+        Looked<Sc2Profile> profile = look(EnrichmentSource.BLIZZARD_SC2_PROFILE, key, Sc2ProfileCell.class,
+                Sc2ProfileCell::new, Sc2ProfileCell::value, budget,
+                () -> client.sc2Profile(host, ref, blizzardLocale, detail));
         if (profile.value().isEmpty()) {
             return sc2Status(profile.failed() ? Status.UNAVAILABLE : Status.NOT_FOUND);
         }
         Sc2Profile p = profile.value().get();
         return new Sc2Stats(Status.OK, p.displayName(), p.clanName(), p.clanTag(), p.portrait(), p.swarmLevel(),
                 p.achievementPoints(), p.modes(), detail ? p.ladder() : null);
+    }
+
+    /** The host of a profile: the member's region when it is theirs, else the region the profile belongs to. */
+    private static BlizzardRegion hostOf(Sc2ProfileRef ref, BlizzardRegion region) {
+        if (ref.regionId() == region.sc2RegionId()) {
+            return region;
+        }
+        return switch (ref.regionId()) {
+            case 1 -> BlizzardRegion.US;
+            case 2 -> BlizzardRegion.EU;
+            case 3 -> BlizzardRegion.KR;
+            default -> region;
+        };
     }
 
     private static Sc2Stats sc2Status(Status status) {
@@ -222,7 +254,8 @@ public class BlizzardStatsService {
                        boolean detail) {
         String blizzardLocale = BlizzardLocale.of(locale, region);
         Looked<D3Profile> profile = look(EnrichmentSource.BLIZZARD_D3_PROFILE,
-                member + ":d3:" + region.key() + ":" + battleTag, D3Profile.class, budget,
+                member + ":d3:" + region.key() + ":" + battleTag, D3ProfileCell.class,
+                D3ProfileCell::new, D3ProfileCell::value, budget,
                 () -> client.d3Profile(region, battleTag, blizzardLocale));
         if (profile.value().isEmpty()) {
             return d3Status(profile.failed() ? Status.UNAVAILABLE : Status.NOT_FOUND);
@@ -253,27 +286,35 @@ public class BlizzardStatsService {
         };
     }
 
+    /** The member's active link, when Battle.net is on, the application can ask and {@code source} is enabled. */
+    private Optional<BattleNetFriendLink> linkIfServable(UserAccount user, EnrichmentSource source) {
+        if (!battleNetOn || !tokens.available() || !properties.source(source).enabled()) {
+            return Optional.empty();
+        }
+        return activeLink(user);
+    }
+
     private Optional<BattleNetFriendLink> activeLink(UserAccount user) {
         return links.findByUserId(user.getId()).filter(l -> l.getStatus() != BattleNetFriendLink.Status.REMOVED);
     }
 
     /**
-     * The cached or fetched value. A recognised "not found" is a cached absence; any other failure of the fetch is
-     * an outage: {@code failed} is set and nothing is cached.
+     * The cached or fetched value. A recognised "not found" is cached as a value (a cell with no content, under the
+     * source's TTL); any other failure of the fetch is an outage: {@code failed} is set and nothing is cached.
      */
-    private <T> Looked<T> look(EnrichmentSource source, String key, Class<T> type, FetchBudget budget,
-                               Supplier<T> fetch) {
+    private <T, W> Looked<T> look(EnrichmentSource source, String key, Class<W> cellType, Function<T, W> wrap,
+                                  Function<W, T> unwrap, FetchBudget budget, Supplier<T> fetch) {
         AtomicBoolean failed = new AtomicBoolean();
-        Optional<T> value = cache.get(source, key, type, budget, () -> {
+        Optional<W> cell = cache.get(source, key, cellType, budget, () -> {
             try {
-                return Optional.ofNullable(fetch.get());
+                return Optional.of(wrap.apply(fetch.get()));
             } catch (BlizzardNotFoundException e) {
-                return Optional.empty();
+                return Optional.of(wrap.apply(null));
             } catch (RuntimeException e) {
                 failed.set(true);
                 throw e;
             }
         });
-        return new Looked<>(value, failed.get());
+        return new Looked<>(cell.map(unwrap), failed.get());
     }
 }

@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.repository.blizzard.BlizzardAccountRepository;
 import fr.enimaloc.catapult.repository.blizzard.BlizzardWowCharacterRepository;
 import fr.enimaloc.catapult.repository.enrichment.GameEnrichmentCacheRepository;
+import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentCache;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentProperties;
 import fr.enimaloc.catapult.service.enrichment.FetchBudget;
@@ -66,7 +67,7 @@ class BlizzardStatsServiceTest {
             return e;
         });
         service = new BlizzardStatsService(new EnrichmentCache(repository, properties, MAPPER), client, tokens,
-                properties, links, accounts, characters);
+                properties, links, accounts, characters, Optional.of(mock(BlizzardAccountService.class)));
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         when(tokens.available()).thenReturn(true);
@@ -186,11 +187,93 @@ class BlizzardStatsServiceTest {
     }
 
     @Test
-    void achievementsFailureIsUnavailable() {
+    void achievementsFailureDegradesToOk() {
         when(client.wowAchievements(any(), anyString(), anyString(), anyString()))
                 .thenThrow(new BlizzardUnavailableException("down"));
 
-        assertThat(stats(BlizzardGame.WOW, false).orElseThrow().status()).isEqualTo(Status.UNAVAILABLE);
+        BlizzardStats s = stats(BlizzardGame.WOW, false).orElseThrow();
+
+        assertThat(s.status()).isEqualTo(Status.OK);
+        assertThat(s.wow().recentAchievements()).isNull();
+        assertThat(s.wow().achievementPoints()).isEqualTo(12000);
+        assertThat(store.keySet()).noneMatch(k -> k.startsWith("blizzard-wow-achievements|"));
+    }
+
+    @Test
+    void achievementsNotFoundAloneIsOk() {
+        when(client.wowAchievements(any(), anyString(), anyString(), anyString()))
+                .thenThrow(new BlizzardNotFoundException("no"));
+
+        BlizzardStats s = stats(BlizzardGame.WOW, false).orElseThrow();
+
+        assertThat(s.status()).isEqualTo(Status.OK);
+        assertThat(s.wow().recentAchievements()).isNull();
+    }
+
+    @Test
+    void battlenetDisabledIsNull() {
+        BlizzardStatsService off = new BlizzardStatsService(new EnrichmentCache(repository, properties, MAPPER),
+                client, tokens, properties, links, accounts, characters, Optional.empty());
+
+        assertThat(off.forGame(user, BlizzardGame.D3, Locale.FRENCH, FetchBudget.UNLIMITED, false)).isEmpty();
+        assertThat(off.forDetected(user, new DetectedGame("WoW:Forever", SourceType.BATTLENET, "WoW"), null,
+                Locale.FRENCH, FetchBudget.UNLIMITED)).isEmpty();
+        verifyNoInteractions(client);
+    }
+
+    @Test
+    void variantNeedsTheSamePreconditions() {
+        DetectedGame variant = new DetectedGame("WoW:Forever", SourceType.BATTLENET, "WoW");
+        when(tokens.available()).thenReturn(false);
+        assertThat(service.forDetected(user, variant, null, Locale.FRENCH, FetchBudget.UNLIMITED)).isEmpty();
+        when(tokens.available()).thenReturn(true);
+
+        link(BattleNetFriendLink.Status.REMOVED);
+        assertThat(service.forDetected(user, variant, null, Locale.FRENCH, FetchBudget.UNLIMITED)).isEmpty();
+        link(BattleNetFriendLink.Status.ACCEPTED);
+
+        EnrichmentProperties.SourceSettings off = new EnrichmentProperties.SourceSettings();
+        off.setEnabled(false);
+        properties.setBlizzardWowCharacter(off);
+        assertThat(service.forDetected(user, variant, null, Locale.FRENCH, FetchBudget.UNLIMITED)).isEmpty();
+    }
+
+    @Test
+    void sc2FallbackProfileUsesItsOwnRegionHost() {
+        when(client.sc2Profiles(42L)).thenReturn(List.of(new Sc2ProfileRef(1, 1, 11L, "us")));
+
+        stats(BlizzardGame.SC2, false);
+
+        verify(client).sc2Profile(eq(BlizzardRegion.US), any(), eq("fr_FR"), eq(false));
+    }
+
+    @Test
+    void notFoundIsCachedAsAValueUnderTheSourceTtl() {
+        when(client.d3Profile(any(), anyString(), anyString())).thenThrow(new BlizzardNotFoundException("no"));
+        stats(BlizzardGame.D3, false);
+
+        GameEnrichmentCacheEntry entry = store.values().iterator().next();
+        assertThat(entry.getPayload()).isNotNull();
+        // Past the personal absence TTL, within the source TTL (15 min): still served from the cache
+        store.put(entry.getSource() + "|" + entry.getLookupKey(), new GameEnrichmentCacheEntry(entry.getSource(),
+                entry.getLookupKey(), entry.getPayload(), Instant.now().minusSeconds(14 * 60)));
+        assertThat(stats(BlizzardGame.D3, false).orElseThrow().status()).isEqualTo(Status.NOT_FOUND);
+        verify(client, times(1)).d3Profile(any(), anyString(), anyString());
+    }
+
+    @Test
+    void staleValueIsServedWhenTheFetchFails() {
+        stats(BlizzardGame.D3, false);
+        GameEnrichmentCacheEntry entry = store.values().iterator().next();
+        store.put(entry.getSource() + "|" + entry.getLookupKey(), new GameEnrichmentCacheEntry(entry.getSource(),
+                entry.getLookupKey(), entry.getPayload(), Instant.now().minusSeconds(3600)));
+        when(client.d3Profile(any(), anyString(), anyString())).thenThrow(new IllegalStateException("boom"));
+
+        BlizzardStats s = stats(BlizzardGame.D3, false).orElseThrow();
+
+        assertThat(s.status()).isEqualTo(Status.OK);
+        assertThat(s.d3().battleTag()).isEqualTo("Tag#1");
+        verify(client, times(2)).d3Profile(any(), anyString(), anyString());
     }
 
     @Test

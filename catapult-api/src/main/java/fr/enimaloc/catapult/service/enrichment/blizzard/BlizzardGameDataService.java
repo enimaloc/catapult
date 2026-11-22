@@ -34,16 +34,21 @@ public class BlizzardGameDataService {
 
     private final EnrichmentCache cache;
     private final BlizzardClient client;
+    private final BlizzardAppTokenService tokens;
 
     @Autowired
-    public BlizzardGameDataService(EnrichmentCache cache, BlizzardClient client) {
+    public BlizzardGameDataService(EnrichmentCache cache, BlizzardClient client, BlizzardAppTokenService tokens) {
         this.cache = cache;
         this.client = client;
+        this.tokens = tokens;
     }
 
     /** The public data of {@code game}; empty when the source is off, Blizzard fails, or there is none (SC2). */
     public Optional<BlizzardPublisher> forGame(BlizzardGame game, BlizzardRegion region, Locale locale,
                                                FetchBudget budget) {
+        if (!tokens.available()) {
+            return Optional.empty();
+        }
         return switch (game) {
             case WOW -> wowToken(region, budget).map(price -> new BlizzardPublisher(game, region.key(),
                     new BlizzardPublisher.Wow(price.gold(), price.updatedAt()), null, null, null));
@@ -60,6 +65,9 @@ public class BlizzardGameDataService {
 
     /** A deck from its code. */
     public Optional<HearthstoneDeck> hearthstoneDeck(String code, Locale locale, FetchBudget budget) {
+        if (!tokens.available()) {
+            return Optional.empty();
+        }
         String blizzardLocale = BlizzardLocale.of(locale, BlizzardRegion.EU);
         return cached(EnrichmentSource.BLIZZARD_HS_DECK, "hs-deck:" + code + ":" + blizzardLocale,
                 HearthstoneDeck.class, budget, () -> client.hearthstoneDeck(code, blizzardLocale));
@@ -67,6 +75,9 @@ public class BlizzardGameDataService {
 
     /** The WoW Token price of {@code region}. */
     public Optional<WowTokenPrice> wowToken(BlizzardRegion region, FetchBudget budget) {
+        if (!tokens.available()) {
+            return Optional.empty();
+        }
         return cached(EnrichmentSource.BLIZZARD_WOW_TOKEN, "wow-token:" + region.key(), WowTokenPrice.class,
                 budget, () -> client.wowToken(region));
     }

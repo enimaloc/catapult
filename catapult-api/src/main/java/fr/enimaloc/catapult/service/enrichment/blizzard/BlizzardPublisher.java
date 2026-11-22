@@ -4,7 +4,10 @@ import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.Blizzard
 
 import java.time.Instant;
 
-/** The public data of a Blizzard game; only the object of the game itself is set. */
+/**
+ * The public data of a Blizzard game; only the object of the game itself is set. {@code sc2} is reserved: always
+ * null in this version.
+ */
 public record BlizzardPublisher(BlizzardGame game, String region, Wow wow, Hearthstone hearthstone, D3 d3,
                                 Object sc2) {
 
