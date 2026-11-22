@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardNotFoundExceptio
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRateLimiter;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
 import fr.enimaloc.catapult.service.enrichment.blizzard.HttpBlizzardClient;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardUnavailableException;
 import fr.enimaloc.catapult.service.enrichment.opencritic.HttpOpenCriticClient;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticClient;
 import fr.enimaloc.catapult.service.enrichment.pcgw.HttpPcGamingWikiClient;
@@ -258,7 +259,7 @@ class SimulatedEnrichmentClientsWiringTest {
         assertThat(bz.hearthstoneSets("en_US")).hasSize(1);
         assertThat(bz.hearthstoneDeck(SimulatedBlizzardClient.DECK_CODE, "en_US").cards()).isNotEmpty();
         assertThatThrownBy(() -> bz.hearthstoneDeck("AAAA", "en_US"))
-                .isInstanceOf(BlizzardNotFoundException.class);
+                .isInstanceOf(BlizzardUnavailableException.class);
         assertThat(bz.d3CurrentSeason(BlizzardRegion.EU)).isPositive();
         assertThat(java.util.Base64.getDecoder().decode(SimulatedBlizzardClient.DECK_CODE)).isNotEmpty();
     }

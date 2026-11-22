@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.simulation.external;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardClient;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardNotFoundException;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardUnavailableException;
 import fr.enimaloc.catapult.service.enrichment.blizzard.D3Hero;
 import fr.enimaloc.catapult.service.enrichment.blizzard.D3Profile;
 import fr.enimaloc.catapult.service.enrichment.blizzard.HearthstoneDeck;
@@ -102,7 +103,7 @@ public class SimulatedBlizzardClient implements BlizzardClient {
     @Override
     public HearthstoneDeck hearthstoneDeck(String code, String locale) {
         if (!DECK_CODE.equals(code)) {
-            throw new BlizzardNotFoundException("no such deck");
+            throw new BlizzardUnavailableException("Blizzard answered 400");
         }
         return new HearthstoneDeck(DECK_CODE, "standard", "Jaina Proudmoore", "Mage", 30, List.of(
                 new HearthstoneDeck.Card(1, "Simulated Bolt", 1, null),
