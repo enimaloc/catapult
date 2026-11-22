@@ -156,6 +156,8 @@ class RetroAchievementsStatsServiceTest {
         assertThat(resolve(GameBinding.SourceType.MANUAL, "x")).isEmpty();
         assertThat(service.forGame(user, 228, FetchBudget.UNLIMITED, false)).isEmpty();
         assertThat(service.account(user, FetchBudget.UNLIMITED)).isEmpty();
+        verify(repository, never()).findBySourceAndLookupKey(anyString(), anyString());
+        verify(client, never()).profile(anyString(), any());
     }
 
     @Test

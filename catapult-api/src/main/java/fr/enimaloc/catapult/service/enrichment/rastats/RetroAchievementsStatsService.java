@@ -257,7 +257,10 @@ public class RetroAchievementsStatsService {
                 profile.richPresence(), profile.lastGameId(), player.value().get().recentlyPlayed(), recent));
     }
 
-    /** The member and their account, when every source in {@code needed} is on and the account has a name. */
+    /**
+     * The member and their account, when every source in {@code needed} is on, the account has a name and there is
+     * a key to ask with (checked before the cache is read: no key is "nothing known", not an outage to log).
+     */
     private Optional<Member> member(UserAccount user, EnrichmentSource... needed) {
         for (EnrichmentSource source : needed) {
             if (!properties.source(source).enabled()) {
@@ -267,6 +270,7 @@ public class RetroAchievementsStatsService {
         }
         return accounts.findById(user.getId())
                 .filter(row -> row.getUsername() != null && row.getUserUlid() != null)
+                .filter(row -> accountService.credentials(user, Optional.of(row)).isPresent())
                 .map(row -> new Member(user, row));
     }
 
