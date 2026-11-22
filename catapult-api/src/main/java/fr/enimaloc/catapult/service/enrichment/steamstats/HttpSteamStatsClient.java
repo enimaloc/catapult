@@ -74,6 +74,12 @@ public class HttpSteamStatsClient implements SteamStatsClient {
     }
 
     @Override
+    public boolean usable(String personalKeyOrNull) {
+        return rateLimiter.isPresent() && (personalKeyOrNull != null && !personalKeyOrNull.isBlank()
+                || rotator.map(SteamApiKeyRotator::hasKeys).orElse(false));
+    }
+
+    @Override
     public Optional<SteamLibrary> library(String steamId, String personalKeyOrNull) {
         Answer answer = get(personalKeyOrNull, API + "/IPlayerService/GetOwnedGames/v1/?key={key}&steamid={id}"
                 + "&include_appinfo=0&include_played_free_games=1", steamId);

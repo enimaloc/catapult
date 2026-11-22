@@ -11,6 +11,14 @@ import java.util.Optional;
  */
 public interface SteamStatsClient {
 
+    /**
+     * Whether Steam can be asked at all for a member with {@code personalKeyOrNull}: false when Steam is off or
+     * there is neither a personal key nor a pool key. That is "nothing known", not an outage.
+     */
+    default boolean usable(String personalKeyOrNull) {
+        return true;
+    }
+
     /** The member's games with their play time; empty when the game list is private. */
     Optional<SteamLibrary> library(String steamId, String personalKeyOrNull);
 

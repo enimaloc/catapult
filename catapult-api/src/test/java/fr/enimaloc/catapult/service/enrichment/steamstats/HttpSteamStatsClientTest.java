@@ -254,6 +254,21 @@ class HttpSteamStatsClientTest {
     }
 
     @Test
+    void usableOnlyWithSteamOnAndAKey() {
+        when(rotator.hasKeys()).thenReturn(true);
+        assertThat(client.usable(null)).isTrue();
+        when(rotator.hasKeys()).thenReturn(false);
+        assertThat(client.usable(null)).as("no pool key, no personal key").isFalse();
+        assertThat(client.usable(" ")).isFalse();
+        assertThat(client.usable("mykey")).isTrue();
+
+        HttpSteamStatsClient off = new HttpSteamStatsClient(RestClient.builder().build(), Optional.empty(),
+                Optional.empty());
+        assertThat(off.usable("mykey")).as("steam disabled").isFalse();
+        assertThat(off.usable(null)).isFalse();
+    }
+
+    @Test
     void personalKeyWinsOverPool() throws IOException {
         server.expect(once(), requestTo(STATS + "/GetPlayerAchievements/v1/?key=mykey&steamid=7656&appid=440"
                         + "&l=english"))

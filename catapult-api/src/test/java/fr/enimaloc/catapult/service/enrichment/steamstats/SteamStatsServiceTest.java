@@ -61,7 +61,16 @@ class SteamStatsServiceTest {
         service = new SteamStatsService(new EnrichmentCache(repository, new EnrichmentProperties(), MAPPER),
                 client, encryption, new EnrichmentProperties());
         user = account("7656");
+        when(client.usable(any())).thenReturn(true);
         happyUpstream();
+    }
+
+    @Test
+    void steamThatCannotBeAskedGivesNoStatsAndMakesNoCall() {
+        when(client.usable(any())).thenReturn(false);
+
+        assertThat(stats(false)).isEmpty();
+        verify(client, never()).library(anyString(), any());
     }
 
     private static UserAccount account(String steamId) {

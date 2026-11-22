@@ -70,8 +70,9 @@ public class SteamStatsService {
     }
 
     /**
-     * The member's stats on Steam app {@code appId}; empty when the member has no linked Steam account or the
-     * source is off. {@code detail} also lists every achievement.
+     * The member's stats on Steam app {@code appId}; empty when the member has no linked Steam account, the
+     * source is off, or Steam cannot be asked at all (off, or no key to ask with). {@code detail} also lists every
+     * achievement.
      *
      * @throws fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException when {@code budget} refuses
      *         a call that is needed
@@ -84,6 +85,9 @@ public class SteamStatsService {
         }
         String steamId = user.getSteamId();
         String personalKey = personalKey(user);
+        if (!client.usable(personalKey)) {
+            return Optional.empty();
+        }
         String lang = SteamLanguage.fromLocale(locale).toString();
         String member = "u:" + user.getId();
 
