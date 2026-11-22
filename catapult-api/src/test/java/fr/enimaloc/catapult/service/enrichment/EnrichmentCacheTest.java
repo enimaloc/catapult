@@ -238,15 +238,14 @@ class EnrichmentCacheTest {
     }
 
     @Test
-    void corruptStalePayload_fetchFails_returnsEmpty() {
+    void corruptStalePayload_fetchFails_hasNothingToServe() {
         stored("not json", Duration.ofDays(2));
         AtomicInteger fetches = new AtomicInteger();
 
-        Optional<Payload> result = get(FetchBudget.UNLIMITED, fetches, () -> {
+        // ProtonDB backs off: with nothing readable to serve, a failure is unavailable (never "absent")
+        assertThatThrownBy(() -> get(FetchBudget.UNLIMITED, fetches, () -> {
             throw new RuntimeException("upstream down");
-        });
-
-        assertThat(result).isEmpty();
+        })).isInstanceOf(EnrichmentUnavailableException.class);
     }
 
     @Test

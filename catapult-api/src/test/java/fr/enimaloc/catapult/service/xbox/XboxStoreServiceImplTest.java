@@ -34,7 +34,10 @@ class XboxStoreServiceImplTest {
     }
 
     private void respond(String url, String json) {
-        catalog.expect(requestTo(url)).andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
+        catalog.expect(requestTo(url))
+                .andExpect(org.springframework.test.web.client.match.MockRestRequestMatchers.header("User-Agent",
+                        "Catapult/1.0 (+https://catapult.enimaloc.fr)"))
+                .andRespond(withSuccess(json, MediaType.APPLICATION_JSON));
     }
 
     private static final String HALO = """

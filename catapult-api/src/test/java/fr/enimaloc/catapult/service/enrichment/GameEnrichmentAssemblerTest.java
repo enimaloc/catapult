@@ -180,6 +180,16 @@ class GameEnrichmentAssemblerTest {
     }
 
     @Test
+    void aFailingSourceThatBacksOff_isNull_othersPresent() {
+        when(protonDb.summary(anyString(), any())).thenThrow(new EnrichmentUnavailableException(Duration.ofMinutes(1)));
+
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
+
+        assertThat(result.protondb()).isNull();
+        assertThat(result.hltb()).isEqualTo(TTB);
+    }
+
+    @Test
     void slowSource_nullAfterTimeout_othersPresent() {
         when(protonDb.summary(anyString(), any())).thenAnswer(slow(Duration.ofSeconds(5), Optional.of(PROTON)));
 

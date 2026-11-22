@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.enrichment.steamgriddb;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -20,8 +21,8 @@ class SteamGridDbNamesTest {
             "Dark Souls: Remastered|dark souls: remastered",
             "Ultimate Edition|ultimate edition",
             "Half-Life 2: Episode One|half-life 2: episode one"})
-    void searchTerm(String name, String term) {
-        assertThat(SteamGridDbNames.searchTerm(name)).isEqualTo(term);
+    void strippedTerm(String name, String term) {
+        assertThat(SteamGridDbNames.strippedTerm(name)).isEqualTo(term);
     }
 
     @ParameterizedTest
@@ -37,5 +38,12 @@ class SteamGridDbNamesTest {
     @CsvSource(delimiter = '|', value = {"Hades|Hades II", "Dark Souls|Dark Souls III", "Doom|Doom Eternal"})
     void key_keepsSequelsApart(String a, String b) {
         assertThat(SteamGridDbNames.key(a)).isNotEqualTo(SteamGridDbNames.key(b));
+    }
+
+    @Test
+    void fullTerm_keepsTheEdition() {
+        assertThat(SteamGridDbNames.fullTerm("Mafia\u2122: Definitive  Edition")).isEqualTo("mafia: definitive edition");
+        assertThat(SteamGridDbNames.key("Mafia")).isNotEqualTo(SteamGridDbNames.key("Mafia: Definitive Edition"));
+        assertThat(SteamGridDbNames.strippedKey("Mafia")).isEqualTo(SteamGridDbNames.strippedKey("Mafia: Definitive Edition"));
     }
 }

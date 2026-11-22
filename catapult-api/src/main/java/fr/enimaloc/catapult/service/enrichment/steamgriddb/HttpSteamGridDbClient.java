@@ -55,35 +55,52 @@ public class HttpSteamGridDbClient implements SteamGridDbClient {
 
     @Override
     public Optional<SteamGridDbAssets> fetchByName(String name) {
-        String term = SteamGridDbNames.searchTerm(name);
-        if (term.isEmpty()) {
+        String full = SteamGridDbNames.fullTerm(name);
+        if (full.isEmpty()) {
             return Optional.empty();
         }
-        return get("/search/autocomplete/{term}", term)
-                .map(json -> bestMatch(json.path("data"), term))
-                .flatMap(match -> match.flatMap(hit -> fetchAssets(hit.get("id").asLong(),
-                        hit.path("name").asString(null))));
+        Optional<JsonNode> match = search(full, name);
+        String stripped = SteamGridDbNames.strippedTerm(name);
+        if (match.isEmpty() && !stripped.equals(full)) {
+            match = search(stripped, name);
+        }
+        return match.flatMap(hit -> fetchAssets(hit.get("id").asLong(), hit.path("name").asString(null)));
     }
 
-    /** The result whose normalised name is the term's, else the first result (SteamGridDB ranks them). */
-    private static Optional<JsonNode> bestMatch(JsonNode results, String term) {
+    private Optional<JsonNode> search(String term, String name) {
+        return get("/search/autocomplete/{term}", term).flatMap(json -> bestMatch(json.path("data"), name));
+    }
+
+    /**
+     * Among the results, the one named as {@code name} (accents, case and punctuation aside, edition kept), else the
+     * one that only differs by an edition marker ("Mafia" for "Mafia: Definitive Edition"), else the first result
+     * (SteamGridDB ranks them).
+     */
+    private static Optional<JsonNode> bestMatch(JsonNode results, String name) {
         if (!results.isArray()) {
             return Optional.empty();
         }
-        String wanted = SteamGridDbNames.key(term);
+        String full = SteamGridDbNames.key(name);
+        String stripped = SteamGridDbNames.strippedKey(name);
         JsonNode first = null;
+        JsonNode sameWithoutEdition = null;
         for (JsonNode hit : results) {
             if (!hit.hasNonNull("id")) {
                 continue;
             }
-            if (first == null) {
-                first = hit;
+            first = first == null ? hit : first;
+            if (!hit.hasNonNull("name")) {
+                continue;
             }
-            if (hit.hasNonNull("name") && SteamGridDbNames.key(hit.get("name").asString()).equals(wanted)) {
+            String hitName = hit.get("name").asString();
+            if (SteamGridDbNames.key(hitName).equals(full)) {
                 return Optional.of(hit);
             }
+            if (sameWithoutEdition == null && SteamGridDbNames.strippedKey(hitName).equals(stripped)) {
+                sameWithoutEdition = hit;
+            }
         }
-        return Optional.ofNullable(first);
+        return Optional.ofNullable(sameWithoutEdition != null ? sameWithoutEdition : first);
     }
 
     @Override

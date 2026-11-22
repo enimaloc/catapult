@@ -263,16 +263,51 @@ class SteamGridDbClientTest {
     }
 
     @Test
-    void byName_searchesTheNormalisedTerm_andPicksTheExactNameOverTheFirstResult() throws IOException {
+    void byName_searchesTheFullCleanedName_andPicksTheNameWithoutItsEditionOverTheFirstResult() throws IOException {
         when(rotator.nextKey()).thenReturn(Optional.of("keyA"));
-        expectSearch("the%20witcher%203%3A%20wild%20hunt",
+        expectSearch("the%20witcher%203%3A%20wild%20hunt%20-%20game%20of%20the%20year%20edition",
                 hits("100", "The Witcher 3: Wild Hunt - Blood and Wine", "5248", "The Witcher 3: Wild Hunt\u2122"));
         expectAssets("keyA", 5248);
 
-        SteamGridDbAssets assets = client.fetchByName("The Witcher 3: Wild Hunt \u2013 Game of the Year Edition")
+        SteamGridDbAssets assets = client.fetchByName("The Witcher 3: Wild Hunt - Game of the Year Edition")
                 .orElseThrow();
 
         assertThat(assets.gameId()).isEqualTo(5248);
+        server.verify();
+    }
+
+    @Test
+    void byName_aRemakeIsNotFoldedIntoTheOriginal_whateverTheOrder() throws IOException {
+        when(rotator.nextKey()).thenReturn(Optional.of("keyA"));
+        expectSearch("mafia%3A%20definitive%20edition", hits("1", "Mafia", "5248", "Mafia: Definitive Edition"));
+        expectAssets("keyA", 5248);
+        assertThat(client.fetchByName("Mafia: Definitive Edition").orElseThrow().gameId()).isEqualTo(5248);
+        server.verify();
+        server.reset();
+        expectSearch("mafia%3A%20definitive%20edition", hits("5248", "Mafia: Definitive Edition", "1", "Mafia"));
+        expectAssets("keyA", 5248);
+        assertThat(client.fetchByName("Mafia: Definitive Edition").orElseThrow().gameId()).isEqualTo(5248);
+        server.verify();
+    }
+
+    @Test
+    void byName_theOriginalStillMatchesItself() throws IOException {
+        when(rotator.nextKey()).thenReturn(Optional.of("keyA"));
+        expectSearch("mafia", hits("5248", "Mafia: Definitive Edition", "1", "Mafia"));
+        expectAssets("keyA", 1);
+
+        assertThat(client.fetchByName("Mafia").orElseThrow().gameId()).isEqualTo(1);
+        server.verify();
+    }
+
+    @Test
+    void byName_nothingForTheFullName_searchesWithoutTheEdition() throws IOException {
+        when(rotator.nextKey()).thenReturn(Optional.of("keyA"));
+        expectSearch("hades%20-%20ultimate%20edition", "{\"success\":true,\"data\":[]}");
+        expectSearch("hades", hits("5248", "Hades"));
+        expectAssets("keyA", 5248);
+
+        assertThat(client.fetchByName("Hades - Ultimate Edition").orElseThrow().gameId()).isEqualTo(5248);
         server.verify();
     }
 

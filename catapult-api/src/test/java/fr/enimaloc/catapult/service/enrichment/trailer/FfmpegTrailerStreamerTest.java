@@ -66,7 +66,8 @@ class FfmpegTrailerStreamerTest {
         List<String> command = commands.getFirst();
         assertThat(command.getFirst()).isEqualTo("ffmpeg");
         assertThat(command).containsSubsequence("-hide_banner", "-loglevel", "error");
-        assertThat(command).containsSubsequence("-protocol_whitelist", "https,tls,tcp,crypto", "-i", HLS.toString());
+        assertThat(command).containsSubsequence("-protocol_whitelist", "https,tls,tcp,crypto", "-user_agent",
+                "Catapult/1.0 (+https://catapult.enimaloc.fr)", "-i", HLS.toString());
         assertThat(command).containsSubsequence("-i", HLS.toString(), "-c", "copy", "-movflags",
                 "frag_keyframe+empty_moov", "-f", "mp4", "pipe:1");
         assertThat(command.getLast()).isEqualTo("pipe:1");

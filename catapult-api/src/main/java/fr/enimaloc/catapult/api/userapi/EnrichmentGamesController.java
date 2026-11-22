@@ -98,6 +98,8 @@ public class EnrichmentGamesController {
     @ApiResponse(responseCode = "200", description = "The app's ProtonDB summary.")
     @ApiResponse(responseCode = "404", description = "Source disabled, or no ProtonDB report for that app.",
             content = @Content)
+    @ApiResponse(responseCode = "503", description = "The source failed and is left alone for a while (not "
+            + "\"unknown\"); retry after Retry-After seconds.", content = @Content)
     @ApiResponse(responseCode = "429", description = "Too many live fetches from this IP; retry after "
             + "Retry-After seconds.", content = @Content)
     @GetMapping("/protondb/{appId}")
@@ -113,6 +115,8 @@ public class EnrichmentGamesController {
     @ApiResponse(responseCode = "200", description = "The app's Steam Deck compatibility.")
     @ApiResponse(responseCode = "404", description = "Source disabled, or no verdict for that app.",
             content = @Content)
+    @ApiResponse(responseCode = "503", description = "The source failed and is left alone for a while (not "
+            + "\"unknown\"); retry after Retry-After seconds.", content = @Content)
     @ApiResponse(responseCode = "429", description = "Too many live fetches from this IP; retry after "
             + "Retry-After seconds.", content = @Content)
     @GetMapping("/steamdeck/{appId}")
@@ -143,6 +147,8 @@ public class EnrichmentGamesController {
     @ApiResponse(responseCode = "200", description = "The game's PCGamingWiki page.")
     @ApiResponse(responseCode = "404", description = "Source disabled, or no PCGamingWiki page with that id.",
             content = @Content)
+    @ApiResponse(responseCode = "503", description = "The source failed and is left alone for a while (not "
+            + "\"unknown\"); retry after Retry-After seconds.", content = @Content)
     @ApiResponse(responseCode = "429", description = "Too many live fetches from this IP; retry after "
             + "Retry-After seconds.", content = @Content)
     @GetMapping("/pcgamingwiki/{pageId}")
