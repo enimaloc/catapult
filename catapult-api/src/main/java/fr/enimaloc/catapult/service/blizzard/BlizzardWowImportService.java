@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService.ImportedCharacter;
 import fr.enimaloc.catapult.service.blizzard.BlizzardImportRefusedException.Reason;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardClient;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardLocale;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
 import fr.enimaloc.catapult.service.enrichment.blizzard.WowUserCharacter;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Service;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Imports a member's World of Warcraft characters with the user token of a {@code wow.profile} consent
@@ -51,14 +53,15 @@ public class BlizzardWowImportService {
     }
 
     /**
-     * Replaces the member's characters by those of the four regions.
+     * Replaces the member's characters by those of the four regions, their names in {@code locale} (the member's
+     * language, mapped per region).
      *
      * @return how many characters were read
      * @throws BlizzardImportRefusedException no Battle.net link, or a consent from another Battle.net account
      * @throws fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardUnavailableException a request failed (nothing
      *         was replaced)
      */
-    public int importFor(UserAccount user, String userAccessToken) {
+    public int importFor(UserAccount user, String userAccessToken, Locale locale) {
         BattleNetFriendLink link = links.findByUserId(user.getId())
                 .filter(found -> found.getStatus() != BattleNetFriendLink.Status.REMOVED)
                 .orElseThrow(() -> new BlizzardImportRefusedException(Reason.NOT_LINKED));
@@ -70,7 +73,8 @@ public class BlizzardWowImportService {
         List<ImportedCharacter> imported = new ArrayList<>();
         // Any failed region throws before anything is written
         for (BlizzardRegion region : BlizzardRegion.values()) {
-            for (WowUserCharacter c : client.wowUserCharacters(region, userAccessToken)) {
+            for (WowUserCharacter c : client.wowUserCharacters(region, userAccessToken,
+                    BlizzardLocale.of(locale, region))) {
                 if (c.realmSlug() == null) {
                     continue; // not readable afterwards
                 }

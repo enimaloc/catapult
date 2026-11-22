@@ -26,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -43,6 +44,7 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -101,6 +103,7 @@ class CatapultOAuth2UserServiceTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+        LocaleContextHolder.resetLocaleContext();
     }
 
     private OAuth2UserRequest buildRequest() {
@@ -407,6 +410,8 @@ class CatapultOAuth2UserServiceTest {
     }
 
     private UserAccount statsStreamer(boolean gateOpen) {
+        // The callback request's language (RequestContextFilter sets it in a real request)
+        LocaleContextHolder.setLocale(Locale.FRENCH);
         UserAccount account = new UserAccount();
         account.setId(UUID.randomUUID());
         signedInStreamer(account);
@@ -424,7 +429,7 @@ class CatapultOAuth2UserServiceTest {
 
         var user = service.loadUser(battleNetStatsRequest());
 
-        verify(wowImport).importFor(account, "wow-token");
+        verify(wowImport).importFor(account, "wow-token", Locale.FRENCH);
         assertThat(user).isSameAs(principal);
         verifyNoInteractions(battleNetFriends, battleNetFriendsProvider, battleNetUserInfo);
         verifyNoInteractions(oAuthTokenRepository, transactionManager);
@@ -453,21 +458,23 @@ class CatapultOAuth2UserServiceTest {
     void statsConsentRefusalsAndFailuresHaveTheirCodes() {
         UserAccount account = statsStreamer(true);
 
-        when(wowImport.importFor(account, "wow-token")).thenThrow(
+        when(wowImport.importFor(account, "wow-token", Locale.FRENCH)).thenThrow(
             new BlizzardImportRefusedException(BlizzardImportRefusedException.Reason.NOT_LINKED));
         assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_unavailable");
 
         reset(wowImport);
-        when(wowImport.importFor(account, "wow-token")).thenThrow(
+        when(wowImport.importFor(account, "wow-token", Locale.FRENCH)).thenThrow(
             new BlizzardImportRefusedException(BlizzardImportRefusedException.Reason.OTHER_ACCOUNT));
         assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_mismatch");
 
         reset(wowImport);
-        when(wowImport.importFor(account, "wow-token")).thenThrow(new BlizzardUnavailableException("down"));
+        when(wowImport.importFor(account, "wow-token", Locale.FRENCH))
+            .thenThrow(new BlizzardUnavailableException("down"));
         assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_failed");
 
         reset(wowImport);
-        when(wowImport.importFor(account, "wow-token")).thenThrow(new IllegalStateException("boom"));
+        when(wowImport.importFor(account, "wow-token", Locale.FRENCH))
+            .thenThrow(new IllegalStateException("boom"));
         assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_failed");
         verifyNoInteractions(battleNetFriends, oAuthTokenRepository);
     }

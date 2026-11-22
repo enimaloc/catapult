@@ -17,8 +17,11 @@ public interface BlizzardClient {
     /** The Battle.net account id {@code userAccessToken} belongs to (never kept), from the OAuth userinfo. */
     long userAccountId(String userAccessToken);
 
-    /** The characters of the account that {@code userAccessToken} belongs to (never kept); empty on a 404. */
-    List<WowUserCharacter> wowUserCharacters(BlizzardRegion region, String userAccessToken);
+    /**
+     * The characters of the account that {@code userAccessToken} belongs to (never kept), named in {@code locale};
+     * empty on a 404.
+     */
+    List<WowUserCharacter> wowUserCharacters(BlizzardRegion region, String userAccessToken, String locale);
 
     /** The StarCraft II profiles of a Battle.net account, from the default region's host. */
     List<Sc2ProfileRef> sc2Profiles(long bnetAccountId);

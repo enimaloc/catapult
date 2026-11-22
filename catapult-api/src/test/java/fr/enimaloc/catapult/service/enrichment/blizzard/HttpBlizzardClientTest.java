@@ -308,10 +308,11 @@ class HttpBlizzardClientTest {
     void userCharactersUseTheUserTokenAndNeverRenew() throws IOException {
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(EU + "/profile/user/wow")))
                 .andExpect(queryParam("namespace", "profile-eu"))
+                .andExpect(queryParam("locale", "fr_FR"))
                 .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer user-token"))
                 .andRespond(withSuccess(fixture("wow-user.json"), MediaType.APPLICATION_JSON));
 
-        List<WowUserCharacter> characters = client.wowUserCharacters(BlizzardRegion.EU, "user-token");
+        List<WowUserCharacter> characters = client.wowUserCharacters(BlizzardRegion.EU, "user-token", "fr_FR");
 
         assertThat(characters).hasSize(2);
         assertThat(characters.get(0).id()).isEqualTo(184726591L);
@@ -338,9 +339,9 @@ class HttpBlizzardClientTest {
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(url)))
                 .andRespond(withStatus(HttpStatus.FORBIDDEN));
 
-        assertThat(client.wowUserCharacters(BlizzardRegion.EU, "user-token")).isEmpty();
+        assertThat(client.wowUserCharacters(BlizzardRegion.EU, "user-token", "fr_FR")).isEmpty();
         for (int i = 0; i < 4; i++) {
-            assertThatThrownBy(() -> client.wowUserCharacters(BlizzardRegion.EU, "user-token"))
+            assertThatThrownBy(() -> client.wowUserCharacters(BlizzardRegion.EU, "user-token", "fr_FR"))
                     .isInstanceOf(BlizzardUnavailableException.class);
         }
     }
@@ -385,11 +386,37 @@ class HttpBlizzardClientTest {
     }
 
     @Test
+    void userCharactersReadLocalizedObjects() throws IOException {
+        // Without a locale Blizzard answers every name as an object of all its translations
+        String url = EU + "/profile/user/wow";
+        for (int i = 0; i < 3; i++) {
+            server.expect(requestTo(org.hamcrest.Matchers.startsWith(url)))
+                    .andRespond(withSuccess(fixture("wow-user-localized.json"), MediaType.APPLICATION_JSON));
+        }
+
+        WowUserCharacter french = client.wowUserCharacters(BlizzardRegion.EU, "user-token", "fr_FR").getFirst();
+        assertThat(french.realmName()).isEqualTo("Corbeaucrête");
+        assertThat(french.className()).isEqualTo("Guerrier");
+        assertThat(french.faction()).isEqualTo("Horde");
+
+        // A locale the object does not hold: en_US
+        WowUserCharacter missing = client.wowUserCharacters(BlizzardRegion.EU, "user-token", "pl_PL").getFirst();
+        assertThat(missing.realmName()).isEqualTo("Ravencrest");
+        assertThat(missing.className()).isEqualTo("Warrior");
+
+        // Neither the locale nor en_US: the first translation, never empty
+        WowUserCharacter other = client.wowUserCharacters(BlizzardRegion.EU, "user-token", "pl_PL").get(1);
+        assertThat(other.realmName()).isEqualTo("Archimonde (DE)");
+        assertThat(other.className()).isEqualTo("Magier");
+        assertThat(other.faction()).isEqualTo("Allianz");
+    }
+
+    @Test
     void userCharactersWithoutAccountsIsAnError() {
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(EU + "/profile/user/wow")))
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
-        assertThatThrownBy(() -> client.wowUserCharacters(BlizzardRegion.EU, "user-token"))
+        assertThatThrownBy(() -> client.wowUserCharacters(BlizzardRegion.EU, "user-token", "fr_FR"))
                 .isInstanceOf(BlizzardUnavailableException.class);
     }
 

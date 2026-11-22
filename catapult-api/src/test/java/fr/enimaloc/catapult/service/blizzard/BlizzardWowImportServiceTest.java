@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService.ImportedCharacter;
 import fr.enimaloc.catapult.service.blizzard.BlizzardImportRefusedException.Reason;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardClient;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardLocale;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardUnavailableException;
 import fr.enimaloc.catapult.service.enrichment.blizzard.WowUserCharacter;
@@ -24,6 +25,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -61,7 +63,7 @@ class BlizzardWowImportServiceTest {
         when(links.findByUserId(user.getId())).thenReturn(Optional.of(link));
         when(client.userAccountId(TOKEN)).thenReturn(BNET_ID);
         for (BlizzardRegion region : BlizzardRegion.values()) {
-            when(client.wowUserCharacters(region, TOKEN)).thenReturn(List.of());
+            when(client.wowUserCharacters(eq(region), eq(TOKEN), anyString())).thenReturn(List.of());
         }
         service = new BlizzardWowImportService(client, accounts, links, Clock.fixed(NOW, ZoneOffset.UTC));
     }
@@ -79,16 +81,17 @@ class BlizzardWowImportServiceTest {
 
     @Test
     void importsAllFourRegions() {
-        when(client.wowUserCharacters(BlizzardRegion.EU, TOKEN))
+        when(client.wowUserCharacters(eq(BlizzardRegion.EU), eq(TOKEN), anyString()))
                 .thenReturn(List.of(character(1, "Inspectordob", 80), character(2, "Altchar", 12)));
-        when(client.wowUserCharacters(BlizzardRegion.US, TOKEN)).thenReturn(List.of(character(3, "Yankee", 70)));
+        when(client.wowUserCharacters(eq(BlizzardRegion.US), eq(TOKEN), anyString()))
+                .thenReturn(List.of(character(3, "Yankee", 70)));
         // KR: the client already turned the recognised 404 into an empty list; TW lists none.
 
-        int count = service.importFor(user, TOKEN);
+        int count = service.importFor(user, TOKEN, Locale.FRENCH);
 
         assertThat(count).isEqualTo(3);
         for (BlizzardRegion region : BlizzardRegion.values()) {
-            verify(client).wowUserCharacters(region, TOKEN);
+            verify(client).wowUserCharacters(region, TOKEN, BlizzardLocale.of(Locale.FRENCH, region));
         }
         List<ImportedCharacter> imported = replaced();
         assertThat(imported).extracting(ImportedCharacter::region)
@@ -99,11 +102,13 @@ class BlizzardWowImportServiceTest {
 
     @Test
     void oneFailedRegionImportsNothing() {
-        when(client.wowUserCharacters(BlizzardRegion.EU, TOKEN)).thenReturn(List.of(character(1, "Inspectordob", 80)));
-        when(client.wowUserCharacters(BlizzardRegion.US, TOKEN))
+        when(client.wowUserCharacters(eq(BlizzardRegion.EU), eq(TOKEN), anyString()))
+                .thenReturn(List.of(character(1, "Inspectordob", 80)));
+        when(client.wowUserCharacters(eq(BlizzardRegion.US), eq(TOKEN), anyString()))
                 .thenThrow(new BlizzardUnavailableException("Blizzard answered 500"));
 
-        assertThatThrownBy(() -> service.importFor(user, TOKEN)).isInstanceOf(BlizzardUnavailableException.class);
+        assertThatThrownBy(() -> service.importFor(user, TOKEN, Locale.FRENCH))
+                .isInstanceOf(BlizzardUnavailableException.class);
 
         verify(accounts, never()).replaceWowCharacters(any(), any(), any());
     }
@@ -112,11 +117,11 @@ class BlizzardWowImportServiceTest {
     void importNeedsTheBattleNetLink() {
         when(links.findByUserId(user.getId())).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.importFor(user, TOKEN)).isInstanceOfSatisfying(
+        assertThatThrownBy(() -> service.importFor(user, TOKEN, Locale.FRENCH)).isInstanceOfSatisfying(
                 BlizzardImportRefusedException.class, e -> assertThat(e.reason()).isEqualTo(Reason.NOT_LINKED));
 
         verify(client, never()).userAccountId(anyString());
-        verify(client, never()).wowUserCharacters(any(), anyString());
+        verify(client, never()).wowUserCharacters(any(), anyString(), anyString());
         verify(accounts, never()).replaceWowCharacters(any(), any(), any());
     }
 
@@ -127,20 +132,20 @@ class BlizzardWowImportServiceTest {
         removed.setStatus(BattleNetFriendLink.Status.REMOVED);
         when(links.findByUserId(user.getId())).thenReturn(Optional.of(removed));
 
-        assertThatThrownBy(() -> service.importFor(user, TOKEN)).isInstanceOfSatisfying(
+        assertThatThrownBy(() -> service.importFor(user, TOKEN, Locale.FRENCH)).isInstanceOfSatisfying(
                 BlizzardImportRefusedException.class, e -> assertThat(e.reason()).isEqualTo(Reason.NOT_LINKED));
 
-        verify(client, never()).wowUserCharacters(any(), anyString());
+        verify(client, never()).wowUserCharacters(any(), anyString(), anyString());
     }
 
     @Test
     void anotherBattleNetAccountImportsNothing() {
         when(client.userAccountId(TOKEN)).thenReturn(999L);
 
-        assertThatThrownBy(() -> service.importFor(user, TOKEN)).isInstanceOfSatisfying(
+        assertThatThrownBy(() -> service.importFor(user, TOKEN, Locale.FRENCH)).isInstanceOfSatisfying(
                 BlizzardImportRefusedException.class, e -> assertThat(e.reason()).isEqualTo(Reason.OTHER_ACCOUNT));
 
-        verify(client, never()).wowUserCharacters(any(), anyString());
+        verify(client, never()).wowUserCharacters(any(), anyString(), anyString());
         verify(accounts, never()).replaceWowCharacters(any(), any(), any());
     }
 
@@ -148,9 +153,10 @@ class BlizzardWowImportServiceTest {
     void anUnknownAccountIdImportsNothing() {
         when(client.userAccountId(TOKEN)).thenThrow(new BlizzardUnavailableException("Blizzard answered 401"));
 
-        assertThatThrownBy(() -> service.importFor(user, TOKEN)).isInstanceOf(BlizzardUnavailableException.class);
+        assertThatThrownBy(() -> service.importFor(user, TOKEN, Locale.FRENCH))
+                .isInstanceOf(BlizzardUnavailableException.class);
 
-        verify(client, never()).wowUserCharacters(any(), anyString());
+        verify(client, never()).wowUserCharacters(any(), anyString(), anyString());
         verify(accounts, never()).replaceWowCharacters(any(), any(), any());
     }
 
@@ -159,16 +165,16 @@ class BlizzardWowImportServiceTest {
         doThrow(new ApiProblem(ErrorCode.NOT_FOUND, "Battle.net is not linked"))
                 .when(accounts).replaceWowCharacters(any(), any(), any());
 
-        assertThatThrownBy(() -> service.importFor(user, TOKEN)).isInstanceOfSatisfying(
+        assertThatThrownBy(() -> service.importFor(user, TOKEN, Locale.FRENCH)).isInstanceOfSatisfying(
                 BlizzardImportRefusedException.class, e -> assertThat(e.reason()).isEqualTo(Reason.NOT_LINKED));
     }
 
     @Test
     void theTokenIsNeverInTheExceptionMessages() {
-        when(client.wowUserCharacters(BlizzardRegion.TW, TOKEN))
+        when(client.wowUserCharacters(eq(BlizzardRegion.TW), eq(TOKEN), anyString()))
                 .thenThrow(new BlizzardUnavailableException("Blizzard answered 503"));
 
-        assertThatThrownBy(() -> service.importFor(user, TOKEN))
+        assertThatThrownBy(() -> service.importFor(user, TOKEN, Locale.FRENCH))
                 .satisfies(e -> assertThat(String.valueOf(e.getMessage())).doesNotContain(TOKEN));
     }
 }

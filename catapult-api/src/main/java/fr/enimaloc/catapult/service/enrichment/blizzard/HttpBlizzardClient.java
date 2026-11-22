@@ -146,9 +146,9 @@ public class HttpBlizzardClient implements BlizzardClient {
     }
 
     @Override
-    public List<WowUserCharacter> wowUserCharacters(BlizzardRegion region, String userAccessToken) {
-        Answer answer = send(region.host() + "/profile/user/wow?namespace={ns}", userAccessToken, MAX_BYTES,
-                region.profileNamespace());
+    public List<WowUserCharacter> wowUserCharacters(BlizzardRegion region, String userAccessToken, String locale) {
+        Answer answer = send(region.host() + "/profile/user/wow?namespace={ns}&locale={locale}", userAccessToken,
+                MAX_BYTES, region.profileNamespace(), locale);
         JsonNode json;
         try {
             json = object(interpret(answer, wowNotFound()));
@@ -168,8 +168,10 @@ public class HttpBlizzardClient implements BlizzardClient {
                     throw garbled();
                 }
                 characters.add(new WowUserCharacter(character.get("id").asLong(), character.get("name").asString(),
-                        text(character.path("realm").path("slug")), text(character.path("realm").path("name")),
-                        text(character.path("playable_class").path("name")), text(character.path("faction").path("name")),
+                        text(character.path("realm").path("slug")),
+                        localized(character.path("realm").path("name"), locale),
+                        localized(character.path("playable_class").path("name"), locale),
+                        localized(character.path("faction").path("name"), locale),
                         character.path("level").asInt(0)));
             }
         }
@@ -449,6 +451,29 @@ public class HttpBlizzardClient implements BlizzardClient {
 
     private static String text(JsonNode node) {
         return node.isString() && !node.asString().isBlank() ? node.asString() : null;
+    }
+
+    /**
+     * A name that is either a string or, when Blizzard was not asked for one locale, an object of every translation:
+     * {@code locale}'s, else en_US, else the first one.
+     */
+    static String localized(JsonNode node, String locale) {
+        if (!node.isObject()) {
+            return text(node);
+        }
+        String found = locale == null ? null : text(node.path(locale));
+        if (found == null) {
+            found = text(node.path("en_US"));
+        }
+        if (found == null) {
+            for (JsonNode value : node.values()) {
+                found = text(value);
+                if (found != null) {
+                    break;
+                }
+            }
+        }
+        return found;
     }
 
     private static Integer integer(JsonNode node) {
