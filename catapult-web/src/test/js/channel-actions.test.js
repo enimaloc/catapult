@@ -295,6 +295,12 @@ describe("channel-connections", () => {
               <input id="speedrun-key-input" value=" abc123 ">
               <button id="speedrun-key-save-btn"></button>
               <button id="speedrun-key-delete-btn"></button>
+              <input id="retroachievements-username-input" value="  Bob ">
+              <button id="retroachievements-username-save-btn"></button>
+              <button id="retroachievements-username-delete-btn"></button>
+              <input id="retroachievements-key-input" value=" abc123 ">
+              <button id="retroachievements-key-save-btn"></button>
+              <button id="retroachievements-key-delete-btn"></button>
               <button id="epic-resend-btn"></button>
               <button id="epic-disconnect-btn"></button>
               <input id="obs-host" value="10.0.0.2">
@@ -432,6 +438,65 @@ describe("channel-connections", () => {
 
             expect(snackbars()).toEqual(["Nom inconnu", "Action failed (502)", "Catapult could not be reached"]);
             delete document.body.dataset.labelSpeedrunRefusedUsername;
+        });
+    });
+
+    describe("the RetroAchievements account", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
+        it("saves the trimmed name and removes it with posts", async () => {
+            await click("#retroachievements-username-save-btn");
+            await click("#retroachievements-username-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/retroachievements/username", { username: "Bob" }],
+                ["/channel/enimaloc/settings/retroachievements/username/delete", {}],
+            ]);
+            expect(snackbars()).toEqual([]);
+        });
+
+        it("saves the trimmed key, empties its field, and deletes it with a post", async () => {
+            await click("#retroachievements-key-save-btn");
+            await click("#retroachievements-key-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/retroachievements/api-key", { apiKey: "abc123" }],
+                ["/channel/enimaloc/settings/retroachievements/api-key/delete", {}],
+            ]);
+            expect(document.getElementById("retroachievements-key-input").value).toBe("");
+        });
+
+        it("sends nothing for an empty field", async () => {
+            document.getElementById("retroachievements-username-input").value = "   ";
+            document.getElementById("retroachievements-key-input").value = "";
+            await click("#retroachievements-username-save-btn");
+            await click("#retroachievements-key-save-btn");
+
+            expect(posts()).toEqual([]);
+        });
+
+        it("tells a name or a key RetroAchievements refuses, and that it cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(400));
+            await click("#retroachievements-username-save-btn");
+            posted.mockResolvedValueOnce(response(400));
+            await click("#retroachievements-key-save-btn");
+            posted.mockResolvedValueOnce(response(503));
+            await click("#retroachievements-username-save-btn");
+
+            expect(snackbars()).toEqual([
+                "RetroAchievements does not know this username",
+                "RetroAchievements refused this API key",
+                "RetroAchievements cannot be reached right now: try again later.",
+            ]);
+        });
+
+        it("speaks the page's language", async () => {
+            document.body.dataset.labelRetroachievementsUnavailable = "Injoignable";
+            posted.mockResolvedValueOnce(response(503));
+            await click("#retroachievements-username-save-btn");
+
+            expect(snackbars()).toEqual(["Injoignable"]);
+            delete document.body.dataset.labelRetroachievementsUnavailable;
         });
     });
 

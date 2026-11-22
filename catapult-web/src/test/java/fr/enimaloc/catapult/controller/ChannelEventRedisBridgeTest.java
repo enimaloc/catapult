@@ -245,6 +245,23 @@ class ChannelEventRedisBridgeTest {
     }
 
     @Test
+    void bridgeRelaysRetroAchievementsAccountChanged() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData("Bob", "https://retroachievements.org/user/Bob",
+                true, false, true);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.RETROACHIEVEMENTS_ACCOUNT_CHANGED,
+                new ChannelEvents.RetroAchievementsAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent("streamer", "Bob",
+                        "https://retroachievements.org/user/Bob", true, false, true));
+    }
+
+    @Test
+    void bridgeDropsARetroAchievementsEventWithoutItsData() {
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.RETROACHIEVEMENTS_ACCOUNT_CHANGED,
+                new ChannelEvents.RetroAchievementsAccountChanged(owner.toString(), "streamer", null)))).isEmpty();
+    }
+
+    @Test
     void bridgeDropsASpeedrunEventWithoutItsData() {
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.SPEEDRUN_ACCOUNT_CHANGED,
                 new ChannelEvents.SpeedrunAccountChanged(owner.toString(), "streamer", null)))).isEmpty();

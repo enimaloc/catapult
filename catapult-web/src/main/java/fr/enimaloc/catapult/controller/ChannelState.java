@@ -23,6 +23,7 @@ import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
+import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
 import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
@@ -95,6 +96,9 @@ public final class ChannelState {
         }
         if (ch.speedrun() != null) {
             events.add(SpeedrunAccountChangedEvent.of(login, ch.speedrun()));
+        }
+        if (ch.retroAchievements() != null) {
+            events.add(RetroAchievementsAccountChangedEvent.of(login, ch.retroAchievements()));
         }
         CustomBindingsStateDto custom = ch.customBindings();
         if (custom != null) {

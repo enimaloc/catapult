@@ -120,6 +120,8 @@ import fr.enimaloc.catapult.common.dto.channel.TitleSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsApiKeyRequest;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
@@ -368,6 +370,32 @@ public class RealApiService implements ApiService {
     public int deleteSpeedrunApiKey(String username) {
         return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/speedrun/api-key", id),
                 status -> status);
+    }
+
+    @Override
+    public int saveRetroAchievementsUsername(String username, String raName) {
+        return onChannel(username, id -> client.putVoid(
+                "/api/internal/users/{userId}/settings/retroachievements/username",
+                new RetroAchievementsUsernameRequest(raName), id), status -> status);
+    }
+
+    @Override
+    public int deleteRetroAchievementsUsername(String username) {
+        return onChannel(username, id -> client.delete(
+                "/api/internal/users/{userId}/settings/retroachievements/username", id), status -> status);
+    }
+
+    @Override
+    public int saveRetroAchievementsApiKey(String username, String apiKey) {
+        return onChannel(username, id -> client.putVoid(
+                "/api/internal/users/{userId}/settings/retroachievements/api-key",
+                new RetroAchievementsApiKeyRequest(apiKey), id), status -> status);
+    }
+
+    @Override
+    public int deleteRetroAchievementsApiKey(String username) {
+        return onChannel(username, id -> client.delete(
+                "/api/internal/users/{userId}/settings/retroachievements/api-key", id), status -> status);
     }
 
     @Override

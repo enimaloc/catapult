@@ -10,6 +10,9 @@
         <li>Steam ID — used to read your game library via the Steam API</li>
         <li>speedrun.com username and API key (both optional) — used to look up your records on speedrun.com;
             the key is stored encrypted and never shown again</li>
+        <li>RetroAchievements username and web API key (both optional) — used to read your achievements; the key
+            is stored encrypted and never shown again. Your Steam, Xbox and RetroAchievements stats are read on
+            demand, cached for 15 minutes at most, and purged when you delete your account</li>
         <li>Error reports — when a page hits an error: your account id, the trail of your last actions
             (clicks, pages, requests) and a recording of the page, without what you type in fields,
             to reproduce the problem</li>
@@ -18,7 +21,7 @@
 
 <section>
     <h2>Data Transfers</h2>
-    <p>Your data is sent only to the Twitch and Steam APIs (and, if you set them, to speedrun.com) for the
+    <p>Your data is sent only to the Twitch and Steam APIs (and, if you set them, to speedrun.com and RetroAchievements) for the
         application to function, and error
         reports to Sentry (sentry.io), through Catapult: your browser never contacts Sentry directly.
         No other third-party sharing.</p>

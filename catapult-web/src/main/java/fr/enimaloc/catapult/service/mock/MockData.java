@@ -17,6 +17,7 @@ import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
@@ -127,6 +128,9 @@ public class MockData {
     /** The speedrun.com card is offered to every mock session: the name declared, whether a key is saved. */
     private String speedrunUsername;
     private boolean speedrunKeySaved;
+    /** The RetroAchievements card is offered to every mock session too; the mock has a shared key. */
+    private String retroAchievementsUsername;
+    private boolean retroAchievementsKeySaved;
     private ObsData obsData;
     private String obsPassword;
     private String twitchatBranch = TwitchatData.AUTO;
@@ -372,7 +376,7 @@ public class MockData {
                 obsData == null ? null : TwitchatData.of(twitchatBranch),
                 username.equals(channelDto.twitchUsername()) ? customBindings.state() : null,
                 // drops: the mock has no experiments, they are offered
-                drops(), ankamaData(), epicData(), speedrunData());
+                drops(), ankamaData(), epicData(), speedrunData(), retroAchievementsData());
     }
 
     /** The mock's one running drops campaign, on the first binding's category. */
@@ -420,6 +424,29 @@ public class MockData {
 
     public void deleteSpeedrunKey() {
         speedrunKeySaved = false;
+    }
+
+    public RetroAchievementsData retroAchievementsData() {
+        return new RetroAchievementsData(retroAchievementsUsername,
+                retroAchievementsUsername == null ? null
+                        : "https://retroachievements.org/user/" + retroAchievementsUsername,
+                retroAchievementsKeySaved, false, true);
+    }
+
+    public void saveRetroAchievementsUsername(String name) {
+        retroAchievementsUsername = name;
+    }
+
+    public void deleteRetroAchievementsUsername() {
+        retroAchievementsUsername = null;
+    }
+
+    public void saveRetroAchievementsKey() {
+        retroAchievementsKeySaved = true;
+    }
+
+    public void deleteRetroAchievementsKey() {
+        retroAchievementsKeySaved = false;
     }
 
     private EpicData epicData() {

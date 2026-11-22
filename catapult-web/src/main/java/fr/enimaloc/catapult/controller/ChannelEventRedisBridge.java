@@ -19,6 +19,7 @@ import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
+import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
 import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
@@ -164,6 +165,11 @@ public class ChannelEventRedisBridge {
                 var changed = read(data, ChannelEvents.SpeedrunAccountChanged.class);
                 if (changed.account() == null) throw new IllegalArgumentException("no speedrun account");
                 yield List.of(SpeedrunAccountChangedEvent.of(login, changed.account()));
+            }
+            case ChannelEvents.RETROACHIEVEMENTS_ACCOUNT_CHANGED -> {
+                var changed = read(data, ChannelEvents.RetroAchievementsAccountChanged.class);
+                if (changed.account() == null) throw new IllegalArgumentException("no retroachievements account");
+                yield List.of(RetroAchievementsAccountChangedEvent.of(login, changed.account()));
             }
             default -> List.of();
         };

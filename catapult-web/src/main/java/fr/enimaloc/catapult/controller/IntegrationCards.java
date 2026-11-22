@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.common.dto.channel.EpicData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
@@ -73,6 +74,9 @@ public final class IntegrationCards {
         }
         if (ch.speedrun() != null) {
             cards.add(speedrun(ch.speedrun()));
+        }
+        if (ch.retroAchievements() != null) {
+            cards.add(retroAchievements(ch.retroAchievements()));
         }
         if (ch.obs() != null) {
             cards.add(obs(ch.obs()));
@@ -398,6 +402,61 @@ public final class IntegrationCards {
                 new Chip(Attrs.cls("speedrun-account-name").withState(
                         SpaState.sync("textContent", SPEEDRUN_EVENT + ".resolvedName")), Message.literal(resolvedName)),
                 new Text(Attrs.NONE, false, key(PREFIX + via))));
+    }
+
+    // RetroAchievements: two optional settings like speedrun.com's, the name the member declares and a personal web API
+    // key (their own quota; it does not prove the account). The account shows as a chip whose name is a part of its
+    // own so that RetroAchievementsAccountChangedEvent replaces it in place. Wide: two forms. The key is never in
+    // the page: only whether one is saved, so that its field gives way to the delete button.
+
+    private static final String RA_EVENT = "RetroAchievementsAccountChangedEvent";
+
+    static IntegrationDto retroAchievements(RetroAchievementsData ra) {
+        boolean hasKey = ra.hasApiKey();
+        boolean hasName = ra.username() != null && !ra.username().isBlank();
+        SpaState hasNameState = SpaState.flag("raHasName", hasName, RA_EVENT + ".declaredUsername");
+        SpaState hasKeyState = SpaState.flag("raHasKey", hasKey, RA_EVENT + ".hasApiKey");
+        SpaState noKeyState = SpaState.flag("raNoKey", !hasKey, RA_EVENT + ".!hasApiKey");
+        // The shared key is what answers a member without a key of their own: without it, they are asked for theirs.
+        SpaState noPoolState = SpaState.flag("raNoPool", !ra.poolAvailable(), RA_EVENT + ".!poolAvailable")
+                .and("raNoKeyOfTheirOwn", !hasKey, RA_EVENT + ".!hasApiKey");
+
+        return wideCard("retroachievements",
+                new Container(Attrs.cls("retroachievements-account").withState(hasNameState), Container.Kind.DIV,
+                        List.of(new Text(Attrs.NONE, false, key(PREFIX + "retroachievements.account")),
+                                new Chip(Attrs.cls("retroachievements-account-name").withState(
+                                        SpaState.sync("textContent", RA_EVENT + ".declaredUsername")),
+                                        Message.literal(hasName ? ra.username() : "")))),
+                new Text(Attrs.cls("retroachievements-none").withState(SpaState.flag("raNoAccount", !hasName,
+                        RA_EVENT + ".!declaredUsername")), false, key(PREFIX + "retroachievements.none")),
+                new Text(Attrs.cls("retroachievements-key-invalid").withState(SpaState.flag("raKeyInvalid",
+                        ra.keyInvalid(), RA_EVENT + ".keyInvalid")), true,
+                        key(PREFIX + "retroachievements.key.invalid")),
+                new Text(Attrs.cls("retroachievements-no-pool").withState(noPoolState), true,
+                        key(PREFIX + "retroachievements.no_pool")),
+
+                new Input(Attrs.id("retroachievements-username-input").withState(SpaState.sync("value",
+                        RA_EVENT + ".declaredUsername")), "text",
+                        key(PREFIX + "retroachievements.username.placeholder"), null, ra.username(), null, null),
+                new Container(Attrs.id("retroachievements-username-actions").withClass("card-actions"),
+                        Container.Kind.SEGMENTED_GROUP, List.of(
+                        segmented(Attrs.id("retroachievements-username-save-btn"),
+                                key(PREFIX + "retroachievements.username.save")),
+                        segmented(Attrs.id("retroachievements-username-delete-btn").withState(hasNameState),
+                                key(PREFIX + "retroachievements.username.delete")))),
+
+                new Text(Attrs.cls("retroachievements-key-saved").withState(hasKeyState), false,
+                        key(PREFIX + "retroachievements.key.saved")),
+                new Input(Attrs.id("retroachievements-key-input").withState(noKeyState), "password",
+                        key(PREFIX + "retroachievements.key.placeholder"), null, null, null, null, "new-password"),
+                new Container(Attrs.id("retroachievements-key-actions").withClass("card-actions"),
+                        Container.Kind.SEGMENTED_GROUP, List.of(
+                        segmented(Attrs.id("retroachievements-key-save-btn").withState(noKeyState),
+                                key(PREFIX + "retroachievements.key.save")),
+                        segmented(Attrs.id("retroachievements-key-delete-btn").withState(hasKeyState),
+                                key(PREFIX + "retroachievements.key.delete")))),
+
+                new Text(Attrs.cls("retroachievements-help"), true, key(PREFIX + "retroachievements.help")));
     }
 
     // Epic: one sub-view and button per status, driven by the status field of EpicLinkEvent, which carries NONE too.

@@ -813,6 +813,37 @@ class RealApiServiceTest {
     }
 
     @Test
+    void retroAchievementsUsername_isSavedAndRemovedOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/retroachievements/username", "{\"username\":\"Bob\"}");
+        expectDelete(channel("enimaloc") + "/settings/retroachievements/username");
+
+        assertThat(service.saveRetroAchievementsUsername("enimaloc", "Bob")).isEqualTo(204);
+        assertThat(service.deleteRetroAchievementsUsername("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void retroAchievementsApiKey_isSavedAndRemovedOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/retroachievements/api-key", "{\"apiKey\":\"abc123\"}");
+        expectDelete(channel("enimaloc") + "/settings/retroachievements/api-key");
+
+        assertThat(service.saveRetroAchievementsApiKey("enimaloc", "abc123")).isEqualTo(204);
+        assertThat(service.deleteRetroAchievementsApiKey("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void retroAchievementsRefusals_keepTheirStatus() {
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/retroachievements/api-key")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/retroachievements/username")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThat(service.saveRetroAchievementsApiKey("enimaloc", "bad")).isEqualTo(400);
+        assertThat(service.saveRetroAchievementsUsername("enimaloc", "n1")).isEqualTo(503);
+    }
+
+    @Test
     void speedrunRefusals_keepTheirStatus() {
         expect(HttpMethod.PUT, channel("enimaloc") + "/settings/speedrun/api-key")
                 .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(

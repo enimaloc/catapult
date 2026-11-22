@@ -15,6 +15,8 @@ import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
 import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsApiKeyRequest;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
@@ -177,6 +179,31 @@ public class ChannelActionsController {
     @PostMapping("/channel/{username}/settings/speedrun/api-key/delete")
     public ResponseEntity<Void> deleteSpeedrunApiKey(@PathVariable String username) {
         return ApiStatus.answer(apiService.deleteSpeedrunApiKey(username));
+    }
+
+    // The member's RetroAchievements account, answered like speedrun.com's: 400 for a name or key RetroAchievements
+    // refuses, 503 when it cannot be asked. The key only ever travels in these bodies.
+
+    @PostMapping("/channel/{username}/settings/retroachievements/username")
+    public ResponseEntity<Void> saveRetroAchievementsUsername(@PathVariable String username,
+                                                              @RequestBody RetroAchievementsUsernameRequest body) {
+        return ApiStatus.answer(apiService.saveRetroAchievementsUsername(username, body.username()));
+    }
+
+    @PostMapping("/channel/{username}/settings/retroachievements/username/delete")
+    public ResponseEntity<Void> deleteRetroAchievementsUsername(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteRetroAchievementsUsername(username));
+    }
+
+    @PostMapping("/channel/{username}/settings/retroachievements/api-key")
+    public ResponseEntity<Void> saveRetroAchievementsApiKey(@PathVariable String username,
+                                                            @RequestBody RetroAchievementsApiKeyRequest body) {
+        return ApiStatus.answer(apiService.saveRetroAchievementsApiKey(username, body.apiKey()));
+    }
+
+    @PostMapping("/channel/{username}/settings/retroachievements/api-key/delete")
+    public ResponseEntity<Void> deleteRetroAchievementsApiKey(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteRetroAchievementsApiKey(username));
     }
 
     @PostMapping("/channel/{username}/steam/refresh-profile-cache")

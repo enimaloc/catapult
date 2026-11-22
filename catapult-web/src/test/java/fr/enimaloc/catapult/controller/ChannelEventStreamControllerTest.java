@@ -142,6 +142,22 @@ class ChannelEventStreamControllerTest {
     }
 
     @Test
+    void theRetroAchievementsAccountGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent("enimaloc", "RaPlayer",
+                "https://retroachievements.org/user/RaPlayer", true, false, true);
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:RetroAchievementsAccountChangedEvent",
+                "RaPlayer");
+        assertThat(moderator.getResponse().getContentAsString())
+                .doesNotContain("RetroAchievementsAccountChangedEvent").doesNotContain("RaPlayer");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
+
+    @Test
     void theEpicLinkGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
         MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
         MvcResult moderator = subscribe("enimaloc", member("a-moderator"));

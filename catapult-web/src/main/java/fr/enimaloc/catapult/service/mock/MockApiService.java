@@ -105,6 +105,7 @@ import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
+import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
 import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftEnrollEvent;
@@ -614,6 +615,37 @@ public class MockApiService implements ApiService {
         MockData data = currentData();
         change.accept(data);
         eventPublisher.publishEvent(SpeedrunAccountChangedEvent.of(username, data.speedrunData()));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public int saveRetroAchievementsUsername(String username, String raName) {
+        log.trace("saveRetroAchievementsUsername({}, {})", username, raName);
+        return retroAchievementsChanged(username, data -> data.saveRetroAchievementsUsername(raName));
+    }
+
+    @Override
+    public int deleteRetroAchievementsUsername(String username) {
+        log.trace("deleteRetroAchievementsUsername({})", username);
+        return retroAchievementsChanged(username, MockData::deleteRetroAchievementsUsername);
+    }
+
+    @Override
+    public int saveRetroAchievementsApiKey(String username, String apiKey) {
+        log.trace("saveRetroAchievementsApiKey({})", username);
+        return retroAchievementsChanged(username, MockData::saveRetroAchievementsKey);
+    }
+
+    @Override
+    public int deleteRetroAchievementsApiKey(String username) {
+        log.trace("deleteRetroAchievementsApiKey({})", username);
+        return retroAchievementsChanged(username, MockData::deleteRetroAchievementsKey);
+    }
+
+    private int retroAchievementsChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(RetroAchievementsAccountChangedEvent.of(username, data.retroAchievementsData()));
         return NO_CONTENT;
     }
 
