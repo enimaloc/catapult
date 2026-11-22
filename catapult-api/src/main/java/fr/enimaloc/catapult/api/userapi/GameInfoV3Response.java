@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.api.userapi;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonView;
 import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
@@ -315,13 +316,22 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
         }
     }
 
-    /** The member's play time and achievements on a Steam app; play times in minutes. */
+    /**
+     * The member's play time and achievements on a Steam app; play times in minutes. {@code all} (every
+     * achievement) is only on the detail route.
+     */
     public record SteamStats(Status status, String appId, Long playtimeMinutes, Long playtimeTwoWeeksMinutes,
-                             Instant lastPlayed, AchievementSummary achievements, String more)
+                             Instant lastPlayed, AchievementSummary achievements,
+                             @JsonInclude(JsonInclude.Include.NON_NULL) List<Achievement> all, String more)
             implements GameInfoResponse.HasMore, PlatformObject {
         static SteamStats of(PlatformStats p, MoreLinks links) {
+            return of(p, links, false);
+        }
+
+        /** The projection of {@code p}; with {@code detail}, also every achievement. */
+        static SteamStats of(PlatformStats p, MoreLinks links, boolean detail) {
             return p == null ? null : new SteamStats(p.status(), p.id(), p.playtimeMinutes(),
-                    p.playtimeTwoWeeksMinutes(), p.lastPlayed(), p.achievements(),
+                    p.playtimeTwoWeeksMinutes(), p.lastPlayed(), p.achievements(), detail ? p.all() : null,
                     p.id() == null ? null : links.toMe(ApiV2.ME_STATS_PATH + "/steam/" + p.id()));
         }
 
@@ -331,11 +341,20 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
         }
     }
 
-    /** The member's play time (minutes), gamerscore and achievements on an Xbox title. */
+    /**
+     * The member's play time (minutes), gamerscore and achievements on an Xbox title. {@code all} (every
+     * achievement) is only on the detail route.
+     */
     public record XboxStats(Status status, String titleId, Long playtimeMinutes, Instant lastPlayed,
-                            XboxGamerscore gamerscore, AchievementSummary achievements, String more)
+                            XboxGamerscore gamerscore, AchievementSummary achievements,
+                            @JsonInclude(JsonInclude.Include.NON_NULL) List<Achievement> all, String more)
             implements GameInfoResponse.HasMore, PlatformObject {
         static XboxStats of(PlatformStats p, MoreLinks links) {
+            return of(p, links, false);
+        }
+
+        /** The projection of {@code p}; with {@code detail}, also every achievement. */
+        static XboxStats of(PlatformStats p, MoreLinks links, boolean detail) {
             if (p == null) {
                 return null;
             }
@@ -343,6 +362,7 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
             Integer total = integer(p.extra(), "gamerscoreTotal");
             return new XboxStats(p.status(), p.id(), p.playtimeMinutes(), p.lastPlayed(),
                     earned == null && total == null ? null : new XboxGamerscore(earned, total), p.achievements(),
+                    detail ? p.all() : null,
                     p.id() == null ? null : links.toMe(ApiV2.ME_STATS_PATH + "/xbox/" + p.id()));
         }
 
@@ -359,13 +379,20 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
     /**
      * The member's progress in a RetroAchievements game: points, hardcore unlocks, highest award ({@code award},
      * as RetroAchievements names it) and achievements. {@code playtime} is RetroAchievements' own number, its unit
-     * not verified yet (so never in the summary's minutes).
+     * not verified yet (so never in the summary's minutes). {@code all} (every achievement) is only on the detail
+     * route.
      */
     public record RaStats(Status status, Integer gameId, String title, String console, String iconUrl,
                           Integer playtime, Instant lastPlayed, RaPoints points, RaHardcore hardcore, String award,
-                          AchievementSummary achievements, String more)
+                          AchievementSummary achievements,
+                          @JsonInclude(JsonInclude.Include.NON_NULL) List<Achievement> all, String more)
             implements GameInfoResponse.HasMore, PlatformObject {
         static RaStats of(PlatformStats p, MoreLinks links) {
+            return of(p, links, false);
+        }
+
+        /** The projection of {@code p}; with {@code detail}, also every achievement. */
+        static RaStats of(PlatformStats p, MoreLinks links, boolean detail) {
             if (p == null) {
                 return null;
             }
@@ -382,7 +409,7 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
                     earned == null && total == null ? null : new RaPoints(earned, total),
                     hardcoreUnlocked == null && hardcorePoints == null ? null
                             : new RaHardcore(hardcoreUnlocked, hardcorePoints),
-                    text(extra, RetroAchievementsStatsService.AWARD), p.achievements(),
+                    text(extra, RetroAchievementsStatsService.AWARD), p.achievements(), detail ? p.all() : null,
                     p.id() == null ? null : links.toMe(ApiV2.ME_STATS_PATH + "/retroachievements/" + p.id()));
         }
 

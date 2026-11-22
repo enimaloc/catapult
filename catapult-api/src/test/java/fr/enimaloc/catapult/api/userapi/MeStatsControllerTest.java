@@ -62,7 +62,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
                 pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
-@Import({ApiSecurityConfig.class, MeStatsControllerTest.Keys.class, ApiUserResolver.class})
+@Import({ApiSecurityConfig.class, MeStatsControllerTest.Keys.class, ApiUserResolver.class, PublicBaseUrl.class})
 @ActiveProfiles("test")
 class MeStatsControllerTest {
 
@@ -112,7 +112,7 @@ class MeStatsControllerTest {
     @Test
     void currentGameStats() throws Exception {
         GameInfoV3Response.StatsObject stats = new GameInfoV3Response.StatsObject(
-                new GameInfoV3Response.SteamStats(Status.OK, "440", 7320L, 95L, null, null,
+                new GameInfoV3Response.SteamStats(Status.OK, "440", 7320L, 95L, null, null, null,
                         "http://localhost/api/me/stats/steam/440?version=3"), null, null, null);
         when(gameInfoAssembler.currentStats(user, Locale.FRENCH))
                 .thenReturn(new MeStatsController.CurrentStats(true, stats));
@@ -122,7 +122,8 @@ class MeStatsControllerTest {
                 .andExpect(jsonPath("$.inGame").value(true))
                 .andExpect(jsonPath("$.stats.steam.playtimeMinutes").value(7320))
                 .andExpect(jsonPath("$.stats.steam.more").value("http://localhost/api/me/stats/steam/440?version=3"))
-                .andExpect(jsonPath("$.stats.xbox").doesNotExist());
+                .andExpect(jsonPath("$.stats.xbox").doesNotExist())
+                .andExpect(jsonPath("$.stats.steam.all").doesNotExist());
     }
 
     @Test
@@ -133,9 +134,49 @@ class MeStatsControllerTest {
         mvc.perform(v3(get(STATS + "/steam/440")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("ok"))
-                .andExpect(jsonPath("$.id").value("440"))
+                .andExpect(jsonPath("$.appId").value("440"))
+                .andExpect(jsonPath("$.playtimeMinutes").value(7320))
+                .andExpect(jsonPath("$.achievements.unlocked").value(1))
                 .andExpect(jsonPath("$.all[0].name").value("First"))
-                .andExpect(jsonPath("$.all[0].rarity").value(3.2));
+                .andExpect(jsonPath("$.all[0].rarity").value(3.2))
+                .andExpect(jsonPath("$.more").value("http://localhost/api/me/stats/steam/440?version=3"))
+                // the aggregate's shape, never the internal one
+                .andExpect(jsonPath("$.id").doesNotExist())
+                .andExpect(jsonPath("$.extra").doesNotExist());
+    }
+
+    @Test
+    void xboxAndRetroAchievementsDetails_areTheAggregateObjectsWithEveryAchievement() throws Exception {
+        List<Achievement> all = List.of(new Achievement("1", "One", "d", "i", true,
+                Instant.parse("2026-11-20T10:00:00Z"), null, 50, false));
+        when(xboxStats.forTitle(eq(user), eq("1144039928"), any(), eq(true))).thenReturn(Optional.of(
+                new PlatformStats(Status.OK, "1144039928", 480L, null, null, AchievementSummary.of(all), all,
+                        Map.of("gamerscore", 50, "gamerscoreTotal", 1000))));
+        when(raStats.forGame(eq(user), eq(228), any(), eq(true))).thenReturn(Optional.of(
+                new PlatformStats(Status.OK, "228", null, null, null, AchievementSummary.of(all), all,
+                        Map.of(RetroAchievementsStatsService.TITLE, "Super Mario World",
+                                RetroAchievementsStatsService.POINTS, 5,
+                                RetroAchievementsStatsService.POINTS_TOTAL, 40))));
+
+        mvc.perform(v3(get(STATS + "/xbox/1144039928")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.titleId").value("1144039928"))
+                .andExpect(jsonPath("$.gamerscore.earned").value(50))
+                .andExpect(jsonPath("$.gamerscore.total").value(1000))
+                .andExpect(jsonPath("$.all[0].name").value("One"))
+                .andExpect(jsonPath("$.more").value("http://localhost/api/me/stats/xbox/1144039928?version=3"))
+                .andExpect(jsonPath("$.extra").doesNotExist());
+        mvc.perform(v3(get(STATS + "/retroachievements/228")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.gameId").value(228))
+                .andExpect(jsonPath("$.title").value("Super Mario World"))
+                .andExpect(jsonPath("$.points.earned").value(5))
+                .andExpect(jsonPath("$.points.total").value(40))
+                .andExpect(jsonPath("$.all[0].name").value("One"))
+                .andExpect(jsonPath("$.more")
+                        .value("http://localhost/api/me/stats/retroachievements/228?version=3"))
+                .andExpect(jsonPath("$.extra").doesNotExist())
+                .andExpect(jsonPath("$.id").doesNotExist());
     }
 
     @Test
@@ -203,7 +244,7 @@ class MeStatsControllerTest {
 
         mvc.perform(v3(get(STATS + "/retroachievements/228")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("228"));
+                .andExpect(jsonPath("$.gameId").value(228));
     }
 
     @Test

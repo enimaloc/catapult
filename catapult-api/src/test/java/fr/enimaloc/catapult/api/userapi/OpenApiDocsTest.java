@@ -252,6 +252,13 @@ class OpenApiDocsTest {
         assertThat(schemas.has("PersonalAchievement")).isTrue();
         assertThat(schemas.at("/Achievement/properties").has("highlighted")).isTrue();
         assertThat(schemas.at("/StatsObject/properties").has("detectedOn")).isFalse();
+        // the detail routes answer the aggregate's objects, with every achievement
+        for (String name : List.of("SteamStats", "XboxStats", "RaStats")) {
+            assertThat(schemas.at("/" + name + "/properties").has("all")).as(name).isTrue();
+        }
+        assertThat(schemas.has("PlatformStats")).isFalse();
+        assertThat(docs.at("/paths/~1api~1me~1stats~1steam~1{appId}/get/responses/200/content").toString())
+                .contains("SteamStats");
     }
 
     private static JsonNode versionHeader(JsonNode docs, String parametersPointer) {
