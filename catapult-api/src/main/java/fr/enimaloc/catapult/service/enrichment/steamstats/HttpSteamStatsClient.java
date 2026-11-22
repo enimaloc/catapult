@@ -181,7 +181,7 @@ public class HttpSteamStatsClient implements SteamStatsClient {
      */
     private Answer get(String personalKeyOrNull, String template, Object... variables) {
         Key key = pick(personalKeyOrNull);
-        if (!rateLimiter.map(limiter -> limiter.acquire(key.value())).orElse(false)) {
+        if (!rateLimiter.map(limiter -> limiter.tryAcquireNow(key.value())).orElse(false)) {
             throw new SteamStatsUnavailableException("Steam rate budget reached");
         }
         Object[] all = withKey(template, key.value(), variables);

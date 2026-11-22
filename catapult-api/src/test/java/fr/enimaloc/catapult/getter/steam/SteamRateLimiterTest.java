@@ -39,4 +39,23 @@ class SteamRateLimiterTest {
         assertThat(usage.windowCalls()).isEqualTo(2);
         assertThat(usage.periodCalls()).isEqualTo(2);
     }
+
+    @Test
+    void tryAcquireNow_neverWaits() {
+        SteamRateLimiter limiter = new SteamRateLimiter(1, 60_000, 5000, new SimpleMeterRegistry());
+        assertThat(limiter.tryAcquireNow("K")).isTrue();
+        long started = System.nanoTime();
+        assertThat(limiter.tryAcquireNow("K")).as("bucket empty: refused at once").isFalse();
+        assertThat(java.time.Duration.ofNanos(System.nanoTime() - started)).isLessThan(java.time.Duration.ofMillis(500));
+        assertThat(limiter.usage("K").periodCalls()).isEqualTo(1);
+    }
+
+    @Test
+    void tryAcquireNow_refusesABlockedKey() {
+        SteamRateLimiter limiter = new SteamRateLimiter(3, 2000, 5000, new SimpleMeterRegistry());
+        limiter.onRateLimitResponse("K", 60);
+        assertThat(limiter.tryAcquireNow("K")).isFalse();
+        limiter.blockAll(60);
+        assertThat(limiter.tryAcquireNow("other")).isFalse();
+    }
 }

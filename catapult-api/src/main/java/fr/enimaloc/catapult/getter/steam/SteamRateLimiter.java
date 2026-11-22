@@ -86,6 +86,16 @@ public class SteamRateLimiter {
     }
 
     /**
+     * Takes a permit for {@code key} only if one is free right now: never waits (for callers that must not compete
+     * with the detection for the bucket). False while the key or every key is blocked.
+     */
+    public boolean tryAcquireNow(String key) {
+        long now = System.currentTimeMillis();
+        if (now < globalBlockedUntil || now < keyBlockedUntil.getOrDefault(key, 0L)) return false;
+        return counted(key, semaphoreFor(key).tryAcquire());
+    }
+
+    /**
      * Acquire a permit by blocking indefinitely (for background tasks on virtual threads).
      */
     public boolean acquireBlocking(String key) {

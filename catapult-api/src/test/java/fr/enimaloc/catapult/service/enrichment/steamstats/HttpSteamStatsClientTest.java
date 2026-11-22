@@ -54,7 +54,7 @@ class HttpSteamStatsClientTest {
         rotator = mock(SteamApiKeyRotator.class);
         limiter = mock(SteamRateLimiter.class);
         when(rotator.nextKey()).thenReturn(Optional.of("poolkey"));
-        when(limiter.acquire(anyString())).thenReturn(true);
+        when(limiter.tryAcquireNow(anyString())).thenReturn(true);
         client = new HttpSteamStatsClient(builder.build(), Optional.of(rotator), Optional.of(limiter));
     }
 
@@ -234,12 +234,12 @@ class HttpSteamStatsClientTest {
         client.globalPercentages("440");
         client.playerAchievements("7656", "440", "english", null);
 
-        verify(limiter, times(3)).acquire("poolkey");
+        verify(limiter, times(3)).tryAcquireNow("poolkey");
     }
 
     @Test
     void refusedByTheRateLimiterMakesNoRequest() {
-        when(limiter.acquire("poolkey")).thenReturn(false);
+        when(limiter.tryAcquireNow("poolkey")).thenReturn(false);
 
         assertThatThrownBy(() -> client.schema("440", "english"))
                 .isInstanceOf(SteamStatsUnavailableException.class);
@@ -263,7 +263,7 @@ class HttpSteamStatsClientTest {
         client.playerAchievements("7656", "440", "english", "mykey");
 
         verify(rotator, never()).nextKey();
-        verify(limiter).acquire("mykey");
+        verify(limiter).tryAcquireNow("mykey");
     }
 
     @Test
