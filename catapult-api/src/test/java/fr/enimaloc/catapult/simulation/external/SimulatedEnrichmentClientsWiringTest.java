@@ -8,6 +8,10 @@ import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
 import fr.enimaloc.catapult.service.enrichment.blizzard.HttpBlizzardClient;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardUnavailableException;
 import fr.enimaloc.catapult.service.enrichment.opencritic.HttpOpenCriticClient;
+import fr.enimaloc.catapult.service.enrichment.riot.HttpRiotClient;
+import fr.enimaloc.catapult.service.enrichment.riot.RiotClient;
+import fr.enimaloc.catapult.service.enrichment.riot.RiotNotFoundException;
+import fr.enimaloc.catapult.service.enrichment.riot.RiotPlatform;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticClient;
 import fr.enimaloc.catapult.service.enrichment.pcgw.HttpPcGamingWikiClient;
 import fr.enimaloc.catapult.service.enrichment.prices.HttpItadClient;
@@ -68,6 +72,7 @@ class SimulatedEnrichmentClientsWiringTest {
         @Bean fr.enimaloc.catapult.service.enrichment.bungie.HttpBungieClient bungie() {
             return mock(fr.enimaloc.catapult.service.enrichment.bungie.HttpBungieClient.class);
         }
+        @Bean HttpRiotClient riot() { return mock(HttpRiotClient.class); }
         @Bean org.springframework.web.client.RestClient.Builder restClientBuilder() {
             return org.springframework.web.client.RestClient.builder();
         }
@@ -78,7 +83,7 @@ class SimulatedEnrichmentClientsWiringTest {
     @Configuration(proxyBeanMethods = false)
     @ComponentScan(basePackageClasses = SimulatedProtonDbClient.class, useDefaultFilters = false,
             includeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
-                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity|SteamStats|XboxStats|RetroAchievements|Blizzard|Bungie)Client|.*SimulatedBlizzardAppTokenService"))
+                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity|SteamStats|XboxStats|RetroAchievements|Blizzard|Bungie|Riot)Client|.*SimulatedBlizzardAppTokenService"))
     static class SimulatedClients {
     }
 
@@ -101,6 +106,7 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(RetroAchievementsClient.class))
                     .isInstanceOf(SimulatedRetroAchievementsClient.class);
             assertThat(ctx.getBean(BlizzardClient.class)).isInstanceOf(SimulatedBlizzardClient.class);
+            assertThat(ctx.getBean(RiotClient.class)).isInstanceOf(SimulatedRiotClient.class);
             assertThat(ctx.getBean(BlizzardAppTokenService.class))
                     .isInstanceOf(SimulatedBlizzardAppTokenService.class);
             assertThat(ctx.getBean(fr.enimaloc.catapult.service.enrichment.bungie.BungieClient.class))
@@ -125,6 +131,7 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(BlizzardClient.class)).isInstanceOf(HttpBlizzardClient.class);
             assertThat(ctx.getBean(fr.enimaloc.catapult.service.enrichment.bungie.BungieClient.class))
                     .isInstanceOf(fr.enimaloc.catapult.service.enrichment.bungie.HttpBungieClient.class);
+            assertThat(ctx.getBean(RiotClient.class)).isInstanceOf(HttpRiotClient.class);
         });
     }
 
@@ -283,5 +290,20 @@ class SimulatedEnrichmentClientsWiringTest {
                 .isInstanceOf(BlizzardUnavailableException.class);
         assertThat(bz.d3CurrentSeason(BlizzardRegion.EU)).isPositive();
         assertThat(java.util.Base64.getDecoder().decode(SimulatedBlizzardClient.DECK_CODE)).isNotEmpty();
+    }
+
+    @Test
+    void simulatedRiot_answersDeterministically() {
+        var riot = new SimulatedRiotClient();
+        var account = riot.accountByRiotId(RiotPlatform.Cluster.EUROPE, "Catapult", "EUW");
+        assertThat(account.puuid()).isEqualTo("sim-catapult-euw");
+        assertThatThrownBy(() -> riot.accountByRiotId(RiotPlatform.Cluster.EUROPE, "Ghost", "0000"))
+                .isInstanceOf(RiotNotFoundException.class);
+        assertThat(riot.lolSummoner(RiotPlatform.EUW1, "p").level()).isEqualTo(312);
+        assertThat(riot.lolLeague(RiotPlatform.EUW1, "p")).hasSize(2);
+        assertThat(riot.lolActiveGame(RiotPlatform.EUW1, "p")).hasValueSatisfying(g ->
+                assertThat(g.championId()).isEqualTo(266));
+        assertThat(riot.tftLeague(RiotPlatform.EUW1, "p").getFirst().tier()).isEqualTo("PLATINUM");
+        assertThat(riot.champions(riot.latestVersion(), "en_US").byKey()).containsKey("266");
     }
 }
