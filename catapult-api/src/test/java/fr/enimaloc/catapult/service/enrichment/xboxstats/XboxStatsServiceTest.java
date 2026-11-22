@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -79,8 +81,8 @@ class XboxStatsServiceTest {
         user.setId(UUID.randomUUID());
         when(oauth.findByUserAndProvider(user, OAuthToken.Provider.XBOX)).thenReturn(Optional.of(new OAuthToken()));
         when(tokens.getToken(user)).thenReturn(Optional.of(SESSION));
-        when(client.titleHistory(any(), any(), anyInt())).thenReturn(history());
-        when(client.achievements(any(), any(), anyString())).thenReturn(achievements());
+        when(client.titleHistory(any(), any(), anyInt(), any())).thenReturn(history());
+        when(client.achievements(any(), any(), anyString(), any())).thenReturn(achievements());
         when(client.minutesPlayed(any(), any(), anyString())).thenReturn(Optional.of(610L));
     }
 
@@ -111,11 +113,19 @@ class XboxStatsServiceTest {
     }
 
     private Optional<PlatformStats> forTitle(boolean detail) {
-        return service.forTitle(user, "1791712750", FetchBudget.UNLIMITED, detail);
+        return service.forTitle(user, "1791712750", Locale.FRANCE, FetchBudget.UNLIMITED, detail);
+    }
+
+    @Test
+    void theCallersLocaleReachesTheClient() {
+        forTitle(true);
+
+        verify(client).titleHistory(any(), any(), anyInt(), eq(Locale.FRANCE));
+        verify(client).achievements(any(), any(), anyString(), eq(Locale.FRANCE));
     }
 
     private Optional<String> resolve(DetectedGame detected, Optional<String> igdb, String name) {
-        return service.resolveTitle(user, detected, igdb, name, FetchBudget.UNLIMITED);
+        return service.resolveTitle(user, detected, igdb, name, Locale.FRANCE, FetchBudget.UNLIMITED);
     }
 
     @Test
@@ -124,7 +134,7 @@ class XboxStatsServiceTest {
                 Optional.empty(), "Forza");
 
         assertThat(id).contains("1791712750");
-        verify(client, never()).titleHistory(any(), any(), anyInt());
+        verify(client, never()).titleHistory(any(), any(), anyInt(), any());
     }
 
     @Test
@@ -137,12 +147,12 @@ class XboxStatsServiceTest {
 
     @Test
     void failingHistoryDuringResolutionIsUnavailableNotAbsent() {
-        when(client.titleHistory(any(), any(), anyInt())).thenThrow(new XboxStatsUnavailableException("503"));
+        when(client.titleHistory(any(), any(), anyInt(), any())).thenThrow(new XboxStatsUnavailableException("503"));
 
         assertThatThrownBy(() -> resolve(new DetectedGame("9MVXMVT8ZKWC", GameBinding.SourceType.XBOX, "x"),
                 Optional.empty(), "x")).isInstanceOf(XboxStatsUnavailableException.class);
 
-        doReturn(history()).when(client).titleHistory(any(), any(), anyInt());
+        doReturn(history()).when(client).titleHistory(any(), any(), anyInt(), any());
         assertThat(resolve(null, Optional.empty(), "Nothing like this")).isEmpty();
     }
 
@@ -161,7 +171,7 @@ class XboxStatsServiceTest {
 
     @Test
     void ambiguousTitleNameIsAbsent() {
-        when(client.titleHistory(any(), any(), anyInt())).thenReturn(List.of(
+        when(client.titleHistory(any(), any(), anyInt(), any())).thenReturn(List.of(
                 title("1", "Halo", List.of(), 1, 2), title("2", "HALO", List.of(), 1, 2)));
 
         assertThat(resolve(null, Optional.empty(), "Halo")).isEmpty();
@@ -185,7 +195,7 @@ class XboxStatsServiceTest {
 
     @Test
     void titleMissingFromHistoryIsEmpty() {
-        assertThat(service.forTitle(user, "999", FetchBudget.UNLIMITED, false)).isEmpty();
+        assertThat(service.forTitle(user, "999", Locale.FRANCE, FetchBudget.UNLIMITED, false)).isEmpty();
     }
 
     @Test
@@ -205,7 +215,7 @@ class XboxStatsServiceTest {
 
     @Test
     void forbiddenAchievementsFallBackToTitlehubSummary() {
-        when(client.achievements(any(), any(), anyString())).thenThrow(new XboxStatsForbiddenException("403"));
+        when(client.achievements(any(), any(), anyString(), any())).thenThrow(new XboxStatsForbiddenException("403"));
 
         PlatformStats stats = forTitle(false).orElseThrow();
 
@@ -218,26 +228,26 @@ class XboxStatsServiceTest {
 
     @Test
     void refusalIsNotRetriedWithinAnHour() {
-        when(client.achievements(any(), any(), anyString())).thenThrow(new XboxStatsForbiddenException("403"));
+        when(client.achievements(any(), any(), anyString(), any())).thenThrow(new XboxStatsForbiddenException("403"));
 
         forTitle(false);
         now.set(now.get().plus(Duration.ofMinutes(30)));
         assertThat(forTitle(false).orElseThrow().status()).isEqualTo(Status.UNSUPPORTED);
-        verify(client, times(1)).achievements(any(), any(), anyString());
+        verify(client, times(1)).achievements(any(), any(), anyString(), any());
 
         now.set(now.get().plus(Duration.ofMinutes(31)));
         forTitle(false);
-        verify(client, times(2)).achievements(any(), any(), anyString());
+        verify(client, times(2)).achievements(any(), any(), anyString(), any());
     }
 
     @Test
     void unauthorizedAchievementsAreUnavailableAndNotMemorized() {
-        when(client.achievements(any(), any(), anyString()))
+        when(client.achievements(any(), any(), anyString(), any()))
                 .thenThrow(new XboxStatsForbiddenException("401", 401));
 
         assertThat(forTitle(false).orElseThrow().status()).isEqualTo(Status.UNAVAILABLE);
         assertThat(forTitle(false).orElseThrow().status()).isEqualTo(Status.UNAVAILABLE);
-        verify(client, times(2)).achievements(any(), any(), anyString());
+        verify(client, times(2)).achievements(any(), any(), anyString(), any());
     }
 
     @Test
@@ -254,7 +264,7 @@ class XboxStatsServiceTest {
 
     @Test
     void lockedSecretAchievementIsHidden() {
-        when(client.achievements(any(), any(), anyString())).thenReturn(List.of(
+        when(client.achievements(any(), any(), anyString(), any())).thenReturn(List.of(
                 new Achievement("3", "Leaked", "Leaked too", "icon", false, null, null, 10, true)));
 
         Achievement shown = forTitle(true).orElseThrow().all().getFirst();
@@ -274,7 +284,7 @@ class XboxStatsServiceTest {
 
     @Test
     void xbox360TitleKeepsTheSummaryOnly() {
-        when(client.achievements(any(), any(), anyString())).thenReturn(List.of());
+        when(client.achievements(any(), any(), anyString(), any())).thenReturn(List.of());
 
         PlatformStats stats = forTitle(true).orElseThrow();
 
@@ -286,14 +296,14 @@ class XboxStatsServiceTest {
 
     @Test
     void titleWithoutAchievementsSaysSoWithoutCallingXbox() {
-        when(client.titleHistory(any(), any(), anyInt())).thenReturn(List.of(
+        when(client.titleHistory(any(), any(), anyInt(), any())).thenReturn(List.of(
                 title("1791712750", "Forza", List.of(), 0, 0)));
 
         PlatformStats stats = forTitle(false).orElseThrow();
 
         assertThat(stats.status()).isEqualTo(Status.NO_ACHIEVEMENTS);
         assertThat(stats.playtimeMinutes()).isEqualTo(610L);
-        verify(client, never()).achievements(any(), any(), anyString());
+        verify(client, never()).achievements(any(), any(), anyString(), any());
     }
 
     @Test
@@ -305,20 +315,20 @@ class XboxStatsServiceTest {
 
     @Test
     void outageOfTheHistoryOrAchievementsIsUnavailableAndNotCached() {
-        when(client.titleHistory(any(), any(), anyInt())).thenThrow(new XboxStatsUnavailableException("503"));
+        when(client.titleHistory(any(), any(), anyInt(), any())).thenThrow(new XboxStatsUnavailableException("503"));
         assertThat(forTitle(false).orElseThrow().status()).isEqualTo(Status.UNAVAILABLE);
 
-        doReturn(history()).when(client).titleHistory(any(), any(), anyInt());
-        doThrow(new XboxStatsUnavailableException("503")).when(client).achievements(any(), any(), anyString());
+        doReturn(history()).when(client).titleHistory(any(), any(), anyInt(), any());
+        doThrow(new XboxStatsUnavailableException("503")).when(client).achievements(any(), any(), anyString(), any());
         assertThat(forTitle(false).orElseThrow().status()).isEqualTo(Status.UNAVAILABLE);
 
-        doReturn(achievements()).when(client).achievements(any(), any(), anyString());
+        doReturn(achievements()).when(client).achievements(any(), any(), anyString(), any());
         assertThat(forTitle(false).orElseThrow().status()).isEqualTo(Status.OK);
     }
 
     @Test
     void anyFailureOfTheFetchIsAnOutageNotAnAbsence() {
-        when(client.titleHistory(any(), any(), anyInt())).thenThrow(new IllegalStateException("parse"));
+        when(client.titleHistory(any(), any(), anyInt(), any())).thenThrow(new IllegalStateException("parse"));
 
         assertThat(forTitle(false).orElseThrow().status()).isEqualTo(Status.UNAVAILABLE);
     }
@@ -335,8 +345,8 @@ class XboxStatsServiceTest {
         forTitle(false);
         forTitle(false);
 
-        verify(client, times(1)).titleHistory(any(), any(), anyInt());
-        verify(client, times(1)).achievements(any(), any(), anyString());
+        verify(client, times(1)).titleHistory(any(), any(), anyInt(), any());
+        verify(client, times(1)).achievements(any(), any(), anyString(), any());
         verify(client, times(1)).minutesPlayed(any(), any(), anyString());
     }
 }

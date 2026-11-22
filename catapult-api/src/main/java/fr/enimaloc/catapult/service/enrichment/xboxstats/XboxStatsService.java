@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -99,7 +100,7 @@ public class XboxStatsService {
      *         nothing stale is cached: "unavailable", as opposed to "not found"
      */
     public Optional<String> resolveTitle(UserAccount user, DetectedGame detected, Optional<String> storeIdFromIgdb,
-                                         String searchName, FetchBudget budget) {
+                                         String searchName, Locale locale, FetchBudget budget) {
         if (tokens.isEmpty() || !enabled()) {
             return Optional.empty();
         }
@@ -111,7 +112,7 @@ public class XboxStatsService {
         if (!linked(user)) {
             return Optional.empty();
         }
-        Looked<Titles> history = history(user, budget);
+        Looked<Titles> history = history(user, locale, budget);
         if (history.value().isEmpty()) {
             if (history.failed()) {
                 throw new XboxStatsUnavailableException("Xbox title history unavailable");
@@ -150,16 +151,17 @@ public class XboxStatsService {
 
     /**
      * The member's stats on Xbox title {@code titleId}; empty when Xbox is off, the member has no Xbox link, or the
-     * title is not in their history. {@code detail} also lists every achievement.
+     * title is not in their history. {@code detail} also lists every achievement; names are in {@code locale}.
      *
      * @throws fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException when {@code budget} refuses
      *         a call that is needed
      */
-    public Optional<PlatformStats> forTitle(UserAccount user, String titleId, FetchBudget budget, boolean detail) {
+    public Optional<PlatformStats> forTitle(UserAccount user, String titleId, Locale locale, FetchBudget budget,
+                                            boolean detail) {
         if (tokens.isEmpty() || !enabled() || !linked(user)) {
             return Optional.empty();
         }
-        Looked<Titles> history = history(user, budget);
+        Looked<Titles> history = history(user, locale, budget);
         if (history.value().isEmpty()) {
             return history.failed() ? Optional.of(PlatformStats.of(Status.UNAVAILABLE, titleId)) : Optional.empty();
         }
@@ -182,7 +184,7 @@ public class XboxStatsService {
             return Optional.of(unsupported(title, minutes));
         }
         Looked<Unlocks> unlocks = look(EnrichmentSource.XBOX_ACHIEVEMENTS, key, Unlocks.class, budget,
-                () -> Optional.of(new Unlocks(client.achievements(user.getId(), session.get(), titleId))));
+                () -> Optional.of(new Unlocks(client.achievements(user.getId(), session.get(), titleId, locale))));
         if (unlocks.forbidden()) {
             achievementsRefused.put(user.getId(), clock.instant());
             return Optional.of(unsupported(title, minutes));
@@ -282,10 +284,10 @@ public class XboxStatsService {
         return oauthTokens.findByUserAndProvider(user, OAuthToken.Provider.XBOX).isPresent();
     }
 
-    private Looked<Titles> history(UserAccount user, FetchBudget budget) {
+    private Looked<Titles> history(UserAccount user, Locale locale, FetchBudget budget) {
         Supplier<XstsSession> session = session(user);
         return look(EnrichmentSource.XBOX_TITLES, "u:" + user.getId(), Titles.class, budget,
-                () -> Optional.of(new Titles(client.titleHistory(user.getId(), session.get(), MAX_TITLES))));
+                () -> Optional.of(new Titles(client.titleHistory(user.getId(), session.get(), MAX_TITLES, locale))));
     }
 
     /** The member's session, asked only when a call needs it; no session (standby, chain failing) is an outage. */

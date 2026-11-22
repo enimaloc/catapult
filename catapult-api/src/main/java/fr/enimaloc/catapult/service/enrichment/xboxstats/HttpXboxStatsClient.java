@@ -5,7 +5,6 @@ import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Achievem
 import fr.enimaloc.catapult.service.xbox.XboxUserTokenService.XstsSession;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -53,6 +52,12 @@ public class HttpXboxStatsClient implements XboxStatsClient {
     }
 
     private final JsonMapper mapper = JsonMapper.builder().build();
+    /** The usual region of a language sent without one. */
+    private static final Map<String, String> DEFAULT_REGIONS = Map.ofEntries(Map.entry("en", "US"),
+            Map.entry("fr", "FR"), Map.entry("de", "DE"), Map.entry("es", "ES"), Map.entry("it", "IT"),
+            Map.entry("pt", "BR"), Map.entry("nl", "NL"), Map.entry("pl", "PL"), Map.entry("ru", "RU"),
+            Map.entry("ja", "JP"), Map.entry("ko", "KR"), Map.entry("zh", "CN"));
+
     private final RestClient restClient;
     private final XboxStatsRateLimiter limiter;
 
@@ -75,8 +80,8 @@ public class HttpXboxStatsClient implements XboxStatsClient {
     }
 
     @Override
-    public List<XboxTitle> titleHistory(UUID userId, XstsSession session, int max) {
-        Answer answer = send(userId, session, TITLEHUB, session.xuid(), max);
+    public List<XboxTitle> titleHistory(UUID userId, XstsSession session, int max, Locale locale) {
+        Answer answer = send(userId, session, locale, TITLEHUB, session.xuid(), max);
         JsonNode titles = json(requireSuccess(answer)).path("titles");
         if (!titles.isArray()) {
             throw new XboxStatsUnavailableException("Xbox answered no titles array");
@@ -97,8 +102,8 @@ public class HttpXboxStatsClient implements XboxStatsClient {
     }
 
     @Override
-    public List<Achievement> achievements(UUID userId, XstsSession session, String titleId) {
-        Answer answer = send(userId, session, ACHIEVEMENTS, session.xuid(), titleId);
+    public List<Achievement> achievements(UUID userId, XstsSession session, String titleId, Locale locale) {
+        Answer answer = send(userId, session, locale, ACHIEVEMENTS, session.xuid(), titleId);
         failOnRefusal(answer);
         JsonNode achievements = json(requireSuccess(answer)).path("achievements");
         if (!achievements.isArray()) {
@@ -129,7 +134,8 @@ public class HttpXboxStatsClient implements XboxStatsClient {
         body.put("arrangebyfield", "xuid");
         body.put("xuids", List.of(session.xuid()));
         body.put("stats", List.of(Map.of("name", "MinutesPlayed", "titleid", titleId)));
-        Answer answer = send(userId, session, USERSTATS, body);
+        // a number: the language does not matter
+        Answer answer = send(userId, session, null, USERSTATS, body);
         failOnRefusal(answer);
         JsonNode root = json(requireSuccess(answer));
         if (!root.path("statlistscollection").isArray()) {
@@ -148,10 +154,10 @@ public class HttpXboxStatsClient implements XboxStatsClient {
     // --- HTTP ---
 
     /**
-     * One request under the member's session: a GET of {@code template} (its variables in {@code args}), or, when
-     * {@code args} is a single map, a POST of it as JSON.
+     * One request under the member's session, in {@code locale}: a GET of {@code template} (its variables in
+     * {@code args}), or, when {@code args} is a single map, a POST of it as JSON.
      */
-    private Answer send(UUID userId, XstsSession session, String template, Object... args) {
+    private Answer send(UUID userId, XstsSession session, Locale locale, String template, Object... args) {
         FetchBudget budget = limiter.forMember(userId);
         if (!budget.tryAcquire()) {
             throw new XboxStatsUnavailableException("Xbox rate budget reached");
@@ -166,7 +172,7 @@ public class HttpXboxStatsClient implements XboxStatsClient {
             }
             answer = request.header(HttpHeaders.AUTHORIZATION, "XBL3.0 x=" + session.userHash() + ";" + session.token())
                     .header("x-xbl-contract-version", "2")
-                    .header(HttpHeaders.ACCEPT_LANGUAGE, acceptLanguage())
+                    .header(HttpHeaders.ACCEPT_LANGUAGE, acceptLanguage(locale))
                     .header(HttpHeaders.ACCEPT, "application/json")
                     .header(HttpHeaders.USER_AGENT, USER_AGENT)
                     .exchange((req, res) -> new Answer(res.getStatusCode(),
@@ -182,10 +188,20 @@ public class HttpXboxStatsClient implements XboxStatsClient {
         return answer;
     }
 
-    /** The request's locale as a language tag with a region (Titlehub answers 400 without one); en-US by default. */
-    private static String acceptLanguage() {
-        Locale locale = LocaleContextHolder.getLocale();
-        return locale.getLanguage().isEmpty() || locale.getCountry().isEmpty() ? "en-US" : locale.toLanguageTag();
+    /**
+     * {@code locale} as a language tag with a region (Titlehub answers 400 without one): given by the caller, never
+     * read from the thread (the reads run on worker threads). A language alone gets its usual region when it has a
+     * known one; en-US otherwise.
+     */
+    static String acceptLanguage(Locale locale) {
+        if (locale == null || locale.getLanguage().isEmpty()) {
+            return "en-US";
+        }
+        if (!locale.getCountry().isEmpty()) {
+            return locale.toLanguageTag();
+        }
+        String region = DEFAULT_REGIONS.get(locale.getLanguage());
+        return region == null ? "en-US" : locale.getLanguage() + "-" + region;
     }
 
     private static Duration retryAfter(String header) {

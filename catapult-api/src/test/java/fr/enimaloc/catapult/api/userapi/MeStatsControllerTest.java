@@ -149,7 +149,7 @@ class MeStatsControllerTest {
     void xboxAndRetroAchievementsDetails_areTheAggregateObjectsWithEveryAchievement() throws Exception {
         List<Achievement> all = List.of(new Achievement("1", "One", "d", "i", true,
                 Instant.parse("2026-11-20T10:00:00Z"), null, 50, false));
-        when(xboxStats.forTitle(eq(user), eq("1144039928"), any(), eq(true))).thenReturn(Optional.of(
+        when(xboxStats.forTitle(eq(user), eq("1144039928"), any(), any(), eq(true))).thenReturn(Optional.of(
                 new PlatformStats(Status.OK, "1144039928", 480L, null, null, AchievementSummary.of(all), all,
                         Map.of("gamerscore", 50, "gamerscoreTotal", 1000))));
         when(raStats.forGame(eq(user), eq(228), any(), eq(true))).thenReturn(Optional.of(
@@ -158,7 +158,7 @@ class MeStatsControllerTest {
                                 RetroAchievementsStatsService.POINTS, 5,
                                 RetroAchievementsStatsService.POINTS_TOTAL, 40))));
 
-        mvc.perform(v3(get(STATS + "/xbox/1144039928")))
+        mvc.perform(v3(get(STATS + "/xbox/1144039928")).header("Accept-Language", "fr-FR,fr;q=0.9"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.titleId").value("1144039928"))
                 .andExpect(jsonPath("$.gamerscore.earned").value(50))
@@ -166,6 +166,7 @@ class MeStatsControllerTest {
                 .andExpect(jsonPath("$.all[0].name").value("One"))
                 .andExpect(jsonPath("$.more").value("http://localhost/api/me/stats/xbox/1144039928?version=3"))
                 .andExpect(jsonPath("$.extra").doesNotExist());
+        verify(xboxStats).forTitle(eq(user), eq("1144039928"), eq(Locale.FRANCE), any(), eq(true));
         mvc.perform(v3(get(STATS + "/retroachievements/228")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.gameId").value(228))
@@ -183,7 +184,7 @@ class MeStatsControllerTest {
     void privateIs200WithStatus() throws Exception {
         when(steamStats.forGame(eq(user), eq("440"), any(), any(), eq(true)))
                 .thenReturn(Optional.of(PlatformStats.of(Status.PRIVATE, "440")));
-        when(xboxStats.forTitle(eq(user), eq("1144039928"), any(), eq(true)))
+        when(xboxStats.forTitle(eq(user), eq("1144039928"), any(), any(), eq(true)))
                 .thenReturn(Optional.of(PlatformStats.of(Status.UNSUPPORTED, "1144039928")));
 
         mvc.perform(v3(get(STATS + "/steam/440")))
@@ -197,7 +198,7 @@ class MeStatsControllerTest {
     @Test
     void unlinkedPlatformIs404() throws Exception {
         when(steamStats.forGame(any(), any(), any(), any(), anyBoolean())).thenReturn(Optional.empty());
-        when(xboxStats.forTitle(any(), any(), any(), anyBoolean())).thenReturn(Optional.empty());
+        when(xboxStats.forTitle(any(), any(), any(), any(), anyBoolean())).thenReturn(Optional.empty());
         when(raStats.forGame(any(), anyInt(), any(), anyBoolean())).thenReturn(Optional.empty());
         when(raStats.account(any(), any())).thenReturn(Optional.empty());
 

@@ -128,9 +128,15 @@ public class MeStatsController {
     public GameInfoV3Response.XboxStats xbox(
             @AuthenticationPrincipal UUID userId,
             @Parameter(description = "Xbox titleId (decimal).", in = ParameterIn.PATH, example = "1144039928")
-            @PathVariable @Pattern(regexp = ApiV2.XBOX_TITLE_ID) String titleId) {
+            @PathVariable @Pattern(regexp = ApiV2.XBOX_TITLE_ID) String titleId,
+            @Parameter(description = LANG_DESCRIPTION, example = "fr", schema = @Schema(defaultValue = "en"))
+            @RequestParam(name = "lang", required = false) String lang,
+            @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER,
+                    example = "fr-FR,fr;q=0.9")
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
         PlatformStats stats = detail(userId, "No Xbox stats for you on that title",
-                (user, budget) -> xboxStatsService.forTitle(user, titleId, budget, true));
+                (user, budget) -> xboxStatsService.forTitle(user, titleId, RequestLocale.parse(lang, acceptLanguage),
+                        budget, true));
         return GameInfoV3Response.XboxStats.of(stats, links(), true);
     }
 

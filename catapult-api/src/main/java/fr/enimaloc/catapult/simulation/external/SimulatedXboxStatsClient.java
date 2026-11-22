@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,7 +31,7 @@ public class SimulatedXboxStatsClient implements XboxStatsClient {
     private static final Instant PLAYED = Instant.parse("2026-11-20T20:00:00Z");
 
     @Override
-    public List<XboxTitle> titleHistory(UUID userId, XstsSession session, int max) {
+    public List<XboxTitle> titleHistory(UUID userId, XstsSession session, int max, Locale locale) {
         return List.of(
                 new XboxTitle(TITLE_ID, "Simulated Xbox Game", List.of(PRODUCT_ID), "Game", 3, 10, 350, 1000,
                         PLAYED),
@@ -39,7 +40,7 @@ public class SimulatedXboxStatsClient implements XboxStatsClient {
     }
 
     @Override
-    public List<Achievement> achievements(UUID userId, XstsSession session, String titleId) {
+    public List<Achievement> achievements(UUID userId, XstsSession session, String titleId, Locale locale) {
         if (REFUSED_TITLE_ID.equals(titleId)) {
             throw new XboxStatsForbiddenException("Xbox refused the achievements of " + titleId);
         }

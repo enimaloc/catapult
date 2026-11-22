@@ -179,22 +179,25 @@ public class GameEnrichmentAssembler {
                         Locale locale, UserAccount user) {
         CompletableFuture<PlatformStats> steam = then(appId, "steam stats", id -> id == null ? null
                 : steamStatsService.forGame(user, id, locale, FetchBudget.UNLIMITED, false).orElse(null));
-        CompletableFuture<PlatformStats> xbox = supply("xbox stats", () -> xboxStats(user, detected, igdb, searched));
+        CompletableFuture<PlatformStats> xbox = supply("xbox stats", () -> xboxStats(user, detected, igdb, searched,
+                locale));
         CompletableFuture<PlatformStats> retro = supply("retroachievements stats", () -> retroStats(user, detected,
                 searched));
         return new Stats(steam, xbox, retro, detected.getSourceType());
     }
 
-    private PlatformStats xboxStats(UserAccount user, DetectedGame detected, String igdb, String searched) {
+    private PlatformStats xboxStats(UserAccount user, DetectedGame detected, String igdb, String searched,
+                                    Locale locale) {
         Optional<String> storeId = igdb == null ? Optional.empty()
                 : igdbService.findExternalUid(igdb, GameBinding.SourceType.XBOX);
         Optional<String> titleId;
         try {
-            titleId = xboxStatsService.resolveTitle(user, detected, storeId, searched, FetchBudget.UNLIMITED);
+            titleId = xboxStatsService.resolveTitle(user, detected, storeId, searched, locale,
+                    FetchBudget.UNLIMITED);
         } catch (XboxStatsUnavailableException e) {
             return PlatformStats.of(Status.UNAVAILABLE, null);
         }
-        return titleId.flatMap(id -> xboxStatsService.forTitle(user, id, FetchBudget.UNLIMITED, false))
+        return titleId.flatMap(id -> xboxStatsService.forTitle(user, id, locale, FetchBudget.UNLIMITED, false))
                 .orElse(null);
     }
 

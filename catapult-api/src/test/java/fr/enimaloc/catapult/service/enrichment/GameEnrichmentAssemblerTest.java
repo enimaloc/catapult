@@ -490,8 +490,9 @@ class GameEnrichmentAssemblerTest {
 
     private void statsEverywhere(UserAccount user) {
         when(steamStats.forGame(eq(user), eq("620"), any(), any(), anyBoolean())).thenReturn(Optional.of(STEAM_OK));
-        when(xboxStats.resolveTitle(eq(user), any(), any(), any(), any())).thenReturn(Optional.of("1144039928"));
-        when(xboxStats.forTitle(eq(user), eq("1144039928"), any(), anyBoolean())).thenReturn(Optional.of(XBOX_OK));
+        when(xboxStats.resolveTitle(eq(user), any(), any(), any(), any(), any())).thenReturn(Optional.of("1144039928"));
+        when(xboxStats.forTitle(eq(user), eq("1144039928"), any(), any(), anyBoolean()))
+                .thenReturn(Optional.of(XBOX_OK));
         when(raStats.resolveGame(eq(user), any(), any(), any())).thenReturn(Optional.of(228));
         when(raStats.forGame(eq(user), eq(228), any(), anyBoolean())).thenReturn(Optional.of(RA_OK));
     }
@@ -516,7 +517,7 @@ class GameEnrichmentAssemblerTest {
         assertThat(result.stats()).isEqualTo(new PersonalStatsEnrichment(STEAM_OK, XBOX_OK, RA_OK,
                 GameBinding.SourceType.STEAM));
         verify(steamStats).forGame(user, "620", Locale.FRENCH, FetchBudget.UNLIMITED, false);
-        verify(xboxStats).forTitle(user, "1144039928", FetchBudget.UNLIMITED, false);
+        verify(xboxStats).forTitle(user, "1144039928", Locale.FRENCH, FetchBudget.UNLIMITED, false);
         verify(raStats).forGame(user, 228, FetchBudget.UNLIMITED, false);
     }
 
@@ -532,21 +533,22 @@ class GameEnrichmentAssemblerTest {
 
         assertThat(result.stats().steam()).isEqualTo(STEAM_OK);
         assertThat(result.stats().detectedOn()).isEqualTo(GameBinding.SourceType.XBOX);
-        verify(xboxStats).resolveTitle(eq(user), eq(HALO), eq(Optional.of("9NBLGGH")), eq("Halo"), any());
+        verify(xboxStats).resolveTitle(eq(user), eq(HALO), eq(Optional.of("9NBLGGH")), eq("Halo"),
+                eq(Locale.ENGLISH), any());
     }
 
     @Test
     void noPlatformAppliesIsNoStats() {
         UserAccount user = member();
         when(steamStats.forGame(any(), any(), any(), any(), anyBoolean())).thenReturn(Optional.empty());
-        when(xboxStats.resolveTitle(any(), any(), any(), any(), any())).thenReturn(Optional.empty());
+        when(xboxStats.resolveTitle(any(), any(), any(), any(), any(), any())).thenReturn(Optional.empty());
         when(raStats.resolveGame(any(), any(), any(), any())).thenReturn(Optional.empty());
 
         GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
                 null, LINKS, Optional.of(user), Locale.ENGLISH);
 
         assertThat(result.stats()).isNull();
-        verify(xboxStats, never()).forTitle(any(), any(), any(), anyBoolean());
+        verify(xboxStats, never()).forTitle(any(), any(), any(), any(), anyBoolean());
         verify(raStats, never()).forGame(any(), anyInt(), any(), anyBoolean());
     }
 
@@ -554,7 +556,7 @@ class GameEnrichmentAssemblerTest {
     void outageWhileResolvingIsUnavailable() {
         UserAccount user = member();
         when(steamStats.forGame(any(), any(), any(), any(), anyBoolean())).thenReturn(Optional.empty());
-        when(xboxStats.resolveTitle(any(), any(), any(), any(), any()))
+        when(xboxStats.resolveTitle(any(), any(), any(), any(), any(), any()))
                 .thenThrow(new XboxStatsUnavailableException("down"));
         when(raStats.resolveGame(any(), any(), any(), any()))
                 .thenThrow(new fr.enimaloc.catapult.service.enrichment.rastats.RaUnavailableException("down"));
@@ -572,7 +574,7 @@ class GameEnrichmentAssemblerTest {
         properties.setAggregateTimeout(Duration.ofMillis(500));
         UserAccount user = member();
         statsEverywhere(user);
-        when(xboxStats.forTitle(any(), any(), any(), anyBoolean()))
+        when(xboxStats.forTitle(any(), any(), any(), any(), anyBoolean()))
                 .thenAnswer(slow(Duration.ofSeconds(3), Optional.of(XBOX_OK)));
 
         long start = System.nanoTime();

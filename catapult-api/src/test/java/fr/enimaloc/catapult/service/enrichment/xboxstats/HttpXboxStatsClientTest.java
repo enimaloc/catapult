@@ -85,7 +85,7 @@ class HttpXboxStatsClientTest {
                 .andExpect(header(HttpHeaders.USER_AGENT, "Catapult/1.0 (+https://catapult.enimaloc.fr)"))
                 .andRespond(withSuccess(fixture("titlehistory.json"), MediaType.APPLICATION_JSON));
 
-        List<XboxTitle> titles = client.titleHistory(member, session, 1000);
+        List<XboxTitle> titles = client.titleHistory(member, session, 1000, Locale.US);
 
         assertThat(titles).hasSize(3);
         XboxTitle forza = titles.getFirst();
@@ -98,13 +98,23 @@ class HttpXboxStatsClientTest {
     }
 
     @Test
-    void usesTheRequestLocaleWithItsRegion() {
-        LocaleContextHolder.setLocale(Locale.CANADA_FRENCH);
+    void usesTheGivenLocaleWithItsRegion_notTheThreads() {
+        // the thread's locale is never read: the reads run on worker threads
+        LocaleContextHolder.setLocale(Locale.GERMANY);
         server.expect(once(), requestTo(HISTORY)).andExpect(header(HttpHeaders.ACCEPT_LANGUAGE, "fr-CA"))
                 .andRespond(withSuccess("{\"titles\":[]}", MediaType.APPLICATION_JSON));
 
-        assertThat(client.titleHistory(member, session, 1000)).isEmpty();
+        assertThat(client.titleHistory(member, session, 1000, Locale.CANADA_FRENCH)).isEmpty();
         server.verify();
+    }
+
+    @Test
+    void aLanguageAloneGetsItsUsualRegion() {
+        assertThat(HttpXboxStatsClient.acceptLanguage(Locale.FRENCH)).isEqualTo("fr-FR");
+        assertThat(HttpXboxStatsClient.acceptLanguage(Locale.ENGLISH)).isEqualTo("en-US");
+        assertThat(HttpXboxStatsClient.acceptLanguage(Locale.forLanguageTag("tlh"))).isEqualTo("en-US");
+        assertThat(HttpXboxStatsClient.acceptLanguage(null)).isEqualTo("en-US");
+        assertThat(HttpXboxStatsClient.acceptLanguage(Locale.UK)).isEqualTo("en-GB");
     }
 
     @Test
@@ -112,7 +122,7 @@ class HttpXboxStatsClientTest {
         server.expect(once(), requestTo(ACHIEVEMENTS))
                 .andRespond(withSuccess(fixture("achievements-v2.json"), MediaType.APPLICATION_JSON));
 
-        List<Achievement> all = client.achievements(member, session, "1791712750");
+        List<Achievement> all = client.achievements(member, session, "1791712750", Locale.US);
 
         assertThat(all).hasSize(3);
         Achievement rare = all.get(1);
@@ -134,7 +144,7 @@ class HttpXboxStatsClientTest {
         server.expect(once(), requestTo(ACHIEVEMENTS))
                 .andRespond(withSuccess(fixture("achievements-v2-norarity.json"), MediaType.APPLICATION_JSON));
 
-        assertThat(client.achievements(member, session, "1791712750")).hasSize(3)
+        assertThat(client.achievements(member, session, "1791712750", Locale.US)).hasSize(3)
                 .allSatisfy(a -> assertThat(a.rarity()).isNull());
     }
 
@@ -167,8 +177,8 @@ class HttpXboxStatsClientTest {
         server.expect(requestTo(USERSTATS)).andRespond(withSuccess(fixture("userstats-batch.json"),
                 MediaType.APPLICATION_JSON));
 
-        client.titleHistory(member, session, 1000);
-        client.achievements(member, session, "1791712750");
+        client.titleHistory(member, session, 1000, Locale.US);
+        client.achievements(member, session, "1791712750", Locale.US);
         client.minutesPlayed(member, session, "1791712750");
 
         verify(limiter, times(3)).forMember(member);
@@ -179,7 +189,7 @@ class HttpXboxStatsClientTest {
     void refusedBudgetSendsNothing() {
         when(budget.tryAcquire()).thenReturn(false);
 
-        assertThatThrownBy(() -> client.titleHistory(member, session, 1000))
+        assertThatThrownBy(() -> client.titleHistory(member, session, 1000, Locale.US))
                 .isInstanceOf(XboxStatsUnavailableException.class);
         server.verify();
     }
@@ -187,7 +197,7 @@ class HttpXboxStatsClientTest {
     @Test
     void unauthorizedAndForbiddenAchievementsAreForbidden() {
         server.expect(once(), requestTo(ACHIEVEMENTS)).andRespond(withStatus(HttpStatus.FORBIDDEN));
-        assertThatThrownBy(() -> client.achievements(member, session, "1791712750"))
+        assertThatThrownBy(() -> client.achievements(member, session, "1791712750", Locale.US))
                 .isInstanceOf(XboxStatsForbiddenException.class);
 
         server.reset();
@@ -201,7 +211,7 @@ class HttpXboxStatsClientTest {
         server.expect(once(), requestTo(HISTORY)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
                 .header(HttpHeaders.RETRY_AFTER, "120"));
 
-        assertThatThrownBy(() -> client.titleHistory(member, session, 1000))
+        assertThatThrownBy(() -> client.titleHistory(member, session, 1000, Locale.US))
                 .isInstanceOf(XboxStatsUnavailableException.class);
         verify(limiter).pause(member, Duration.ofSeconds(120));
     }
@@ -210,7 +220,7 @@ class HttpXboxStatsClientTest {
     void tooManyRequestsWithoutRetryAfterPausesAMinute() {
         server.expect(once(), requestTo(HISTORY)).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
 
-        assertThatThrownBy(() -> client.titleHistory(member, session, 1000))
+        assertThatThrownBy(() -> client.titleHistory(member, session, 1000, Locale.US))
                 .isInstanceOf(XboxStatsUnavailableException.class);
         verify(limiter).pause(member, Duration.ofSeconds(60));
     }
@@ -218,32 +228,32 @@ class HttpXboxStatsClientTest {
     @Test
     void serviceUnavailableRedirectAndGarbageAreOutages() {
         server.expect(once(), requestTo(HISTORY)).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
-        assertThatThrownBy(() -> client.titleHistory(member, session, 1000))
+        assertThatThrownBy(() -> client.titleHistory(member, session, 1000, Locale.US))
                 .isInstanceOf(XboxStatsUnavailableException.class);
         verify(limiter, never()).pause(any(), any());
 
         server.reset();
         server.expect(once(), requestTo(HISTORY)).andRespond(withStatus(HttpStatus.FOUND)
                 .header(HttpHeaders.LOCATION, "https://elsewhere.example/"));
-        assertThatThrownBy(() -> client.titleHistory(member, session, 1000))
+        assertThatThrownBy(() -> client.titleHistory(member, session, 1000, Locale.US))
                 .isInstanceOf(XboxStatsUnavailableException.class);
 
         server.reset();
         server.expect(once(), requestTo(HISTORY)).andRespond(withSuccess("<html>oops</html>",
                 MediaType.TEXT_HTML));
-        assertThatThrownBy(() -> client.titleHistory(member, session, 1000))
+        assertThatThrownBy(() -> client.titleHistory(member, session, 1000, Locale.US))
                 .isInstanceOf(XboxStatsUnavailableException.class);
     }
 
     @Test
     void wellFormedButWrongShapedAnswersAreOutages() {
         server.expect(once(), requestTo(HISTORY)).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
-        assertThatThrownBy(() -> client.titleHistory(member, session, 1000))
+        assertThatThrownBy(() -> client.titleHistory(member, session, 1000, Locale.US))
                 .isInstanceOf(XboxStatsUnavailableException.class);
 
         server.reset();
         server.expect(once(), requestTo(ACHIEVEMENTS)).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
-        assertThatThrownBy(() -> client.achievements(member, session, "1791712750"))
+        assertThatThrownBy(() -> client.achievements(member, session, "1791712750", Locale.US))
                 .isInstanceOf(XboxStatsUnavailableException.class);
 
         server.reset();
@@ -257,6 +267,6 @@ class HttpXboxStatsClientTest {
         server.expect(once(), requestTo(ACHIEVEMENTS)).andRespond(withSuccess("{\"achievements\":[]}",
                 MediaType.APPLICATION_JSON));
 
-        assertThat(client.achievements(member, session, "1791712750")).isEmpty();
+        assertThat(client.achievements(member, session, "1791712750", Locale.US)).isEmpty();
     }
 }

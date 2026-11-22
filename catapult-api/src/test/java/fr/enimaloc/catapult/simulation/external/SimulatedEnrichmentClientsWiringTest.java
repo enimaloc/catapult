@@ -172,17 +172,17 @@ class SimulatedEnrichmentClientsWiringTest {
         var xbox = new SimulatedXboxStatsClient();
         var session = new XstsSession("t", "h", "x");
         var id = java.util.UUID.randomUUID();
-        var title = xbox.titleHistory(id, session, 10).getFirst();
+        var title = xbox.titleHistory(id, session, 10, java.util.Locale.US).getFirst();
         assertThat(title.productIds()).containsExactly("9NBLGGH4NNS1");
         assertThat(title.currentGamerscore()).isEqualTo(350);
         assertThat(title.totalGamerscore()).isEqualTo(1000);
-        var achievements = xbox.achievements(id, session, title.titleId());
+        var achievements = xbox.achievements(id, session, title.titleId(), java.util.Locale.US);
         assertThat(achievements).hasSize(10).filteredOn(a -> a.unlocked()).hasSize(3);
         assertThat(achievements.stream().filter(a -> a.unlocked()).mapToInt(a -> a.points()).sum())
                 .as("the unlocked gamerscore matches the title history").isEqualTo(title.currentGamerscore());
         assertThat(achievements.stream().mapToInt(a -> a.points()).sum()).isEqualTo(title.totalGamerscore());
         assertThat(xbox.minutesPlayed(id, session, title.titleId())).contains(480L);
-        assertThatThrownBy(() -> xbox.achievements(id, session, "2000002"))
+        assertThatThrownBy(() -> xbox.achievements(id, session, "2000002", java.util.Locale.US))
                 .isInstanceOf(XboxStatsForbiddenException.class);
     }
 
