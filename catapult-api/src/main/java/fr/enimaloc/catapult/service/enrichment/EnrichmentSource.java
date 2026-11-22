@@ -35,7 +35,11 @@ public enum EnrichmentSource {
     BLIZZARD_WOW_TOKEN("blizzard-wow-token"),
     BLIZZARD_HS_SETS("blizzard-hs-sets"),
     BLIZZARD_HS_DECK("blizzard-hs-deck"),
-    BLIZZARD_D3_SEASON("blizzard-d3-season");
+    BLIZZARD_D3_SEASON("blizzard-d3-season"),
+    BUNGIE_PROFILE("bungie-profile"),
+    BUNGIE_TRIUMPHS("bungie-triumphs"),
+    BUNGIE_DEFINITIONS("bungie-definitions"),
+    BUNGIE_SEASON("bungie-season");
 
     private final String key;
 
@@ -50,13 +54,14 @@ public enum EnrichmentSource {
 
     /**
      * Whether the source holds one member's own stats (keyed {@code u:<userId>...}): the Steam, Xbox and
-     * RetroAchievements sources and the Blizzard character, achievement and profile ones, except the Steam schema and rarity, which are the same for everyone.
+     * RetroAchievements sources, the Blizzard character, achievement and profile ones and the Bungie profile and
+     * triumphs, except the Steam schema and rarity, which are the same for everyone.
      */
     public boolean personal() {
         return switch (this) {
             case STEAM_LIBRARY, STEAM_ACHIEVEMENTS, XBOX_TITLES, XBOX_ACHIEVEMENTS, XBOX_PLAYTIME, RA_USER,
                  RA_PROGRESS, RA_RECENT, BLIZZARD_WOW_CHARACTER, BLIZZARD_WOW_ACHIEVEMENTS, BLIZZARD_SC2_PROFILE,
-                 BLIZZARD_D3_PROFILE -> true;
+                 BLIZZARD_D3_PROFILE, BUNGIE_PROFILE, BUNGIE_TRIUMPHS -> true;
             default -> false;
         };
     }

@@ -50,6 +50,19 @@ public final class PublisherGames {
         });
     }
 
+    /** The Bungie games the enrichment knows. */
+    public enum BungieGame {
+        @JsonProperty("destiny2") DESTINY2
+    }
+
+    /** IGDB's id of Destiny 2 (checked on IGDB on 2026-11-23: {@code destiny-2}; the expansions have ids of their own). */
+    static final String DESTINY2_IGDB_ID = "25657";
+
+    /** The Bungie game of a detected one, by IGDB id (Bungie has no detection source of its own). */
+    public static Optional<BungieGame> bungie(String igdbId) {
+        return DESTINY2_IGDB_ID.equals(igdbId) ? Optional.of(BungieGame.DESTINY2) : Optional.empty();
+    }
+
     /** A Battle.net variant of a game (the source id carries a {@code :}, like {@code WoW:Forever}). */
     public static boolean isBlizzardVariant(DetectedGame game) {
         return game != null && game.getSourceType() == SourceType.BATTLENET && game.getSourceId() != null

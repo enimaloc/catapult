@@ -280,4 +280,20 @@ class DebugRedactorTest {
         assertThat(redactor.body(b("{\"access_token\":\"SECRET\",\"token_type\":\"bearer\",\"expires_in\":86399}"),
                 MediaType.APPLICATION_JSON, false)).doesNotContain("SECRET").contains("\"token_type\":\"bearer\"");
     }
+
+    @Test
+    void bungiesCredentialsAreMasked_inHeadersBodiesAndText() {
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.set("X-API-Key", "0123456789abcdef0123456789abcdef");
+        headers.set("Authorization", "Basic QkFTSUNTRUNSRVQ=");
+        assertThat(redactor.headers(headers, false)).doesNotContain("0123456789abcdef0123456789abcdef")
+                .doesNotContain("QkFTSUNTRUNSRVQ=");
+        assertThat(redactor.body(b("grant_type=refresh_token&refresh_token=RSECRET"),
+                MediaType.APPLICATION_FORM_URLENCODED, false)).doesNotContain("RSECRET");
+        assertThat(redactor.body(b("{\"access_token\":\"ATOKEN\",\"refresh_token\":\"RTOKEN\","
+                + "\"refresh_expires_in\":7776000,\"membership_id\":\"42\"}"), MediaType.APPLICATION_JSON, false))
+                .doesNotContain("ATOKEN").doesNotContain("RTOKEN").contains("membership_id");
+        assertThat(redactor.text("refused X-API-Key: 0123456789abcdef0123456789abcdef and client_secret=CSECRET", false))
+                .doesNotContain("0123456789abcdef0123456789abcdef").doesNotContain("CSECRET");
+    }
 }
