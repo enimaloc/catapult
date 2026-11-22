@@ -357,6 +357,7 @@ class BlizzardAccountServiceTest {
         assertThat(data.linked()).isTrue();
         assertThat(data.region()).isEqualTo("eu");
         assertThat(data.wowImported()).isTrue();
+        assertThat(data.wowImportedAt()).isEqualTo(NOW);
         assertThat(data.available()).isTrue();
         assertThat(data.wowMainKey()).isEqualTo("eu:1");
         assertThat(data.characters()).extracting(BlizzardStatsData.WowCharacterOption::key)
@@ -373,6 +374,7 @@ class BlizzardAccountServiceTest {
         assertThat(data.linked()).isFalse();
         assertThat(data.region()).isNull();
         assertThat(data.wowImported()).isFalse();
+        assertThat(data.wowImportedAt()).isNull();
         assertThat(data.characters()).isEmpty();
         assertThat(data.wowMainKey()).isNull();
     }

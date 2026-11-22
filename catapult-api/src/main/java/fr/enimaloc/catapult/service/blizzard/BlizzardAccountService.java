@@ -202,7 +202,8 @@ public class BlizzardAccountService {
         String main = row.filter(r -> r.getWowMainRegion() != null && r.getWowMainCharacterId() != null)
                 .map(r -> key(r.getWowMainRegion(), r.getWowMainCharacterId())).orElse(null);
         return new BlizzardStatsData(linked, row.map(BlizzardAccount::getRegion).orElse(null),
-                row.map(r -> r.getWowImportedAt() != null).orElse(false), options, main, available);
+                row.map(r -> r.getWowImportedAt() != null).orElse(false), options, main, available,
+                row.map(BlizzardAccount::getWowImportedAt).orElse(null));
     }
 
     /** The member's Battle.net link, unless it was removed (such a link is a leftover, not a link). */
