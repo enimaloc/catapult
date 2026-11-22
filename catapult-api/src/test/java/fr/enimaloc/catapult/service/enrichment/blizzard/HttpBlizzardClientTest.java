@@ -326,19 +326,23 @@ class HttpBlizzardClientTest {
     }
 
     @Test
-    void userCharactersNotFoundIsEmptyAndForbiddenIsAnError() {
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(EU + "/profile/user/wow")))
-                .andRespond(withStatus(HttpStatus.NOT_FOUND));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(EU + "/profile/user/wow")))
+    void userCharactersRecognisedNotFoundIsEmptyAndEverythingElseIsAnError() throws IOException {
+        String url = EU + "/profile/user/wow";
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(url))).andRespond(withStatus(HttpStatus.NOT_FOUND)
+                .body(fixture("wow-404.json")).contentType(MediaType.APPLICATION_JSON));
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(url))).andRespond(withStatus(HttpStatus.NOT_FOUND)
+                .body(fixture("d3-404.html")).contentType(MediaType.TEXT_HTML));
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(url))).andRespond(withStatus(HttpStatus.NOT_FOUND));
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(url)))
                 .andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(EU + "/profile/user/wow")))
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(url)))
                 .andRespond(withStatus(HttpStatus.FORBIDDEN));
 
         assertThat(client.wowUserCharacters(BlizzardRegion.EU, "user-token")).isEmpty();
-        assertThatThrownBy(() -> client.wowUserCharacters(BlizzardRegion.EU, "user-token"))
-                .isInstanceOf(BlizzardUnavailableException.class);
-        assertThatThrownBy(() -> client.wowUserCharacters(BlizzardRegion.EU, "user-token"))
-                .isInstanceOf(BlizzardUnavailableException.class);
+        for (int i = 0; i < 4; i++) {
+            assertThatThrownBy(() -> client.wowUserCharacters(BlizzardRegion.EU, "user-token"))
+                    .isInstanceOf(BlizzardUnavailableException.class);
+        }
     }
 
     @Test

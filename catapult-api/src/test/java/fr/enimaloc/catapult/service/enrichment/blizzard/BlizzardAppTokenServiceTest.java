@@ -196,4 +196,46 @@ class BlizzardAppTokenServiceTest {
         verify(limiter, org.mockito.Mockito.atLeast(1)).budget();
         assertThat(acquired).hasValue(1);
     }
+
+    @Test
+    void shortLivedTokenIsKeptForHalfItsLifetime() {
+        server.expect(requestTo(URL)).andRespond(withSuccess(
+                "{\"access_token\":\"t\",\"expires_in\":1800}", MediaType.APPLICATION_JSON));
+        BlizzardAppTokenService tokens = service("id", "secret");
+
+        tokens.token();
+        clock.now = clock.now.plus(Duration.ofMinutes(10));
+        assertThat(tokens.token()).isEqualTo("t");
+
+        server.verify();
+    }
+
+    @Test
+    void oversizedTokenAnswerIsUnavailable() {
+        byte[] big = new byte[4 * 1024 * 1024 + 1];
+        java.util.Arrays.fill(big, (byte) ' ');
+        server.expect(requestTo(URL)).andRespond(withSuccess(big, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> service("id", "secret").token()).isInstanceOf(BlizzardUnavailableException.class);
+    }
+
+    @Test
+    void tokenRequestSendsTheUserAgent() throws IOException {
+        server.expect(requestTo(URL)).andExpect(header("User-Agent", HttpBlizzardClient.USER_AGENT))
+                .andRespond(withSuccess(fixture("token.json"), MediaType.APPLICATION_JSON));
+
+        service("id", "secret").token();
+
+        server.verify();
+    }
+
+    @Test
+    void failedRenewalDoesNotStickAndTheNextCallRetries() throws IOException {
+        server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.BAD_GATEWAY));
+        server.expect(requestTo(URL)).andRespond(withSuccess(fixture("token.json"), MediaType.APPLICATION_JSON));
+        BlizzardAppTokenService tokens = service("id", "secret");
+
+        assertThatThrownBy(tokens::token).isInstanceOf(BlizzardUnavailableException.class);
+        assertThat(tokens.token()).isEqualTo("test-token");
+    }
 }

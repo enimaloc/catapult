@@ -34,9 +34,9 @@ import java.util.function.Predicate;
 @Component
 public class HttpBlizzardClient implements BlizzardClient {
 
-    private static final String USER_AGENT = "Catapult/1.0 (+https://catapult.enimaloc.fr)";
+    static final String USER_AGENT = "Catapult/1.0 (+https://catapult.enimaloc.fr)";
     private static final Duration PAUSE = Duration.ofSeconds(60);
-    private static final int MAX_BYTES = 4 * 1024 * 1024;
+    static final int MAX_BYTES = 4 * 1024 * 1024;
     private static final int MAX_ACHIEVEMENT_BYTES = 8 * 1024 * 1024;
     private static final int RECENT = 10;
 
@@ -137,10 +137,12 @@ public class HttpBlizzardClient implements BlizzardClient {
     public List<WowUserCharacter> wowUserCharacters(BlizzardRegion region, String userAccessToken) {
         Answer answer = send(region.host() + "/profile/user/wow?namespace={ns}", userAccessToken, MAX_BYTES,
                 region.profileNamespace());
-        if (answer.status() == 404) {
+        JsonNode json;
+        try {
+            json = object(interpret(answer, wowNotFound()));
+        } catch (BlizzardNotFoundException e) {
             return List.of();
         }
-        JsonNode json = object(interpret(answer, node -> false));
         if (!json.path("wow_accounts").isArray()) {
             throw garbled();
         }
@@ -360,7 +362,7 @@ public class HttpBlizzardClient implements BlizzardClient {
     }
 
     /** At most {@code max} bytes; null when there are more. */
-    private static byte[] readLimited(java.io.InputStream in, int max) throws IOException {
+    static byte[] readLimited(java.io.InputStream in, int max) throws IOException {
         byte[] bytes = in.readNBytes(max + 1);
         return bytes.length > max ? null : bytes;
     }

@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.enrichment.blizzard;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -114,7 +115,7 @@ public class BlizzardAppTokenService {
             }
             mine.complete(fresh.value());
             return fresh.value();
-        } catch (RuntimeException e) {
+        } catch (Throwable e) {
             synchronized (this) {
                 inFlight = null;
             }
@@ -138,27 +139,35 @@ public class BlizzardAppTokenService {
         }
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "client_credentials");
-        String[] answer;
+        Object[] answer;
         try {
             answer = restClient.post().uri(URL).headers(h -> h.setBasicAuth(clientId, clientSecret))
-                    .contentType(MediaType.APPLICATION_FORM_URLENCODED).accept(MediaType.APPLICATION_JSON).body(form)
-                    .exchange((req, res) -> new String[]{String.valueOf(res.getStatusCode().value()),
-                            res.getStatusCode().is2xxSuccessful() ? res.bodyTo(String.class) : null});
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED).accept(MediaType.APPLICATION_JSON)
+                    .header(HttpHeaders.USER_AGENT, HttpBlizzardClient.USER_AGENT).body(form)
+                    .exchange((req, res) -> new Object[]{res.getStatusCode().value(),
+                            res.getStatusCode().is2xxSuccessful()
+                                    ? HttpBlizzardClient.readLimited(res.getBody(), HttpBlizzardClient.MAX_BYTES)
+                                    : null});
         } catch (RestClientException e) {
             throw new BlizzardUnavailableException("the Blizzard token request failed");
         }
-        int status = Integer.parseInt(answer[0]);
+        int status = (Integer) answer[0];
         if (status < 200 || status >= 300) {
             throw new BlizzardUnavailableException("the Blizzard token endpoint answered " + status);
         }
+        if (answer[1] == null) {
+            throw new BlizzardUnavailableException("the Blizzard token answer is too big");
+        }
         try {
-            JsonNode json = mapper.readTree(answer[1]);
+            JsonNode json = mapper.readTree((byte[]) answer[1]);
             JsonNode token = json.path("access_token");
             JsonNode expires = json.path("expires_in");
             if (!token.isString() || token.asString().isBlank() || !expires.isNumber() || expires.asLong() <= 0) {
                 throw new BlizzardUnavailableException("the Blizzard token answer is not the expected one");
             }
-            Instant renewAt = clock.instant().plusSeconds(expires.asLong()).minus(RENEW_BEFORE);
+            long lifetime = expires.asLong();
+            long usable = Math.max(lifetime - RENEW_BEFORE.toSeconds(), lifetime / 2);
+            Instant renewAt = clock.instant().plusSeconds(usable);
             return new Fresh(token.asString(), renewAt);
         } catch (JacksonException | IllegalArgumentException e) {
             throw new BlizzardUnavailableException("the Blizzard token answer is not JSON");
