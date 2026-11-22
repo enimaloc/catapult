@@ -432,6 +432,16 @@ class GameInfoV3ResponseTest {
     }
 
     @Test
+    void anUnavailableDetectedPlatformFallsBackToTheFirstOkOne() {
+        GameInfoV3Response response = withStats(PlatformStats.of(Status.UNAVAILABLE, "620"), XBOX, RA,
+                GameBinding.SourceType.STEAM);
+
+        assertThat(response.playtime()).isEqualTo(610L);
+        assertThat(response.achievements())
+                .isEqualTo(new GameInfoV3Response.AchievementsSummary("xbox", 2, 3));
+    }
+
+    @Test
     void lastAchievementIsTheLatestAcrossPlatforms() {
         GameInfoV3Response response = withStats(STEAM, XBOX, RA, GameBinding.SourceType.STEAM);
 

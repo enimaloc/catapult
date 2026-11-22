@@ -214,8 +214,9 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
     }
 
     /**
-     * The member's play time in minutes on the main platform of the stats (the one the game was detected on, else
-     * the first that answered {@code ok} among Steam, Xbox, RetroAchievements); null if unknown.
+     * The member's play time in minutes on the main platform of the stats (the one the game was detected on unless
+     * it is unavailable, else the first that answered {@code ok} among Steam, Xbox, RetroAchievements); null if
+     * unknown.
      */
     @JsonView(GameInfoResponse.Summary.class)
     public Long playtime() {
@@ -300,11 +301,14 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
             return Stream.<PlatformObject>of(steam, xbox, retroachievements).filter(p -> p != null).toList();
         }
 
-        /** The platform the game was detected on, else the first that answered {@code ok}. */
+        /**
+         * The platform the game was detected on (unless it is {@code unavailable}), else the first that answered
+         * {@code ok}.
+         */
         PlatformObject main() {
             PlatformObject detected = detectedOn == GameBinding.SourceType.STEAM ? steam
                     : detectedOn == GameBinding.SourceType.XBOX ? xbox : null;
-            if (detected != null) {
+            if (detected != null && detected.status() != Status.UNAVAILABLE) {
                 return detected;
             }
             return platforms().stream().filter(p -> p.status() == Status.OK).findFirst().orElse(null);
