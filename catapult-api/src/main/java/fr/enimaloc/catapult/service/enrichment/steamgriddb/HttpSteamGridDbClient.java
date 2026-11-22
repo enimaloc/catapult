@@ -26,6 +26,8 @@ public class HttpSteamGridDbClient implements SteamGridDbClient {
 
     private static final String BASE = "https://www.steamgriddb.com/api/v2";
     private static final String GAME_URL = "https://www.steamgriddb.com/game/";
+    /** The grid sizes asked for, best first: the portrait cover shape of the UI (the IGDB cover it replaces). */
+    static final String COVER_DIMENSIONS = "600x900,342x482,660x930";
     private static final Duration DEFAULT_BLOCK = Duration.ofSeconds(60);
 
     private final JsonMapper mapper = JsonMapper.builder().build();
@@ -52,10 +54,35 @@ public class HttpSteamGridDbClient implements SteamGridDbClient {
 
     @Override
     public Optional<SteamGridDbAssets> fetchByName(String name) {
-        return get("/search/autocomplete/{term}", name)
-                .map(json -> json.path("data"))
-                .filter(data -> data.isArray() && !data.isEmpty() && data.get(0).hasNonNull("id"))
-                .flatMap(data -> fetchAssets(data.get(0).get("id").asLong(), data.get(0).path("name").asString(null)));
+        String term = SteamGridDbNames.searchTerm(name);
+        if (term.isEmpty()) {
+            return Optional.empty();
+        }
+        return get("/search/autocomplete/{term}", term)
+                .map(json -> bestMatch(json.path("data"), term))
+                .flatMap(match -> match.flatMap(hit -> fetchAssets(hit.get("id").asLong(),
+                        hit.path("name").asString(null))));
+    }
+
+    /** The result whose normalised name is the term's, else the first result (SteamGridDB ranks them). */
+    private static Optional<JsonNode> bestMatch(JsonNode results, String term) {
+        if (!results.isArray()) {
+            return Optional.empty();
+        }
+        String wanted = SteamGridDbNames.key(term);
+        JsonNode first = null;
+        for (JsonNode hit : results) {
+            if (!hit.hasNonNull("id")) {
+                continue;
+            }
+            if (first == null) {
+                first = hit;
+            }
+            if (hit.hasNonNull("name") && SteamGridDbNames.key(hit.get("name").asString()).equals(wanted)) {
+                return Optional.of(hit);
+            }
+        }
+        return Optional.ofNullable(first);
     }
 
     @Override
@@ -71,15 +98,29 @@ public class HttpSteamGridDbClient implements SteamGridDbClient {
     }
 
     private Optional<SteamGridDbAssets> fetchAssets(long gameId, String name) {
-        List<SteamGridDbAssets.Asset> grids = assets("grids", gameId).orElse(List.of());
+        List<SteamGridDbAssets.Asset> grids = grids(gameId);
         List<SteamGridDbAssets.Asset> heroes = assets("heroes", gameId).orElse(List.of());
         List<SteamGridDbAssets.Asset> logos = assets("logos", gameId).orElse(List.of());
         List<SteamGridDbAssets.Asset> icons = assets("icons", gameId).orElse(List.of());
         return Optional.of(new SteamGridDbAssets(gameId, name, GAME_URL + gameId, grids, heroes, logos, icons));
     }
 
+    /**
+     * The portrait grids the UI shows as the game's cover (600x900, and Steam's 342x482 and 660x930 library
+     * capsules); every grid when none has such a size, so a game that only has odd sizes still gets an image.
+     */
+    private List<SteamGridDbAssets.Asset> grids(long gameId) {
+        List<SteamGridDbAssets.Asset> portrait = assetsAt("/grids/game/{id}?dimensions=" + COVER_DIMENSIONS, gameId)
+                .orElse(List.of());
+        return portrait.isEmpty() ? assetsAt("/grids/game/{id}", gameId).orElse(List.of()) : portrait;
+    }
+
     private Optional<List<SteamGridDbAssets.Asset>> assets(String kind, long gameId) {
-        return get("/" + kind + "/game/{id}", gameId).map(json -> {
+        return assetsAt("/" + kind + "/game/{id}", gameId);
+    }
+
+    private Optional<List<SteamGridDbAssets.Asset>> assetsAt(String pathTemplate, long gameId) {
+        return get(pathTemplate, gameId).map(json -> {
             List<SteamGridDbAssets.Asset> out = new ArrayList<>();
             for (JsonNode node : json.path("data")) {
                 if (node.hasNonNull("url")) {

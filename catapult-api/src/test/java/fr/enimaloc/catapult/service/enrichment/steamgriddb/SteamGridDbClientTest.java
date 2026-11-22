@@ -50,9 +50,15 @@ class SteamGridDbClientTest {
         return new ClassPathResource("enrichment/sgdb-" + name + ".json").getContentAsString(StandardCharsets.UTF_8);
     }
 
+    /** Grids are asked with the portrait cover sizes; the other kinds as they are. */
+    private static String assetUrl(String kind, long id) {
+        return BASE + "/" + kind + "/game/" + id
+                + ("grids".equals(kind) ? "?dimensions=600x900,342x482,660x930" : "");
+    }
+
     private void expectAssets(String key, long id) throws IOException {
         for (String kind : new String[]{"grids", "heroes", "logos", "icons"}) {
-            server.expect(once(), requestTo(BASE + "/" + kind + "/game/" + id))
+            server.expect(once(), requestTo(assetUrl(kind, id)))
                     .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer " + key))
                     .andRespond(withSuccess(fixture(kind), MediaType.APPLICATION_JSON));
         }
@@ -151,7 +157,7 @@ class SteamGridDbClientTest {
         when(rotator.nextKey()).thenReturn(Optional.of("keyA"), Optional.of("keyB"), Optional.of("keyB"),
                 Optional.of("keyB"), Optional.of("keyB"), Optional.of("keyB"));
         for (String kind : new String[]{"grids", "heroes", "logos", "icons"}) {
-            server.expect(once(), requestTo(BASE + "/" + kind + "/game/5248"))
+            server.expect(once(), requestTo(assetUrl(kind, 5248)))
                     .andRespond(withSuccess(fixture(kind), MediaType.APPLICATION_JSON));
         }
 
@@ -216,9 +222,10 @@ class SteamGridDbClientTest {
     @Test
     void gridsNotFound_emptyGridsOtherKindsKept() throws IOException {
         when(rotator.nextKey()).thenReturn(Optional.of("keyA"));
+        server.expect(once(), requestTo(assetUrl("grids", 5248))).andRespond(withStatus(HttpStatus.NOT_FOUND));
         server.expect(once(), requestTo(BASE + "/grids/game/5248")).andRespond(withStatus(HttpStatus.NOT_FOUND));
         for (String kind : new String[]{"heroes", "logos", "icons"}) {
-            server.expect(once(), requestTo(BASE + "/" + kind + "/game/5248"))
+            server.expect(once(), requestTo(assetUrl(kind, 5248)))
                     .andRespond(withSuccess(fixture(kind), MediaType.APPLICATION_JSON));
         }
 
@@ -239,5 +246,75 @@ class SteamGridDbClientTest {
         SteamGridDbAssets assets = client.fetchBySteamAppId("570").orElseThrow();
 
         assertThat(JsonMapper.builder().build().writeValueAsString(assets)).doesNotContain("super-secret-key");
+    }
+
+    private void expectSearch(String encodedTerm, String body) {
+        server.expect(once(), requestTo(BASE + "/search/autocomplete/" + encodedTerm))
+                .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+    }
+
+    private static String hits(String... idAndName) {
+        StringBuilder out = new StringBuilder("{\"success\":true,\"data\":[");
+        for (int i = 0; i < idAndName.length; i += 2) {
+            out.append(i == 0 ? "" : ",").append("{\"id\":").append(idAndName[i]).append(",\"name\":\"")
+                    .append(idAndName[i + 1]).append("\"}");
+        }
+        return out.append("]}").toString();
+    }
+
+    @Test
+    void byName_searchesTheNormalisedTerm_andPicksTheExactNameOverTheFirstResult() throws IOException {
+        when(rotator.nextKey()).thenReturn(Optional.of("keyA"));
+        expectSearch("the%20witcher%203%3A%20wild%20hunt",
+                hits("100", "The Witcher 3: Wild Hunt - Blood and Wine", "5248", "The Witcher 3: Wild Hunt\u2122"));
+        expectAssets("keyA", 5248);
+
+        SteamGridDbAssets assets = client.fetchByName("The Witcher 3: Wild Hunt \u2013 Game of the Year Edition")
+                .orElseThrow();
+
+        assertThat(assets.gameId()).isEqualTo(5248);
+        server.verify();
+    }
+
+    @Test
+    void byName_noExactMatch_fallsBackToTheFirstResult() throws IOException {
+        when(rotator.nextKey()).thenReturn(Optional.of("keyA"));
+        expectSearch("hades", hits("5248", "Hades II", "9", "Hades Star"));
+        expectAssets("keyA", 5248);
+
+        assertThat(client.fetchByName("Hades").orElseThrow().gameId()).isEqualTo(5248);
+        server.verify();
+    }
+
+    @Test
+    void byName_ignoresPunctuationAndAccentsWhenMatching() throws IOException {
+        when(rotator.nextKey()).thenReturn(Optional.of("keyA"));
+        expectSearch("pok%C3%A9mon%20red", hits("1", "Pokemon Red Version Remake", "5248", "Pok\u00E9mon: Red"));
+        expectAssets("keyA", 5248);
+
+        assertThat(client.fetchByName("Pok\u00E9mon Red").orElseThrow().gameId()).isEqualTo(5248);
+        server.verify();
+    }
+
+    @Test
+    void byName_blankAfterNormalisation_doesNotSearch() {
+        assertThat(client.fetchByName("\u2122")).isEmpty();
+        server.verify();
+    }
+
+    @Test
+    void grids_noPortraitSize_fallsBackToEveryGrid() throws IOException {
+        when(rotator.nextKey()).thenReturn(Optional.of("keyA"));
+        server.expect(once(), requestTo(assetUrl("grids", 5248)))
+                .andRespond(withSuccess("{\"success\":true,\"data\":[]}", MediaType.APPLICATION_JSON));
+        server.expect(once(), requestTo(BASE + "/grids/game/5248"))
+                .andRespond(withSuccess(fixture("grids"), MediaType.APPLICATION_JSON));
+        for (String kind : new String[]{"heroes", "logos", "icons"}) {
+            server.expect(once(), requestTo(assetUrl(kind, 5248)))
+                    .andRespond(withSuccess(fixture(kind), MediaType.APPLICATION_JSON));
+        }
+
+        assertThat(client.fetchByGameId(5248, "Dota 2").orElseThrow().grids()).hasSize(2);
+        server.verify();
     }
 }

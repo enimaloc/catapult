@@ -6,7 +6,6 @@ import fr.enimaloc.catapult.service.enrichment.FetchBudget;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -60,6 +59,6 @@ public class SteamGridDbService {
     }
 
     static String normalize(String name) {
-        return name.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        return SteamGridDbNames.searchTerm(name);
     }
 }
