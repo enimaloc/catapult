@@ -220,8 +220,10 @@ public class HttpRetroAchievementsClient implements RetroAchievementsClient {
 
     // --- mapping ---
 
-    private JsonNode array(Optional<JsonNode> answer) {
-        return answer.filter(JsonNode::isArray).orElseGet(mapper::createArrayNode);
+    /** The answer of a list call; anything but a JSON array (an object, an error shape) is an outage. */
+    private static JsonNode array(Optional<JsonNode> answer) {
+        return answer.filter(JsonNode::isArray).orElseThrow(
+                () -> new RaUnavailableException("RetroAchievements answered something that is not a list"));
     }
 
     private static RaAchievement achievement(JsonNode node) {

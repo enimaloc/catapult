@@ -188,14 +188,24 @@ class HttpRetroAchievementsClientTest {
     }
 
     @Test
-    void anEmptyOrObjectAnswerGivesNoRecentGames() {
+    void anEmptyListGivesNoRecentGames() {
         server.expect(once(), requestTo(API + "API_GetUserRecentlyPlayedGames.php?u=" + ULID + "&c=5&y=poolkey0123456789"))
                 .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
-        server.expect(once(), requestTo(API + "API_GetUserRecentlyPlayedGames.php?u=" + ULID + "&c=6&y=poolkey0123456789"))
-                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
         assertThat(client.recentlyPlayed(ULID, 5, POOL)).isEmpty();
-        assertThat(client.recentlyPlayed(ULID, 6, POOL)).isEmpty();
+    }
+
+    @Test
+    void anObjectWhereAListIsExpectedIsUnavailable() {
+        server.expect(once(), requestTo(API + "API_GetUserRecentlyPlayedGames.php?u=" + ULID + "&c=6&y=poolkey0123456789"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        server.expect(once(), requestTo(API + "API_GetUserRecentAchievements.php?u=" + ULID + "&m=60&y=poolkey0123456789"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.recentlyPlayed(ULID, 6, POOL)).isInstanceOf(RaUnavailableException.class);
+        assertThatThrownBy(() -> client.recentAchievements(ULID, 60, POOL))
+                .isInstanceOf(RaUnavailableException.class);
+        server.verify();
     }
 
     @Test
