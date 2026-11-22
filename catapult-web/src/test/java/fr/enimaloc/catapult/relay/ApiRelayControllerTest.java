@@ -235,6 +235,18 @@ class ApiRelayControllerTest {
         mvc.perform(get("/api/me/speedrun").header("Authorization", "Bearer catr_TOKEN"))
                 .andExpect(status().isOk()).andExpect(content().string("{\"account\":null}"));
         assertThat(RECEIVED.get().uri()).isEqualTo("/api/me/speedrun");
+
+        answer = exchange -> respond(exchange, 200, "{\"inGame\":false}",
+                Map.of("Content-Type", List.of("application/json")));
+        mvc.perform(get("/api/me/stats").header("Authorization", "Bearer catr_TOKEN"))
+                .andExpect(status().isOk()).andExpect(content().string("{\"inGame\":false}"));
+        assertThat(RECEIVED.get().uri()).isEqualTo("/api/me/stats");
+
+        answer = exchange -> respond(exchange, 200, "{\"status\":\"ok\"}",
+                Map.of("Content-Type", List.of("application/json")));
+        mvc.perform(get("/api/me/stats/steam/440?lang=fr").header("Authorization", "Bearer catr_TOKEN"))
+                .andExpect(status().isOk()).andExpect(content().string("{\"status\":\"ok\"}"));
+        assertThat(RECEIVED.get().uri()).isEqualTo("/api/me/stats/steam/440?lang=fr");
     }
 
     /** The public API by resource, the read-only token in the query included: relayed as sent. */
