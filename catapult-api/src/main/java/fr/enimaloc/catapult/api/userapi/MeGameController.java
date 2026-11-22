@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.api.ApiUserResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -60,8 +61,17 @@ public class MeGameController {
                     + "public game data (publisher.blizzard: WoW Token price, latest Hearthstone set, Diablo III "
                     + "season, in your Blizzard region else eu; null when no publisher applies) — public game "
                     + "data, nothing about you.")
+    @Parameter(name = "country", in = ParameterIn.QUERY, description = "Version 3 only: the ISO 3166 country the "
+            + "store prices are asked for.", example = "FR", schema = @Schema(defaultValue = "FR"))
+    @Parameter(name = "language", in = ParameterIn.QUERY, description = "Version 3 only: the two-letter language "
+            + "of the Twitch streams counted; any language when absent.", example = "fr",
+            schema = @Schema(type = "string"))
     @ApiResponse(responseCode = "200", description = "inGame=false with every platform object null while no "
-            + "game is detected; otherwise the aggregated game info.")
+            + "game is detected; otherwise the aggregated game info. The shape follows the API version: "
+            + "GameInfoResponse for version 2, GameInfoV3Response (the same objects plus the enrichment ones) for "
+            + "version 3.",
+            content = @Content(mediaType = "application/json",
+                    schema = @Schema(oneOf = {GameInfoResponse.class, GameInfoV3Response.class})))
     @GetMapping
     public ResponseEntity<?> gameInfo(
             @AuthenticationPrincipal UUID userId,
