@@ -69,7 +69,8 @@ class ApiAdminBattleNetAccountsControllerTest {
         when(sessions.sessionState(any())).thenReturn("DISABLED");
         mvc = MockMvcBuilders.standaloneSetup(new ApiAdminBattleNetAccountsController(
                         new BattleNetServiceAccountAdmin(accounts, links, encryption, coordinator, sessions,
-                                mock(GetterConfigRepository.class), mock(ChannelEventPublisher.class)), rawCalls))
+                                mock(GetterConfigRepository.class), mock(ChannelEventPublisher.class),
+                                mock(fr.enimaloc.catapult.service.blizzard.BlizzardAccountService.class)), rawCalls))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new ProblemAdvice()).build();
     }

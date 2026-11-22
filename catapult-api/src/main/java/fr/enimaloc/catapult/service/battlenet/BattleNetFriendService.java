@@ -177,18 +177,13 @@ public class BattleNetFriendService {
             });
             return link.orElse(null);
         });
+        // Whatever Blizzard settings are kept go with the link, also when there was no link left to remove
+        forgetBlizzard(user.getId());
         if (removed == null) {
             return;
         }
         log.info("Battle.net link of user {} deleted ({})", user.getId(), removed.getStatus());
         channelEventPublisher.battleNetLinkChanged(user.getId(), "NONE", null, null);
-        try {
-            blizzardAccounts.forget(user.getId());
-        } catch (RuntimeException e) {
-            // The link is gone either way; what Blizzard settings were kept is cleared on the next unlink.
-            log.warn("Blizzard settings of user {} not cleared after the unlink: {}", user.getId(),
-                    e.getClass().getSimpleName());
-        }
 
         UUID botId = removed.getServiceAccount().getId();
         if (removed.getStatus() == Status.PENDING && removed.getInvitationId() != null) {
@@ -200,6 +195,16 @@ public class BattleNetFriendService {
             long friendId = removed.getBnetAccountId();
             call(botId, user.getId(), "removeFriend", friendId, client -> client.removeFriend(friendId))
                     .whenComplete(logFailure("removeFriend", user.getId()));
+        }
+    }
+
+    /** Purges the member's Blizzard settings; a failure is logged (the purge is idempotent, a later unlink redoes it). */
+    private void forgetBlizzard(UUID userId) {
+        try {
+            blizzardAccounts.forget(userId);
+        } catch (RuntimeException e) {
+            log.warn("Blizzard settings of user {} not purged with their Battle.net link: {}", userId,
+                    e.getClass().getSimpleName());
         }
     }
 
@@ -396,6 +401,7 @@ public class BattleNetFriendService {
         if (!moved) {
             log.warn("No Battle.net service account has room left: the link of user {} is deleted", ownerId);
             channelEventPublisher.battleNetLinkChanged(ownerId, "NONE", null, null);
+            forgetBlizzard(ownerId);
             return;
         }
         log.info("Battle.net link of user {} moved to {}", ownerId, next[0].getId());

@@ -105,6 +105,29 @@ class BlizzardAccountServiceTest {
     }
 
     @Test
+    void aRemovedLinkIsNoLinkForTheRegion() {
+        BattleNetFriendLink removed = new BattleNetFriendLink();
+        removed.setStatus(BattleNetFriendLink.Status.REMOVED);
+        when(links.findByUserId(user.getId())).thenReturn(Optional.of(removed));
+
+        assertProblem(() -> service.setRegion(user, "eu"), ErrorCode.NOT_FOUND);
+
+        verify(accounts, never()).save(any());
+    }
+
+    @Test
+    void aLinkRemovedAfterTheFirstCheckStopsTheWrite() {
+        BattleNetFriendLink removed = new BattleNetFriendLink();
+        removed.setStatus(BattleNetFriendLink.Status.REMOVED);
+        when(links.findByUserId(user.getId())).thenReturn(Optional.of(new BattleNetFriendLink()))
+                .thenReturn(Optional.of(removed));
+
+        assertProblem(() -> service.setRegion(user, "eu"), ErrorCode.NOT_FOUND);
+
+        verify(accounts, never()).save(any());
+    }
+
+    @Test
     void regionStartsTheRowAndEvictsAndTellsThePages() {
         service.setRegion(user, "KR");
 
@@ -273,12 +296,13 @@ class BlizzardAccountServiceTest {
 
     @Test
     void forgetDeletesTheRowAndEvicts() {
-        BlizzardAccount row = existing();
+        existing();
 
         service.forget(user.getId());
 
         verify(characters).deleteByUserId(user.getId());
-        verify(accounts).delete(row);
+        verify(accounts).purgeByUserId(user.getId());
+        verify(accounts, never()).save(any());
         verify(cache).evictUser(user.getId());
     }
 
@@ -286,7 +310,7 @@ class BlizzardAccountServiceTest {
     void forgetWithoutARowStillEvicts() {
         service.forget(user.getId());
 
-        verify(accounts, never()).delete(any());
+        verify(accounts).purgeByUserId(user.getId());
         verify(cache).evictUser(user.getId());
     }
 
@@ -325,6 +349,15 @@ class BlizzardAccountServiceTest {
     }
 
     @Test
+    void dataIgnoresARemovedLink() {
+        BattleNetFriendLink removed = new BattleNetFriendLink();
+        removed.setStatus(BattleNetFriendLink.Status.REMOVED);
+        when(links.findByUserId(user.getId())).thenReturn(Optional.of(removed));
+
+        assertThat(service.data(user).linked()).isFalse();
+    }
+
+    @Test
     void notAvailableWithoutTheClientCredentials() {
         BlizzardAccountService noSecret = new BlizzardAccountService(accounts, characters, links, cache, events,
                 TransactionOperations.withoutTransaction(), "id", "", Clock.fixed(NOW, ZoneOffset.UTC));
@@ -348,7 +381,7 @@ class BlizzardAccountServiceTest {
         row.setRealmName("Archimonde");
         row.setName(name);
         row.setDisplayName(display);
-        row.setLevel(id == 1 ? 80 : level);
+        row.setLevel(level);
         row.setClassName("Mage");
         row.setFaction("Alliance");
         return row;

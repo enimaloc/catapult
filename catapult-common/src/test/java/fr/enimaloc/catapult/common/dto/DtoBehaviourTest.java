@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.common.dto;
 
+import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
+import java.util.ArrayList;
 import fr.enimaloc.catapult.common.dto.admin.AdminCclDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminIgdbDescriptorDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMembersPage;
@@ -359,7 +361,7 @@ class DtoBehaviourTest {
     class BlizzardStats {
         @Test
         void noCharactersIsAnEmptyList() {
-            var data = new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(false, null, false, null, null,
+            var data = new BlizzardStatsData(false, null, false, null, null,
                     false);
 
             assertThat(data.characters()).isEmpty();
@@ -367,10 +369,9 @@ class DtoBehaviourTest {
 
         @Test
         void theCharactersAreCopied() {
-            var options = new java.util.ArrayList<fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData
-                    .WowCharacterOption>();
-            options.add(new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData.WowCharacterOption("eu:1", "A"));
-            var data = new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(true, "eu", true, options,
+            var options = new ArrayList<BlizzardStatsData.WowCharacterOption>();
+            options.add(new BlizzardStatsData.WowCharacterOption("eu:1", "A"));
+            var data = new BlizzardStatsData(true, "eu", true, options,
                     "eu:1", true);
             options.clear();
 

@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData.WowCharacterOption;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.battlenet.BattleNetFriendLink;
 import fr.enimaloc.catapult.domain.blizzard.BlizzardAccount;
 import fr.enimaloc.catapult.domain.blizzard.BlizzardWowCharacter;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
@@ -87,9 +88,7 @@ public class BlizzardAccountService {
     public void setRegion(UserAccount user, String region) {
         BlizzardRegion parsed = BlizzardRegion.parse(region)
                 .orElseThrow(() -> new ApiProblem(ErrorCode.BAD_REQUEST, "Unknown Blizzard region"));
-        if (links.findByUserId(user.getId()).isEmpty()) {
-            throw new ApiProblem(ErrorCode.NOT_FOUND, "Battle.net is not linked");
-        }
+        requireLink(user.getId());
         write(user.getId(), true, row -> row.setRegion(parsed.key()));
         done(user.getId());
     }
@@ -165,11 +164,14 @@ public class BlizzardAccountService {
         }
     }
 
-    /** Deletes everything held for the member (Battle.net was unlinked) and what was cached of their stats. */
+    /**
+     * Deletes everything held for the member (their Battle.net link is gone) and what was cached of their stats.
+     * Idempotent and never an optimistic-lock loser: bulk deletes, no read-modify-write.
+     */
     public void forget(UUID userId) {
         transactions.executeWithoutResult(status -> {
             characters.deleteByUserId(userId);
-            accounts.findById(userId).ifPresent(accounts::delete);
+            accounts.purgeByUserId(userId);
         });
         cache.evictUser(userId);
         publish(userId);
@@ -181,7 +183,7 @@ public class BlizzardAccountService {
     }
 
     private BlizzardStatsData data(UUID userId) {
-        boolean linked = links.findByUserId(userId).isPresent();
+        boolean linked = activeLink(userId).isPresent();
         Optional<BlizzardAccount> row = accounts.findById(userId);
         List<WowCharacterOption> options = characters.findByUserId(userId).stream()
                 .map(c -> new WowCharacterOption(key(c.getRegion(), c.getCharacterId()), label(c))).toList();
@@ -189,6 +191,17 @@ public class BlizzardAccountService {
                 .map(r -> key(r.getWowMainRegion(), r.getWowMainCharacterId())).orElse(null);
         return new BlizzardStatsData(linked, row.map(BlizzardAccount::getRegion).orElse(null),
                 row.map(r -> r.getWowImportedAt() != null).orElse(false), options, main, available);
+    }
+
+    /** The member's Battle.net link, unless it was removed (such a link is a leftover, not a link). */
+    private Optional<BattleNetFriendLink> activeLink(UUID userId) {
+        return links.findByUserId(userId).filter(link -> link.getStatus() != BattleNetFriendLink.Status.REMOVED);
+    }
+
+    private void requireLink(UUID userId) {
+        if (activeLink(userId).isEmpty()) {
+            throw new ApiProblem(ErrorCode.NOT_FOUND, "Battle.net is not linked");
+        }
     }
 
     private static String key(String region, long characterId) {
@@ -237,6 +250,10 @@ public class BlizzardAccountService {
 
     private boolean writeOnce(UUID userId, boolean create, Consumer<BlizzardAccount> change) {
         return Boolean.TRUE.equals(transactions.execute(status -> {
+            if (create) {
+                // The link may have been removed since the caller checked: no row for a member without a link
+                requireLink(userId);
+            }
             Optional<BlizzardAccount> found = accounts.findById(userId);
             if (found.isEmpty() && !create) {
                 return false;

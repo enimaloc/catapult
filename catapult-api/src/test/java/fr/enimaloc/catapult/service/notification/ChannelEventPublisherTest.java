@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
@@ -159,8 +160,8 @@ class ChannelEventPublisherTest {
 
     @Test
     void blizzardAccountChanged_publishesTheCardsData() {
-        var account = new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(true, "eu", true,
-                List.of(new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData.WowCharacterOption("eu:1", "A")),
+        var account = new BlizzardStatsData(true, "eu", true,
+                List.of(new BlizzardStatsData.WowCharacterOption("eu:1", "A")),
                 "eu:1", true);
 
         publisher.blizzardAccountChanged(ownerId, account);
