@@ -32,6 +32,9 @@ class DebugRedactorTest {
                 false)).isEqualTo("https://retroachievements.org/API/API_GetUserProfile.php?u=bob&y=[masqué]");
         assertThat(redactor.url(URI.create("https://x.test/a?ay=1"), false)).isEqualTo("https://x.test/a?ay=1");
         assertThat(redactor.query("u=bob&y=SECRET", false)).isEqualTo("u=bob&y=[masqué]");
+        assertThat(redactor.text("GET https://retroachievements.org/API/API_GetUserProfile.php?u=bob&y=SECRET failed",
+                false)).isEqualTo("GET https://retroachievements.org/API/API_GetUserProfile.php?u=bob&y=[masqué] failed");
+        assertThat(redactor.text("point x=1 y=2", false)).isEqualTo("point x=1 y=2");
     }
 
     @Test
