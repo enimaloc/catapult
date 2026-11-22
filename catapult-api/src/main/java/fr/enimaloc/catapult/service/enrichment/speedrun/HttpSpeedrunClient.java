@@ -279,7 +279,7 @@ public class HttpSpeedrunClient implements SpeedrunClient {
         return Optional.of(new SpeedrunRecords.CategoryRecord(text(category.path("id")), text(category.path("name")),
                 text(category.path("weblink")), new BigDecimal(times.get("primary_t").asString()),
                 timing(times, defaultTiming), List.copyOf(runners), date(first.path("date")),
-                text(first.path("weblink")), text(first.path("videos").path("links").path(0).path("uri"))));
+                text(first.path("weblink")), video(first.path("videos").path("links"))));
     }
 
     /** The runner of a run's player reference, named from the embedded players when there are any. */
@@ -325,6 +325,17 @@ public class HttpSpeedrunClient implements SpeedrunClient {
         return Optional.of(new SpeedrunRun(gameId, text(gameData.path("names").path("international")), categoryId,
                 text(categoryData.path("name")), place, new BigDecimal(run.get("times").get("primary_t").asString()),
                 date(run.path("date")), instant(run.path("submitted")), text(run.path("weblink"))));
+    }
+
+    /** The first video link that is one http(s) URL: runners sometimes paste two URLs into the same field. */
+    private static String video(JsonNode links) {
+        for (JsonNode link : links) {
+            String uri = text(link.path("uri"));
+            if (uri != null && uri.matches("https?://.+") && uri.indexOf("://") == uri.lastIndexOf("://")) {
+                return uri;
+            }
+        }
+        return null;
     }
 
     private static String text(JsonNode node) {

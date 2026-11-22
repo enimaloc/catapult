@@ -114,6 +114,8 @@ class HttpSpeedrunClientTest {
         SpeedrunRecords.CategoryRecord tie = records.categories().get(1);
         assertThat(tie.time()).isEqualByComparingTo(new BigDecimal("2682.345"));
         assertThat(tie.runners()).hasSize(2);
+        assertThat(tie.videoUrl()).as("two URLs pasted in one link are skipped")
+                .isEqualTo("https://www.youtube.com/watch?v=CMNkc2jtet0");
         assertThat(tie.runners().getFirst().url()).isNotNull();
         assertThat(tie.runners().get(1)).isEqualTo(new SpeedrunRecords.Runner("Madeline", null));
     }
