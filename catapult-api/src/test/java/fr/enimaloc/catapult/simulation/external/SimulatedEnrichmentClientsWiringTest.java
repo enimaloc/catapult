@@ -16,6 +16,16 @@ import fr.enimaloc.catapult.service.enrichment.steamdeck.HttpSteamDeckClient;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckClient;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.HttpSteamGridDbClient;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbClient;
+import fr.enimaloc.catapult.service.enrichment.rastats.RaCredentials;
+import fr.enimaloc.catapult.service.enrichment.rastats.RaKeyRejectedException;
+import fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsClient;
+import fr.enimaloc.catapult.service.enrichment.steamstats.HttpSteamStatsClient;
+import fr.enimaloc.catapult.service.enrichment.steamstats.SteamStatsClient;
+import fr.enimaloc.catapult.service.enrichment.xboxstats.HttpXboxStatsClient;
+import fr.enimaloc.catapult.service.enrichment.xboxstats.XboxStatsClient;
+import fr.enimaloc.catapult.service.enrichment.xboxstats.XboxStatsForbiddenException;
+import fr.enimaloc.catapult.service.enrichment.rastats.HttpRetroAchievementsClient;
+import fr.enimaloc.catapult.service.xbox.XboxUserTokenService.XstsSession;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +34,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -43,12 +54,15 @@ class SimulatedEnrichmentClientsWiringTest {
         @Bean HttpOpenCriticClient openCritic() { return mock(HttpOpenCriticClient.class); }
         @Bean HttpSpeedrunClient speedrun() { return mock(HttpSpeedrunClient.class); }
         @Bean HelixTwitchActivityClient twitchActivity() { return mock(HelixTwitchActivityClient.class); }
+        @Bean HttpSteamStatsClient steamStats() { return mock(HttpSteamStatsClient.class); }
+        @Bean HttpXboxStatsClient xboxStats() { return mock(HttpXboxStatsClient.class); }
+        @Bean HttpRetroAchievementsClient raStats() { return mock(HttpRetroAchievementsClient.class); }
     }
 
     @Configuration(proxyBeanMethods = false)
     @ComponentScan(basePackageClasses = SimulatedProtonDbClient.class, useDefaultFilters = false,
             includeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
-                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity)Client"))
+                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity|SteamStats|XboxStats|RetroAchievements)Client"))
     static class SimulatedClients {
     }
 
@@ -66,6 +80,10 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(OpenCriticClient.class)).isInstanceOf(SimulatedOpenCriticClient.class);
             assertThat(ctx.getBean(SpeedrunClient.class)).isInstanceOf(SimulatedSpeedrunClient.class);
             assertThat(ctx.getBean(TwitchActivityClient.class)).isInstanceOf(SimulatedTwitchActivityClient.class);
+            assertThat(ctx.getBean(SteamStatsClient.class)).isInstanceOf(SimulatedSteamStatsClient.class);
+            assertThat(ctx.getBean(XboxStatsClient.class)).isInstanceOf(SimulatedXboxStatsClient.class);
+            assertThat(ctx.getBean(RetroAchievementsClient.class))
+                    .isInstanceOf(SimulatedRetroAchievementsClient.class);
         });
     }
 
@@ -80,6 +98,9 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(OpenCriticClient.class)).isInstanceOf(HttpOpenCriticClient.class);
             assertThat(ctx.getBean(SpeedrunClient.class)).isInstanceOf(HttpSpeedrunClient.class);
             assertThat(ctx.getBean(TwitchActivityClient.class)).isInstanceOf(HelixTwitchActivityClient.class);
+            assertThat(ctx.getBean(SteamStatsClient.class)).isInstanceOf(HttpSteamStatsClient.class);
+            assertThat(ctx.getBean(XboxStatsClient.class)).isInstanceOf(HttpXboxStatsClient.class);
+            assertThat(ctx.getBean(RetroAchievementsClient.class)).isInstanceOf(HttpRetroAchievementsClient.class);
         });
     }
 
@@ -132,5 +153,55 @@ class SimulatedEnrichmentClientsWiringTest {
         assertThat(sr.personalBests(user.id(), null)).hasSize(2).allSatisfy(r -> assertThat(r.place()).isNotNull());
         assertThat(sr.pendingRuns(user.id(), null, null)).hasSize(1)
                 .allSatisfy(r -> assertThat(r.place()).isNull());
+    }
+
+    @Test
+    void simulatedSteamStats_answerDeterministically() {
+        var steam = new SimulatedSteamStatsClient();
+        assertThat(steam.library("76561198000000000", null).orElseThrow().games().get("440").playtimeMinutes())
+                .isEqualTo(7_320);
+        assertThat(steam.library("private", null)).isEmpty();
+        assertThat(steam.playerAchievements("1", "440", "en", null).unlocked()).hasSize(12);
+        assertThat(steam.schema("440", "en").orElseThrow().achievements()).hasSize(50);
+        assertThat(steam.globalPercentages("440").get("ACH_1")).isEqualByComparingTo("0.4");
+        assertThat(steam.schema("1", "en")).isEmpty();
+    }
+
+    @Test
+    void simulatedXboxStats_answerDeterministically() {
+        var xbox = new SimulatedXboxStatsClient();
+        var session = new XstsSession("t", "h", "x");
+        var id = java.util.UUID.randomUUID();
+        var title = xbox.titleHistory(id, session, 10).getFirst();
+        assertThat(title.productIds()).containsExactly("9NBLGGH4NNS1");
+        assertThat(title.currentGamerscore()).isEqualTo(350);
+        assertThat(title.totalGamerscore()).isEqualTo(1000);
+        assertThat(xbox.achievements(id, session, title.titleId())).hasSize(10)
+                .filteredOn(a -> a.unlocked()).hasSize(3);
+        assertThat(xbox.minutesPlayed(id, session, title.titleId())).contains(480L);
+        assertThatThrownBy(() -> xbox.achievements(id, session, "2000002"))
+                .isInstanceOf(XboxStatsForbiddenException.class);
+    }
+
+    @Test
+    void simulatedRetroAchievements_acceptsOnlyTheValidKey() {
+        var now = java.time.Instant.parse("2026-11-22T10:00:00Z");
+        var ra = new SimulatedRetroAchievementsClient(java.time.Clock.fixed(now, java.time.ZoneOffset.UTC));
+        var key = new RaCredentials("valid", true);
+        var user = ra.profile("simulated", key).orElseThrow();
+        assertThat(ra.profile(user.ulid(), key)).isPresent();
+        assertThat(ra.profile("nobody", key)).isEmpty();
+        var recent = ra.recentlyPlayed(user.ulid(), 1, key).getFirst();
+        assertThat(recent.title()).isEqualTo("Super Mario World");
+        assertThat(recent.lastPlayed()).isEqualTo(now.minusSeconds(120));
+        var progress = ra.progress(recent.gameId(), user.ulid(), key).orElseThrow();
+        assertThat(progress.numAchievements()).isEqualTo(40);
+        assertThat(progress.numAwardedToUser()).isEqualTo(10);
+        assertThat(progress.numAwardedToUserHardcore()).isEqualTo(8);
+        assertThat(progress.achievements()).filteredOn(a -> a.dateEarnedHardcore() != null).hasSize(8);
+        assertThat(ra.recentAchievements(user.ulid(), 60, key)).isEmpty();
+        assertThatThrownBy(() -> ra.profile("simulated", new RaCredentials("other", false)))
+                .isInstanceOf(RaKeyRejectedException.class);
+        assertThat(new SimulatedRetroAchievementsClient()).isNotNull();
     }
 }
