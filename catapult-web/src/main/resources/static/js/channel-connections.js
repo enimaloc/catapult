@@ -134,6 +134,24 @@ window.CatapultConnections = (function () {
         if (event.detail.root.contains(document.getElementById("channel-connections"))) bind();
     });
 
+    // The import day comes as yyyy-MM-dd (UTC), from the page and from the event: shown in the viewer's format.
+    function localizeBlizzardImportDate() {
+        const chip = document.querySelector(".blizzard-stats-imported-on");
+        if (!chip) return;
+        const localize = () => {
+            const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(chip.textContent.trim());
+            if (!match) return;
+            const day = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+            chip.textContent = new Intl.DateTimeFormat(document.documentElement.lang || undefined,
+                { dateStyle: "short", timeZone: "UTC" }).format(day);
+        };
+        localize();
+        if (!chip.dataset.localized) {
+            chip.dataset.localized = "1";
+            new MutationObserver(localize).observe(chip, { childList: true, characterData: true, subtree: true });
+        }
+    }
+
     function bind() {
         if (!document.getElementById("channel-connections")) return;
         showTwitchatPresence();
@@ -239,6 +257,7 @@ window.CatapultConnections = (function () {
         on("blizzard-import-btn", "click", () => location.assign("/oauth2/authorization/battlenet-stats"));
         on("blizzard-reimport-btn", "click", () => location.assign("/oauth2/authorization/battlenet-stats"));
         on("blizzard-forget-btn", "click", () => postJson(`${baseUrl}/settings/blizzard/wow-characters/delete`, {}));
+        localizeBlizzardImportDate();
 
         // OBS: connecting and disconnecting both save the whole form, only `enabled` differs.
         // An empty password field means "keep the stored one" (it's never sent back to the page),

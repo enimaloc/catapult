@@ -436,7 +436,7 @@ public class MockData {
     }
 
     public BlizzardStatsData blizzardStatsData() {
-        return new BlizzardStatsData("ACCEPTED".equals(battleNetLink.status()), blizzardRegion,
+        return new BlizzardStatsData(!List.of("NONE", "REMOVED").contains(battleNetLink.status()), blizzardRegion,
                 !blizzardCharacters.isEmpty(), blizzardCharacters, blizzardWowMain, true,
                 blizzardCharacters.isEmpty() ? null : java.time.Instant.parse("2026-11-20T10:00:00Z"));
     }

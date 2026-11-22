@@ -362,7 +362,7 @@ class BlizzardAccountServiceTest {
         assertThat(data.wowMainKey()).isEqualTo("eu:1");
         assertThat(data.characters()).extracting(BlizzardStatsData.WowCharacterOption::key)
                 .containsExactly("eu:1", "eu:2");
-        assertThat(data.characters().getFirst().label()).isEqualTo("Alpha — Archimonde (niv. 80, Mage)");
+        assertThat(data.characters().getFirst().label()).isEqualTo("Alpha — Archimonde (80, Mage)");
     }
 
     @Test

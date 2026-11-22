@@ -222,7 +222,7 @@ public class BlizzardAccountService {
     }
 
     private static String label(BlizzardWowCharacter c) {
-        return c.getDisplayName() + " — " + c.getRealmName() + " (niv. " + c.getLevel() + ", "
+        return c.getDisplayName() + " — " + c.getRealmName() + " (" + c.getLevel() + ", "
                 + c.getClassName() + ")";
     }
 
