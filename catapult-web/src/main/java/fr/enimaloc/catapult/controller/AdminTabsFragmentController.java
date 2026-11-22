@@ -488,6 +488,7 @@ public class AdminTabsFragmentController {
             model.addAttribute("opencritic", apiService.adminApiKeys(ApiKeyProvider.OPENCRITIC));
             model.addAttribute("retroachievements", apiService.adminApiKeys(ApiKeyProvider.RETROACHIEVEMENTS));
             model.addAttribute("bungie", apiService.adminBungieCredentials());
+            model.addAttribute("riot", apiService.adminApiKeys(ApiKeyProvider.RIOT));
             model.addAttribute("minecraft", apiService.adminMinecraftAccounts());
             model.addAttribute("battlenet", apiService.adminBattleNetAccounts());
             model.addAttribute("ankama", apiService.adminAnkamaAccounts());

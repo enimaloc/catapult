@@ -48,6 +48,16 @@ class ApiKeysPageDtoTest {
     }
 
     @Test
+    void riotPageKeepsItsFlagAndKeys() {
+        ApiKeysPageDto dto = ApiKeysPageDto.of(new RiotKeysPageData(List.of(KEY), true));
+
+        assertThat(dto.enabled()).isTrue();
+        assertThat(dto.keys()).containsExactly(new ApiKeysPageDto.Key("k1", "ab…yz", "owner", true, 42));
+        assertThat(ApiKeysPageDto.of(new RiotKeysPageData(null, false))).isEqualTo(new ApiKeysPageDto(false, List.of()));
+        assertThat(ApiKeysPageDto.of((RiotKeysPageData) null)).isNull();
+    }
+
+    @Test
     void anUnreachablePageGivesNull() {
         assertThat(ApiKeysPageDto.of((RetroAchievementsKeysPageData) null)).isNull();
         assertThat(ApiKeysPageDto.of((ItadKeysPageData) null)).isNull();

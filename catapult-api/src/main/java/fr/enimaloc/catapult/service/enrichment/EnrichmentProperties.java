@@ -81,6 +81,25 @@ public class EnrichmentProperties {
         private int perSecond = 20;
     }
 
+    /**
+     * Riot API settings that are not a source's own ({@code catapult.enrichment.riot.*}). The rates are the
+     * personal key's (20 / s, 100 / 2 min) until Riot's {@code X-App-Rate-Limit} header says otherwise. The IGDB ids
+     * tell the Riot games apart; an empty one maps no game.
+     */
+    @Getter
+    @Setter
+    public static class Riot {
+        /** The whole Riot source; it also stays off while the key pool is empty. */
+        private boolean enabled = true;
+        /** Calls per second, per key and cluster, before a header is read. */
+        private int perSecond = 20;
+        /** Calls per two minutes, per key and cluster, before a header is read. */
+        private int perTwoMinutes = 100;
+        private String lolIgdbId = "115";
+        private String tftIgdbId = "";
+        private String valorantIgdbId = "126459";
+    }
+
     private SourceSettings hltb = new SourceSettings();
     private SourceSettings protondb = new SourceSettings();
     private SourceSettings steamgriddb = new SourceSettings();
@@ -121,6 +140,7 @@ public class EnrichmentProperties {
     private SourceSettings bungieDefinitions = new SourceSettings();
     private SourceSettings bungieSeason = new SourceSettings();
     private Bungie bungie = new Bungie();
+    private Riot riot = new Riot();
     private Speedrun speedrun = new Speedrun();
     private RetroAchievements retroachievements = new RetroAchievements();
     private XboxStats xboxStats = new XboxStats();
@@ -207,6 +227,10 @@ public class EnrichmentProperties {
 
     public int bungiePerSecond() {
         return bungie.getPerSecond();
+    }
+
+    public boolean riotEnabled() {
+        return riot.isEnabled();
     }
 
     public int speedrunPerMinute() {
