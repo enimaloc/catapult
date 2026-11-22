@@ -92,8 +92,12 @@ public class EnrichmentCache {
 
     /** Forgets everything the personal sources cached for one member ({@code u:<id>} and {@code u:<id>:...}). */
     public void evictUser(UUID userId) {
-        List<String> sources = Arrays.stream(EnrichmentSource.values())
-                .filter(EnrichmentSource::personal).map(EnrichmentSource::key).toList();
+        evictUser(userId, Arrays.stream(EnrichmentSource.values()).filter(EnrichmentSource::personal).toList());
+    }
+
+    /** Forgets what only the given personal sources cached for one member. */
+    public void evictUser(UUID userId, java.util.Collection<EnrichmentSource> only) {
+        List<String> sources = only.stream().filter(EnrichmentSource::personal).map(EnrichmentSource::key).toList();
         String key = "u:" + userId;
         repository.deleteByKeyOfSources(sources, key, key + ":%");
     }

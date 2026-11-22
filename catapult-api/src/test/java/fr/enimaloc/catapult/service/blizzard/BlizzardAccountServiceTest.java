@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.repository.blizzard.BlizzardAccountRepository;
 import fr.enimaloc.catapult.repository.blizzard.BlizzardWowCharacterRepository;
 import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService.ImportedCharacter;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentCache;
+import fr.enimaloc.catapult.service.enrichment.EnrichmentSource;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
@@ -129,6 +130,17 @@ class BlizzardAccountServiceTest {
         verify(accounts, never()).save(any());
     }
 
+    private static final List<EnrichmentSource> BLIZZARD_PERSONAL = List.of(EnrichmentSource.BLIZZARD_WOW_CHARACTER,
+            EnrichmentSource.BLIZZARD_WOW_ACHIEVEMENTS, EnrichmentSource.BLIZZARD_SC2_PROFILE,
+            EnrichmentSource.BLIZZARD_D3_PROFILE);
+
+    @Test
+    void aSettingsWriteNeverEvictsTheOtherProvidersEntries() {
+        service.setRegion(user, "KR");
+
+        verify(cache, never()).evictUser(user.getId());
+    }
+
     @Test
     void regionStartsTheRowAndEvictsAndTellsThePages() {
         service.setRegion(user, "KR");
@@ -137,7 +149,7 @@ class BlizzardAccountServiceTest {
         verify(accounts).save(saved.capture());
         assertThat(saved.getValue().getRegion()).isEqualTo("kr");
         assertThat(saved.getValue().getUpdatedAt()).isEqualTo(NOW);
-        verify(cache).evictUser(user.getId());
+        verify(cache).evictUser(user.getId(), BLIZZARD_PERSONAL);
         verify(events).blizzardAccountChanged(any(UUID.class), any(BlizzardStatsData.class));
     }
 
@@ -173,7 +185,7 @@ class BlizzardAccountServiceTest {
 
         assertThat(row.getWowMainRegion()).isEqualTo("eu");
         assertThat(row.getWowMainCharacterId()).isEqualTo(2L);
-        verify(cache, times(2)).evictUser(user.getId());
+        verify(cache, times(2)).evictUser(user.getId(), BLIZZARD_PERSONAL);
     }
 
     @Test
@@ -289,7 +301,7 @@ class BlizzardAccountServiceTest {
         assertThat(row.getWowMainRegion()).isNull();
         assertThat(row.getWowMainCharacterId()).isNull();
         assertThat(row.getWowImportedAt()).isNull();
-        verify(cache).evictUser(user.getId());
+        verify(cache).evictUser(user.getId(), BLIZZARD_PERSONAL);
     }
 
     @Test

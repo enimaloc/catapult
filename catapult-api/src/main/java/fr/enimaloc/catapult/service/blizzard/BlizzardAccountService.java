@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.repository.blizzard.BlizzardAccountRepository;
 import fr.enimaloc.catapult.repository.blizzard.BlizzardWowCharacterRepository;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentCache;
+import fr.enimaloc.catapult.service.enrichment.EnrichmentSource;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.extern.slf4j.Slf4j;
@@ -228,7 +229,9 @@ public class BlizzardAccountService {
 
     /** What follows a write: the cached stats were read with the old settings; the owner's pages are told. */
     private void done(UUID userId) {
-        cache.evictUser(userId);
+        cache.evictUser(userId, List.of(EnrichmentSource.BLIZZARD_WOW_CHARACTER,
+                EnrichmentSource.BLIZZARD_WOW_ACHIEVEMENTS, EnrichmentSource.BLIZZARD_SC2_PROFILE,
+                EnrichmentSource.BLIZZARD_D3_PROFILE));
         publish(userId);
     }
 

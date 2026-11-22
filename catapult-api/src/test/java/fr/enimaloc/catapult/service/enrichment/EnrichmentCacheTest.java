@@ -266,6 +266,15 @@ class EnrichmentCacheTest {
     }
 
     @Test
+    void evictUserOfGivenSourcesDropsOnlyThose() {
+        java.util.UUID a = java.util.UUID.randomUUID();
+        cache.evictUser(a, java.util.List.of(EnrichmentSource.BLIZZARD_SC2_PROFILE, EnrichmentSource.BLIZZARD_HS_SETS));
+
+        verify(repository).deleteByKeyOfSources(java.util.List.of("blizzard-sc2-profile"),
+                "u:" + a, "u:" + a + ":%");
+    }
+
+    @Test
     void evictUserDropsOnlyThatMembersPersonalEntries() {
         java.util.UUID a = java.util.UUID.randomUUID();
         cache.evictUser(a);

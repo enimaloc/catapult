@@ -253,6 +253,21 @@ class TwitchLoginSuccessHandlerTest {
     }
 
     @Test
+    void anImportThatFoundNoCharacterIsToldApart() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        request.setAttribute(TwitchLoginSuccessHandler.WOW_IMPORT_COUNT_ATTRIBUTE, 0);
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("battlenet-stats");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("https://web.example.com/channel/jeb_?imported=wow-empty#integrations");
+    }
+
+    @Test
     void userTokenIsForgottenEvenWithoutTheWeb() throws Exception {
         var authToken = mock(OAuth2AuthenticationToken.class);
         when(authToken.getAuthorizedClientRegistrationId()).thenReturn("battlenet-stats");

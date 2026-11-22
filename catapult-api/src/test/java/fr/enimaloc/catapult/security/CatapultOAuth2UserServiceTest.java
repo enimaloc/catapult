@@ -436,6 +436,22 @@ class CatapultOAuth2UserServiceTest {
     }
 
     @Test
+    void statsConsentLeavesTheCharacterCountForTheRedirect() {
+        UserAccount account = statsStreamer(true);
+        when(wowImport.importFor(account, "wow-token", Locale.FRENCH)).thenReturn(0);
+        var web = new org.springframework.mock.web.MockHttpServletRequest();
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(web));
+        try {
+            service.loadUser(battleNetStatsRequest());
+        } finally {
+            org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+        }
+
+        assertThat(web.getAttribute(TwitchLoginSuccessHandler.WOW_IMPORT_COUNT_ATTRIBUTE)).isEqualTo(0);
+    }
+
+    @Test
     void statsConsentWithoutTwitchSessionIsUnauthorized() {
         lenient().when(wowImportProvider.getIfAvailable()).thenReturn(wowImport);
 

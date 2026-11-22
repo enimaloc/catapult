@@ -39,6 +39,8 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 import java.util.Map;
@@ -190,7 +192,11 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             throw new OAuth2AuthenticationException(new OAuth2Error("battlenet_stats_unavailable"));
         }
         try {
-            imports.importFor(user, userRequest.getAccessToken().getTokenValue(), LocaleContextHolder.getLocale());
+            int count = imports.importFor(user, userRequest.getAccessToken().getTokenValue(),
+                    LocaleContextHolder.getLocale());
+            if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes web) {
+                web.getRequest().setAttribute(TwitchLoginSuccessHandler.WOW_IMPORT_COUNT_ATTRIBUTE, count);
+            }
         } catch (BlizzardImportRefusedException e) {
             log.warn("World of Warcraft import refused for user {}: {}", user.getId(), e.reason());
             String code = e.reason() == BlizzardImportRefusedException.Reason.OTHER_ACCOUNT

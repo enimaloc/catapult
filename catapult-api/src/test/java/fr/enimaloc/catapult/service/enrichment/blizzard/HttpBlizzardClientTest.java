@@ -247,6 +247,16 @@ class HttpBlizzardClientTest {
     }
 
     @Test
+    void anAbsurdRetryAfterIsCapped() {
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(EU))).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, "86400"));
+
+        assertThatThrownBy(() -> client.wowToken(BlizzardRegion.EU)).isInstanceOf(BlizzardUnavailableException.class);
+
+        verify(limiter).pause(Duration.ofMinutes(10));
+    }
+
+    @Test
     void status429WithoutRetryAfterPausesAMinute() {
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(EU)))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));

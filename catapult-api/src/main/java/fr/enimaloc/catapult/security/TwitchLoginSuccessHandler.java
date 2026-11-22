@@ -35,6 +35,10 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
 
+    /** Request attribute the World of Warcraft import leaves its character count in, for the redirect. */
+    public static final String WOW_IMPORT_COUNT_ATTRIBUTE = "catapult.blizzard.wow-import-count";
+
+
     private final OAuth2AuthorizedClientRepository authorizedClientRepository;
     private final OAuthTokenRepository oAuthTokenRepository;
     private final TokenEncryptionService tokenEncryptionService;
@@ -94,8 +98,9 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                 // the card says the import is done.
                 authorizedClientRepository.removeAuthorizedClient("battlenet-stats", authentication, request, response);
                 if (webUrl != null && !webUrl.isBlank()) {
+                    boolean none = Integer.valueOf(0).equals(request.getAttribute(WOW_IMPORT_COUNT_ATTRIBUTE));
                     response.sendRedirect(UriComponentsBuilder.fromUriString(channelIntegrationsUrl(catUser))
-                            .replaceQueryParam("imported", "wow").toUriString());
+                            .replaceQueryParam("imported", none ? "wow-empty" : "wow").toUriString());
                     return;
                 }
             } else if ("epic".equals(registrationId)) {

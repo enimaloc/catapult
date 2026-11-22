@@ -166,8 +166,8 @@ class Oauth2LoginFailureHandlerTest {
 
     @Test
     void anyOtherWowImportFailure_isAFailedImportOnTheCard() throws Exception {
-        // A refused consent (access_denied), a failed token exchange or an unexpected error: never the login page.
-        for (String code : new String[]{"access_denied", "invalid_token_response", "server_error"}) {
+        // A failed token exchange or an unexpected error: never the login page.
+        for (String code : new String[]{"invalid_token_response", "server_error"}) {
             request = callbackOf("battlenet-stats", "jeb_");
             response = new MockHttpServletResponse();
 
@@ -177,6 +177,17 @@ class Oauth2LoginFailureHandlerTest {
             assertThat(response.getRedirectedUrl())
                     .isEqualTo("http://localhost:8081/channel/jeb_?error=battlenet_stats_failed#integrations");
         }
+    }
+
+    @Test
+    void decliningTheBlizzardConsent_isACancelledImportNotAFailure() throws Exception {
+        request = callbackOf("battlenet-stats", "jeb_");
+
+        handler.onAuthenticationFailure(request, response,
+                new OAuth2AuthenticationException(new OAuth2Error("access_denied")));
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("http://localhost:8081/channel/jeb_?error=battlenet_stats_cancelled#integrations");
     }
 
     @Test

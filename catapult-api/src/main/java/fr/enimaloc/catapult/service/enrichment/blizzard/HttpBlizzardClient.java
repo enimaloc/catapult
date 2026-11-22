@@ -37,6 +37,8 @@ public class HttpBlizzardClient implements BlizzardClient {
     static final String USERINFO = "https://oauth.battle.net/userinfo";
     static final String USER_AGENT = "Catapult/1.0 (+https://catapult.enimaloc.fr)";
     private static final Duration PAUSE = Duration.ofSeconds(60);
+    /** The longest pause a 429 can ask for: a larger Retry-After is not trusted. */
+    private static final Duration MAX_PAUSE = Duration.ofMinutes(10);
     static final int MAX_BYTES = 4 * 1024 * 1024;
     private static final int MAX_ACHIEVEMENT_BYTES = 8 * 1024 * 1024;
     private static final int RECENT = 10;
@@ -421,7 +423,10 @@ public class HttpBlizzardClient implements BlizzardClient {
     private static Duration retryAfter(String header) {
         try {
             long seconds = header == null ? 0 : Long.parseLong(header.trim());
-            return seconds > 0 ? Duration.ofSeconds(seconds) : PAUSE;
+            if (seconds <= 0) {
+                return PAUSE;
+            }
+            return seconds > MAX_PAUSE.toSeconds() ? MAX_PAUSE : Duration.ofSeconds(seconds);
         } catch (NumberFormatException e) {
             return PAUSE;
         }
