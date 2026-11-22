@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.config;
 
+import fr.enimaloc.catapult.service.bungie.BungieCredentialsService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,12 +13,13 @@ import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizati
 import org.springframework.security.oauth2.client.endpoint.RestClientRefreshTokenTokenResponseClient;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @Configuration
 public class OAuth2ClientConfig {
@@ -51,8 +54,14 @@ public class OAuth2ClientConfig {
     @Value("${app.base-url}")
     private String baseUrl;
 
+    /** The Bungie.net OAuth endpoints (client confidential: its secret in the Basic header). */
+    static final String BUNGIE_AUTHORIZE = "https://www.bungie.net/en/OAuth/Authorize";
+    static final String BUNGIE_TOKEN = "https://www.bungie.net/platform/app/oauth/token/";
+    static final String BUNGIE_MEMBERSHIPS = "https://www.bungie.net/Platform/User/GetMembershipsForCurrentUser/";
+
     @Bean
-    public ClientRegistrationRepository clientRegistrationRepository() {
+    public ClientRegistrationRepository clientRegistrationRepository(
+            ObjectProvider<BungieCredentialsService> bungieCredentials) {
         List<ClientRegistration> registrations = new ArrayList<>();
 
         registrations.add(authorizationCode("twitch", twitchClientId, twitchClientSecret)
@@ -117,7 +126,25 @@ public class OAuth2ClientConfig {
                 .build());
         }
 
-        return new InMemoryClientRegistrationRepository(registrations);
+        // Bungie: the credentials are an admin's (bungie_app_credentials), read at each lookup, so the login exists
+        // only while they are set. Bungie sets the scopes on its portal (none is sent) and has no userinfo endpoint:
+        // CatapultOAuth2UserService reads the memberships itself, with the API key. Its callback,
+        // <base>/login/oauth2/code/bungie, must be declared on Bungie's portal.
+        return new DynamicClientRegistrationRepository(registrations, Map.of("bungie",
+            () -> Optional.ofNullable(bungieCredentials.getIfAvailable())
+                .flatMap(BungieCredentialsService::current)
+                .map(c -> bungie(c.clientId(), c.clientSecret()))));
+    }
+
+    /** The Bungie.net registration of {@code clientId}. */
+    ClientRegistration bungie(String clientId, String clientSecret) {
+        return authorizationCode("bungie", clientId, clientSecret)
+            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+            .authorizationUri(BUNGIE_AUTHORIZE)
+            .tokenUri(BUNGIE_TOKEN)
+            .userInfoUri(BUNGIE_MEMBERSHIPS)
+            .userNameAttributeName("membershipId")
+            .build();
     }
 
     /** An authorization-code registration redirecting back to this API's login callback. */

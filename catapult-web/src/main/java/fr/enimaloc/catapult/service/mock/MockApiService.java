@@ -2022,6 +2022,25 @@ public class MockApiService implements ApiService {
         return apiKeys.refresh();
     }
 
+    // The secrets are never logged.
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData adminBungieCredentials() {
+        log.trace("adminBungieCredentials()");
+        return apiKeys.bungie();
+    }
+
+    @Override
+    public int adminSaveBungieCredentials(String clientId, String clientSecret, String apiKey) {
+        log.trace("adminSaveBungieCredentials()");
+        return apiKeys.saveBungie(clientId, clientSecret, apiKey);
+    }
+
+    @Override
+    public int adminDeleteBungieCredentials() {
+        log.trace("adminDeleteBungieCredentials()");
+        return apiKeys.deleteBungie();
+    }
+
     @Override
     public List<BattleNetAccountDto> adminBattleNetAccounts() {
         log.trace("adminBattleNetAccounts()");

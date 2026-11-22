@@ -2062,6 +2062,23 @@ class RealApiServiceTest {
     }
 
     @Test
+    void bungieCredentials_readSetAndRemove() {
+        respond(HttpMethod.GET, "/api/internal/admin/bungie-credentials",
+                "{\"configured\":true,\"clientId\":\"12345\",\"apiKeyMasked\":\"abcd…wxyz\",\"updatedAt\":null}");
+        expect(HttpMethod.PUT, "/api/internal/admin/bungie-credentials")
+                .andExpect(content().json("{\"clientId\":\"12345\",\"clientSecret\":\"s\",\"apiKey\":\"\"}", true))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.DELETE, "/api/internal/admin/bungie-credentials").andRespond(withNoContent());
+
+        var page = service.adminBungieCredentials();
+        assertThat(page.configured()).isTrue();
+        assertThat(page.clientId()).isEqualTo("12345");
+        assertThat(page.apiKeyMasked()).isEqualTo("abcd…wxyz");
+        assertThat(service.adminSaveBungieCredentials("12345", "s", "")).isEqualTo(400);
+        assertThat(service.adminDeleteBungieCredentials()).isEqualTo(204);
+    }
+
+    @Test
     void apiKeyActions_reachEachProvidersRoute() {
         expect(HttpMethod.POST, "/api/internal/admin/dtdd-keys")
                 .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());

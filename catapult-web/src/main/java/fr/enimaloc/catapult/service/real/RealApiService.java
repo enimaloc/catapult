@@ -1609,6 +1609,24 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData adminBungieCredentials() {
+        return client.get("/api/internal/admin/bungie-credentials",
+                fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData.class);
+    }
+
+    @Override
+    public int adminSaveBungieCredentials(String clientId, String clientSecret, String apiKey) {
+        return client.call(HttpMethod.PUT, "/api/internal/admin/bungie-credentials",
+                new fr.enimaloc.catapult.common.dto.admin.BungieCredentialsRequest(clientId, clientSecret, apiKey),
+                Void.class).status();
+    }
+
+    @Override
+    public int adminDeleteBungieCredentials() {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/bungie-credentials", null, Void.class).status();
+    }
+
+    @Override
     public List<BattleNetAccountDto> adminBattleNetAccounts() {
         // a 404 (Battle.net disabled in catapult-api) is null, like any failed read
         BattleNetAccountDto[] accounts = client.get("/api/internal/admin/battlenet-accounts", BattleNetAccountDto[].class);

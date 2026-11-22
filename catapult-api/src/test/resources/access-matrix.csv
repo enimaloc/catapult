@@ -271,6 +271,9 @@ GET,/api/internal/admin/retroachievements-keys,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/retroachievements-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/retroachievements-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/retroachievements-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/bungie-credentials,,,401,PASS,403,403,403,PASS,401
+PUT,/api/internal/admin/bungie-credentials,,"{""clientId"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/bungie-credentials,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/opencritic-keys,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/opencritic-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/opencritic-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
