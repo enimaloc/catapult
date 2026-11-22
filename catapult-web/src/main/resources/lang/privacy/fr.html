@@ -12,7 +12,9 @@
             speedrun.com ; la clé est stockée chiffrée et jamais réaffichée</li>
         <li>Nom d'utilisateur et clé d'API web RetroAchievements (facultatifs), pour lire vos succès ; la clé est
             stockée chiffrée et jamais réaffichée. Vos statistiques Steam, Xbox et RetroAchievements sont lues à
-            la demande, gardées en cache 15 minutes au plus, et purgées à la suppression de votre compte</li>
+            la demande et rafraîchies toutes les 15 minutes au plus ; la dernière copie est gardée jusqu'à la
+            déliaison de la plateforme ou la suppression de votre compte, et peut encore être affichée quand la
+            plateforme est injoignable</li>
         <li>Rapports d'erreur : quand une page rencontre une erreur, l'identifiant de votre compte, le
             déroulé des dernières actions (clics, pages, requêtes) et un enregistrement de la page,
             sans ce que vous tapez dans les champs, pour reproduire le problème</li>
@@ -22,8 +24,10 @@
 <section>
     <h2>Transferts de données</h2>
     <p>Votre nom d'utilisateur et votre clé speedrun.com, si vous les renseignez, ne sont transmis qu'à
-        speedrun.com ; ceux de RetroAchievements, qu'à RetroAchievements. Les rapports d'erreur sont envoyés à Sentry (sentry.io), en passant par Catapult : votre
-        navigateur ne contacte jamais Sentry directement. Aucun autre transfert à des tiers.</p>
+        speedrun.com. Votre nom d'utilisateur et votre clé RetroAchievements ne sont transmis qu'à
+        RetroAchievements. Les rapports d'erreur sont envoyés à Sentry (sentry.io), en passant par
+        Catapult : votre navigateur ne contacte jamais Sentry directement. Aucun autre transfert à des
+        tiers.</p>
 </section>
 
 <section>
