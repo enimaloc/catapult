@@ -76,6 +76,18 @@ class HttpSteamStatsClientTest {
     }
 
     @Test
+    void identifiesCatapult() throws IOException {
+        server.expect(once(), requestTo(STATS + "/GetGlobalAchievementPercentagesForApp/v0002/?gameid=440"
+                        + "&format=json&key=poolkey"))
+                .andExpect(header(HttpHeaders.USER_AGENT, "Catapult/1.0 (+https://catapult.enimaloc.fr)"))
+                .andRespond(withSuccess(fixture("global-percentages-440.json"), MediaType.APPLICATION_JSON));
+
+        client.globalPercentages("440");
+
+        server.verify();
+    }
+
+    @Test
     void readsTheLibrary() throws IOException {
         server.expect(once(), requestTo(API + "/IPlayerService/GetOwnedGames/v1/?key=poolkey&steamid=7656"
                         + "&include_appinfo=0&include_played_free_games=1"))

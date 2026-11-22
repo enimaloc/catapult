@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.enrichment.xboxstats;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import fr.enimaloc.catapult.service.enrichment.FetchBudget;
 import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Achievement;
 import fr.enimaloc.catapult.service.xbox.XboxUserTokenService.XstsSession;
@@ -45,7 +46,7 @@ public class HttpXboxStatsClient implements XboxStatsClient {
     private static final String ACHIEVEMENTS = "https://achievements.xboxlive.com/users/xuid({xuid})/achievements"
             + "?titleId={titleId}&maxItems=1000";
     private static final String USERSTATS = "https://userstats.xboxlive.com/batch";
-    private static final String USER_AGENT = "Catapult/1.0 (+https://catapult.enimaloc.fr)";
+    private static final String USER_AGENT = EnrichmentUserAgent.VALUE;
     private static final Duration DEFAULT_RETRY_AFTER = Duration.ofSeconds(60);
 
     private record Answer(HttpStatusCode status, String retryAfter, String body) {

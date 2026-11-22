@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.enrichment.twitch;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import fr.enimaloc.catapult.service.twitch.TwitchTokenService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -36,7 +37,7 @@ public class HelixTwitchActivityClient implements TwitchActivityClient {
 
     public HelixTwitchActivityClient(RestClient.Builder builder, TwitchTokenService tokens,
                                      @Value("${twitch.client-id:}") String clientId) {
-        this.restClient = builder.build();
+        this.restClient = builder.defaultHeader(HttpHeaders.USER_AGENT, EnrichmentUserAgent.VALUE).build();
         this.tokens     = tokens;
         this.clientId   = clientId;
     }

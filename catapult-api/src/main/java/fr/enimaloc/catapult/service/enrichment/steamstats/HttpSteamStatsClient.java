@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.enrichment.steamstats;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import fr.enimaloc.catapult.getter.steam.SteamApiKeyRotator;
 import fr.enimaloc.catapult.getter.steam.SteamRateLimiter;
 import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Status;
@@ -211,7 +212,7 @@ public class HttpSteamStatsClient implements SteamStatsClient {
         Answer answer;
         try {
             answer = restClient.get().uri(template, all).header(HttpHeaders.ACCEPT, "application/json")
-                    .header(HttpHeaders.USER_AGENT, "Catapult/1.0 (+https://catapult.enimaloc.fr)")
+                    .header(HttpHeaders.USER_AGENT, EnrichmentUserAgent.VALUE)
                     .exchange((req, res) -> new Answer(res.getStatusCode(),
                             res.getHeaders().getFirst(HttpHeaders.RETRY_AFTER),
                             res.getStatusCode().is3xxRedirection() ? null : res.bodyTo(String.class)));

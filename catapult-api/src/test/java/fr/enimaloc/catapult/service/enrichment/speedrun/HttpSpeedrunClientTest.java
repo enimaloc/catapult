@@ -74,6 +74,17 @@ class HttpSpeedrunClientTest {
     }
 
     @Test
+    void identifiesCatapult() throws IOException {
+        server.expect(once(), requestTo(BASE + "/games?name=Celeste&max=20"))
+                .andExpect(header(HttpHeaders.USER_AGENT, "Catapult/1.0 (+https://catapult.enimaloc.fr)"))
+                .andRespond(withSuccess(fixture("games-celeste"), MediaType.APPLICATION_JSON));
+
+        client.searchGames("Celeste");
+
+        server.verify();
+    }
+
+    @Test
     void searchGames_readsNamesAndCover() throws IOException {
         server.expect(once(), requestTo(BASE + "/games?name=Celeste&max=20"))
                 .andRespond(withSuccess(fixture("games-celeste"), MediaType.APPLICATION_JSON));

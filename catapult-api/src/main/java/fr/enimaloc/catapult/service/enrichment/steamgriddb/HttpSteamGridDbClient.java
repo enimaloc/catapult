@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.enrichment.steamgriddb;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import fr.enimaloc.catapult.getter.steamgriddb.SteamGridDbApiKeyRotator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -35,7 +36,7 @@ public class HttpSteamGridDbClient implements SteamGridDbClient {
     private final Optional<SteamGridDbApiKeyRotator> rotator;
 
     public HttpSteamGridDbClient(RestClient.Builder builder, Optional<SteamGridDbApiKeyRotator> rotator) {
-        this.restClient = builder.build();
+        this.restClient = builder.defaultHeader(HttpHeaders.USER_AGENT, EnrichmentUserAgent.VALUE).build();
         this.rotator = rotator;
     }
 

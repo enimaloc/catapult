@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.enrichment.prices;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import fr.enimaloc.catapult.getter.itad.ItadApiKeyRotator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -42,7 +43,7 @@ public class HttpItadClient implements ItadClient {
     private final Optional<ItadApiKeyRotator> rotator;
 
     public HttpItadClient(RestClient.Builder builder, Optional<ItadApiKeyRotator> rotator) {
-        this.restClient = builder.build();
+        this.restClient = builder.defaultHeader(HttpHeaders.USER_AGENT, EnrichmentUserAgent.VALUE).build();
         this.rotator = rotator;
     }
 

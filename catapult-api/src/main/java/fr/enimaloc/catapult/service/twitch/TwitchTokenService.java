@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.service.twitch;
 
+import org.springframework.http.HttpHeaders;
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import fr.enimaloc.catapult.site.SiteRole;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -94,6 +96,7 @@ public class TwitchTokenService {
             form.add("client_secret", twitchClientSecret);
             Map<String, Object> response = restClient.post()
                 .uri(TWITCH_TOKEN_URL)
+                .header(HttpHeaders.USER_AGENT, EnrichmentUserAgent.VALUE)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(form)
                 .retrieve()
@@ -170,6 +173,7 @@ public class TwitchTokenService {
         form.add("client_secret", twitchClientSecret);
         Map<String, Object> response = restClient.post()
             .uri(TWITCH_TOKEN_URL)
+            .header(HttpHeaders.USER_AGENT, EnrichmentUserAgent.VALUE)
             .contentType(MediaType.APPLICATION_FORM_URLENCODED)
             .body(form)
             .retrieve()
