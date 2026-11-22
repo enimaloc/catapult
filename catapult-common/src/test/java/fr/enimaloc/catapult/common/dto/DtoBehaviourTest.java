@@ -354,4 +354,27 @@ class DtoBehaviourTest {
             assertThat(page.speedrun()).isNull();
         }
     }
+
+    @Nested
+    class BlizzardStats {
+        @Test
+        void noCharactersIsAnEmptyList() {
+            var data = new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(false, null, false, null, null,
+                    false);
+
+            assertThat(data.characters()).isEmpty();
+        }
+
+        @Test
+        void theCharactersAreCopied() {
+            var options = new java.util.ArrayList<fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData
+                    .WowCharacterOption>();
+            options.add(new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData.WowCharacterOption("eu:1", "A"));
+            var data = new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(true, "eu", true, options,
+                    "eu:1", true);
+            options.clear();
+
+            assertThat(data.characters()).hasSize(1);
+        }
+    }
 }

@@ -208,6 +208,9 @@ PUT,/api/internal/users/{userId}/settings/retroachievements/username,,"{""userna
 DELETE,/api/internal/users/{userId}/settings/retroachievements/username,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/retroachievements/api-key,,"{""apiKey"":""matrix""}",401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/settings/retroachievements/api-key,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/blizzard/region,,"{""region"":""eu""}",401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/blizzard/wow-main,,"{""region"":""eu"",""characterId"":1}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/blizzard/wow-characters,,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/settings/twitchat,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat,,"{""enabled"":false}",401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat/branch,,,401,401,403,403,PASS,403,401

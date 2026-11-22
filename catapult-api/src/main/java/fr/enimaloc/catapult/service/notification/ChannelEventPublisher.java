@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service.notification;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
@@ -153,6 +154,12 @@ public class ChannelEventPublisher {
     public void speedrunAccountChanged(UUID channelOwnerId, SpeedrunData account) {
         publish(channelOwnerId, ChannelEvents.SPEEDRUN_ACCOUNT_CHANGED,
                 (id, login) -> new ChannelEvents.SpeedrunAccountChanged(id, login, account));
+    }
+
+    /** The owner's Blizzard settings now stand as {@code account} (names only). */
+    public void blizzardAccountChanged(UUID channelOwnerId, BlizzardStatsData account) {
+        publish(channelOwnerId, ChannelEvents.BLIZZARD_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.BlizzardAccountChanged(id, login, account));
     }
 
     /** The owner's RetroAchievements settings now stand as {@code account} (the name only, never the key). */

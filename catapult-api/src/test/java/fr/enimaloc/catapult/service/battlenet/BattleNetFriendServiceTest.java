@@ -65,6 +65,7 @@ class BattleNetFriendServiceTest {
     @Mock private ChannelEventPublisher publisher;
     @Mock private BattleNetSessionManager sessionManager;
     @Mock private BgsClient client;
+    @Mock private fr.enimaloc.catapult.service.blizzard.BlizzardAccountService blizzardAccounts;
 
     private BattleNetFriendService service;
     private UserAccount user;
@@ -108,7 +109,7 @@ class BattleNetFriendServiceTest {
     @BeforeEach
     void setUp() {
         service = new BattleNetFriendService(accountRepository, linkRepository, getterConfigRepository, publisher,
-                sessionManager, transactions, SessionDebug.OFF, Runnable::run);
+                sessionManager, transactions, SessionDebug.OFF, blizzardAccounts, Runnable::run);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         bot1 = bot("bot1", 1, "CatapultBot#1111");
@@ -546,8 +547,31 @@ class BattleNetFriendServiceTest {
     }
 
     @Test
+    void unenrollDeletesAccountAndEvicts() {
+        link(bot1, Status.ACCEPTED, null);
+
+        service.unenroll(user);
+
+        assertThat(links).isEmpty();
+        verify(blizzardAccounts).forget(user.getId());
+    }
+
+    @Test
+    void unenrollSucceedsEvenWhenThePurgeFails() {
+        link(bot1, Status.ACCEPTED, null);
+        org.mockito.Mockito.doThrow(new IllegalStateException("db")).when(blizzardAccounts).forget(any());
+
+        service.unenroll(user);
+
+        assertThat(links).isEmpty();
+        verify(publisher).battleNetLinkChanged(user.getId(), "NONE", null, null);
+    }
+
+    @Test
     void unenrollWithoutLinkDoesNothing() {
         service.unenroll(user);
+
+        verify(blizzardAccounts, never()).forget(any());
 
         verify(sessionManager, never()).withClient(any(), any());
         verify(publisher, never()).battleNetLinkChanged(any(), any(), any(), any());

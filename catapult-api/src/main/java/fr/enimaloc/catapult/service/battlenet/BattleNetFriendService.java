@@ -18,6 +18,7 @@ import fr.enimaloc.catapult.domain.binding.GetterConfig;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
+import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService;
 import fr.enimaloc.catapult.service.debug.SessionDebug;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.Getter;
@@ -75,6 +76,7 @@ public class BattleNetFriendService {
     private final BattleNetSessionManager sessionManager;
     private final TransactionOperations transactions;
     private final SessionDebug debug;
+    private final BlizzardAccountService blizzardAccounts;
     private final Executor followUps;
 
     @Autowired
@@ -84,10 +86,11 @@ public class BattleNetFriendService {
                                   ChannelEventPublisher channelEventPublisher,
                                   BattleNetSessionManager sessionManager,
                                   TransactionOperations transactions,
-                                  @Qualifier("battleNetSessionDebug") SessionDebug debug) {
+                                  @Qualifier("battleNetSessionDebug") SessionDebug debug,
+                                  BlizzardAccountService blizzardAccounts) {
         // The outcome of an invitation completes on the BGS session loop: its database follow-up leaves that thread
         this(accountRepository, linkRepository, getterConfigRepository, channelEventPublisher, sessionManager,
-                transactions, debug, task -> Thread.ofVirtual().name("battlenet-friends").start(task));
+                transactions, debug, blizzardAccounts, task -> Thread.ofVirtual().name("battlenet-friends").start(task));
     }
 
     /** @param followUps runs what follows the outcome of an invitation sent at enrolment */
@@ -98,6 +101,7 @@ public class BattleNetFriendService {
                            BattleNetSessionManager sessionManager,
                            TransactionOperations transactions,
                            SessionDebug debug,
+                           BlizzardAccountService blizzardAccounts,
                            Executor followUps) {
         this.accountRepository = accountRepository;
         this.linkRepository = linkRepository;
@@ -106,6 +110,7 @@ public class BattleNetFriendService {
         this.sessionManager = sessionManager;
         this.transactions = transactions;
         this.debug = debug;
+        this.blizzardAccounts = blizzardAccounts;
         this.followUps = followUps;
     }
 
@@ -177,6 +182,13 @@ public class BattleNetFriendService {
         }
         log.info("Battle.net link of user {} deleted ({})", user.getId(), removed.getStatus());
         channelEventPublisher.battleNetLinkChanged(user.getId(), "NONE", null, null);
+        try {
+            blizzardAccounts.forget(user.getId());
+        } catch (RuntimeException e) {
+            // The link is gone either way; what Blizzard settings were kept is cleared on the next unlink.
+            log.warn("Blizzard settings of user {} not cleared after the unlink: {}", user.getId(),
+                    e.getClass().getSimpleName());
+        }
 
         UUID botId = removed.getServiceAccount().getId();
         if (removed.getStatus() == Status.PENDING && removed.getInvitationId() != null) {
