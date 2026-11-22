@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * The mock's Steam, DTDD, SteamGridDB, IsThereAnyDeal and OpenCritic shared API keys: one store for the whole application. Answers like
+ * The mock's Steam, DTDD, SteamGridDB, IsThereAnyDeal, OpenCritic and RetroAchievements shared API keys: one store for the whole application. Answers like
  * catapult-api: the same key formats (400 otherwise), an already listed key changes nothing, an
  * unknown key id is a 404, and only the masked form ever leaves the store.
  */
@@ -21,7 +21,8 @@ class MockKeysStore {
             ApiKeyProvider.DTDD, Pattern.compile("ddd_[A-Za-z0-9]{16,128}"),
             ApiKeyProvider.STEAMGRIDDB, Pattern.compile("[0-9A-Fa-f]{32}"),
             ApiKeyProvider.ITAD, Pattern.compile("[0-9A-Fa-f]{40}"),
-            ApiKeyProvider.OPENCRITIC, Pattern.compile("[A-Za-z0-9]{40,60}"));
+            ApiKeyProvider.OPENCRITIC, Pattern.compile("[A-Za-z0-9]{40,60}"),
+            ApiKeyProvider.RETROACHIEVEMENTS, Pattern.compile("[A-Za-z0-9]{16,64}"));
 
     private final Map<ApiKeyProvider, List<String>> keys = new EnumMap<>(ApiKeyProvider.class);
 
@@ -32,6 +33,7 @@ class MockKeysStore {
         keys.put(ApiKeyProvider.ITAD, new ArrayList<>(List.of("fedcba9876543210FEDCBA9876543210fedcba98")));
         keys.put(ApiKeyProvider.OPENCRITIC,
                 new ArrayList<>(List.of("MockRapidApiKey0123456789MockRapidApiKey0123456789")));
+        keys.put(ApiKeyProvider.RETROACHIEVEMENTS, new ArrayList<>(List.of("MockRaKey0123456789abcdefghijklmn")));
     }
 
     private static String mask(String key) {
@@ -48,7 +50,7 @@ class MockKeysStore {
         long tick = System.currentTimeMillis() / 3000;
         int window = (int) (tick % 4);
         if (provider == ApiKeyProvider.STEAMGRIDDB || provider == ApiKeyProvider.ITAD
-                || provider == ApiKeyProvider.OPENCRITIC) {
+                || provider == ApiKeyProvider.OPENCRITIC || provider == ApiKeyProvider.RETROACHIEVEMENTS) {
             return new KeyUsageDto(window, null, 60, null, "DAY", 40 + tick % 20, null, null);
         }
         return provider == ApiKeyProvider.STEAM

@@ -61,6 +61,7 @@ import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamGridDbKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.ItadKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.OpenCriticKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.RetroAchievementsKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
@@ -1512,6 +1513,10 @@ public class RealApiService implements ApiService {
                 OpenCriticKeysPageData page = client.get("/api/internal/admin/opencritic-keys", OpenCriticKeysPageData.class);
                 yield page == null ? null : ApiKeysPageDto.of(page);
             }
+            case RETROACHIEVEMENTS -> {
+                RetroAchievementsKeysPageData page = client.get("/api/internal/admin/retroachievements-keys", RetroAchievementsKeysPageData.class);
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
         };
     }
 
@@ -1524,6 +1529,7 @@ public class RealApiService implements ApiService {
             case STEAMGRIDDB -> client.call(HttpMethod.POST, "/api/internal/admin/steamgriddb-keys", body, Void.class);
             case ITAD -> client.call(HttpMethod.POST, "/api/internal/admin/itad-keys", body, Void.class);
             case OPENCRITIC -> client.call(HttpMethod.POST, "/api/internal/admin/opencritic-keys", body, Void.class);
+            case RETROACHIEVEMENTS -> client.call(HttpMethod.POST, "/api/internal/admin/retroachievements-keys", body, Void.class);
         };
         return result.status();
     }
@@ -1536,6 +1542,7 @@ public class RealApiService implements ApiService {
             case STEAMGRIDDB -> client.call(HttpMethod.DELETE, "/api/internal/admin/steamgriddb-keys/{keyId}", null, Void.class, keyId);
             case ITAD -> client.call(HttpMethod.DELETE, "/api/internal/admin/itad-keys/{keyId}", null, Void.class, keyId);
             case OPENCRITIC -> client.call(HttpMethod.DELETE, "/api/internal/admin/opencritic-keys/{keyId}", null, Void.class, keyId);
+            case RETROACHIEVEMENTS -> client.call(HttpMethod.DELETE, "/api/internal/admin/retroachievements-keys/{keyId}", null, Void.class, keyId);
         };
         return result.status();
     }
@@ -1548,6 +1555,7 @@ public class RealApiService implements ApiService {
             case STEAMGRIDDB -> client.call(HttpMethod.POST, "/api/internal/admin/steamgriddb-keys/refresh", null, Void.class);
             case ITAD -> client.call(HttpMethod.POST, "/api/internal/admin/itad-keys/refresh", null, Void.class);
             case OPENCRITIC -> client.call(HttpMethod.POST, "/api/internal/admin/opencritic-keys/refresh", null, Void.class);
+            case RETROACHIEVEMENTS -> client.call(HttpMethod.POST, "/api/internal/admin/retroachievements-keys/refresh", null, Void.class);
         };
         return result.status();
     }

@@ -2049,6 +2049,21 @@ class RealApiServiceTest {
     }
 
     @Test
+    void retroAchievementsKeys_areReadAndManagedThroughTheirRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.RETROACHIEVEMENTS;
+        respond(HttpMethod.GET, "/api/internal/admin/retroachievements-keys", "{\"keys\":[],\"retroachievementsEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/retroachievements-keys")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/retroachievements-keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/retroachievements-keys/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
+    }
+
+    @Test
     void steamGridDbKeys_areReadAndManagedThroughTheirRoutes() {
         var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAMGRIDDB;
         respond(HttpMethod.GET, "/api/internal/admin/steamgriddb-keys", "{\"keys\":[],\"steamgriddbEnabled\":true}");
