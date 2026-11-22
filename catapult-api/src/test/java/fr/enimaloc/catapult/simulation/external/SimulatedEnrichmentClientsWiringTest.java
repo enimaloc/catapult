@@ -176,8 +176,11 @@ class SimulatedEnrichmentClientsWiringTest {
         assertThat(title.productIds()).containsExactly("9NBLGGH4NNS1");
         assertThat(title.currentGamerscore()).isEqualTo(350);
         assertThat(title.totalGamerscore()).isEqualTo(1000);
-        assertThat(xbox.achievements(id, session, title.titleId())).hasSize(10)
-                .filteredOn(a -> a.unlocked()).hasSize(3);
+        var achievements = xbox.achievements(id, session, title.titleId());
+        assertThat(achievements).hasSize(10).filteredOn(a -> a.unlocked()).hasSize(3);
+        assertThat(achievements.stream().filter(a -> a.unlocked()).mapToInt(a -> a.points()).sum())
+                .as("the unlocked gamerscore matches the title history").isEqualTo(title.currentGamerscore());
+        assertThat(achievements.stream().mapToInt(a -> a.points()).sum()).isEqualTo(title.totalGamerscore());
         assertThat(xbox.minutesPlayed(id, session, title.titleId())).contains(480L);
         assertThatThrownBy(() -> xbox.achievements(id, session, "2000002"))
                 .isInstanceOf(XboxStatsForbiddenException.class);

@@ -50,8 +50,17 @@ public class SimulatedXboxStatsClient implements XboxStatsClient {
                 .mapToObj(i -> new Achievement("" + i, "Achievement " + i, "Do the thing " + i + ".",
                         "https://example.invalid/xbox/" + i + ".png", i <= 3,
                         i <= 3 ? PLAYED.minusSeconds(3_600L * i) : null,
-                        new BigDecimal(i == 1 ? "1.5" : "20"), i <= 3 ? 50 + 100 * (i - 1) : 100, false))
+                        new BigDecimal(i == 1 ? "1.5" : "20"), gamerscore(i), false))
                 .toList();
+    }
+
+    /** 50 + 100 + 200 = 350 unlocked (as the title history says), and 6 × 100 + 50 locked: 1000 in all. */
+    private static int gamerscore(int i) {
+        return switch (i) {
+            case 1, 10 -> 50;
+            case 3 -> 200;
+            default -> 100;
+        };
     }
 
     @Override
