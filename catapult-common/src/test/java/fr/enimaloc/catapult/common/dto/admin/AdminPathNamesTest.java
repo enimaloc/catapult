@@ -21,6 +21,8 @@ class AdminPathNamesTest {
         assertThat(ApiKeyProvider.STEAMGRIDDB.pathName()).isEqualTo("steamgriddb");
         assertThat(ApiKeyProvider.ITAD.apiPath()).isEqualTo("itad-keys");
         assertThat(ApiKeyProvider.ITAD.pathName()).isEqualTo("itad");
+        assertThat(ApiKeyProvider.RETROACHIEVEMENTS.apiPath()).isEqualTo("retroachievements-keys");
+        assertThat(ApiKeyProvider.RETROACHIEVEMENTS.pathName()).isEqualTo("retroachievements");
         assertThat(ApiKeyProvider.OPENCRITIC.apiPath()).isEqualTo("opencritic-keys");
         assertThat(ApiKeyProvider.OPENCRITIC.pathName()).isEqualTo("opencritic");
     }
