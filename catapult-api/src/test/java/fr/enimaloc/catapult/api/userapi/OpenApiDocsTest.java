@@ -273,15 +273,18 @@ class OpenApiDocsTest {
 
     /**
      * The version 3 answer of {@code /api/me/game} is documented next to the version 2 one (springdoc merges the two
-     * versions of a path into one operation): a oneOf, with the enrichment objects and the version 3 parameters.
+     * versions of a path into one operation): an anyOf, with the enrichment objects and the version 3 parameters.
      */
     @Test
     void docs_describeTheVersion3AnswerOfTheMemberGame() throws Exception {
         JsonNode docs = docs();
 
         JsonNode schema = docs.at("/paths/~1api~1me~1game/get/responses/200/content/application~1json/schema");
+        assertThat(schema.has("oneOf")).as("a v3 payload also fits the v2 schema: anyOf, not oneOf").isFalse();
+        assertThat(docs.at("/paths/~1api~1me~1game/get/responses/200/content/text~1plain/schema/type").asString())
+                .isEqualTo("string");
         List<String> alternatives = new ArrayList<>();
-        schema.get("oneOf").forEach(alternative -> alternatives.add(alternative.get("$ref").asString()));
+        schema.get("anyOf").forEach(alternative -> alternatives.add(alternative.get("$ref").asString()));
         assertThat(alternatives).containsExactly("#/components/schemas/GameInfoResponse",
                 "#/components/schemas/GameInfoV3Response");
         JsonNode v3 = docs.at("/components/schemas/GameInfoV3Response/properties");

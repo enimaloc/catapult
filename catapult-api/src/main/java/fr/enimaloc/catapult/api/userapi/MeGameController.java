@@ -70,8 +70,10 @@ public class MeGameController {
             + "game is detected; otherwise the aggregated game info. The shape follows the API version: "
             + "GameInfoResponse for version 2, GameInfoV3Response (the same objects plus the enrichment ones) for "
             + "version 3.",
-            content = @Content(mediaType = "application/json",
-                    schema = @Schema(oneOf = {GameInfoResponse.class, GameInfoV3Response.class})))
+            content = {@Content(mediaType = "application/json",
+                    schema = @Schema(anyOf = {GameInfoResponse.class, GameInfoV3Response.class})),
+                    @Content(mediaType = "text/plain", schema = @Schema(type = "string",
+                            description = "The one field asked with ?f=, as plain text."))})
     @GetMapping
     public ResponseEntity<?> gameInfo(
             @AuthenticationPrincipal UUID userId,
