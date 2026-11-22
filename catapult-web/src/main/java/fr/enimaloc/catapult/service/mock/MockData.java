@@ -135,8 +135,8 @@ public class MockData {
     /** The Blizzard card too: a region and two imported World of Warcraft characters, the first the main. */
     static final List<String> BLIZZARD_REGIONS = List.of("eu", "us", "kr", "tw");
     private static final List<BlizzardStatsData.WowCharacterOption> MOCK_WOW_CHARACTERS = List.of(
-            new BlizzardStatsData.WowCharacterOption("eu:1001", "Thrall — Draenor (niv. 80, Shaman)"),
-            new BlizzardStatsData.WowCharacterOption("eu:1002", "Jaina — Archimonde (niv. 70, Mage)"));
+            new BlizzardStatsData.WowCharacterOption("eu:1001", "Thrall — Draenor (80, Shaman)"),
+            new BlizzardStatsData.WowCharacterOption("eu:1002", "Jaina — Archimonde (70, Mage)"));
     private String blizzardRegion = "eu";
     private List<BlizzardStatsData.WowCharacterOption> blizzardCharacters = MOCK_WOW_CHARACTERS;
     private String blizzardWowMain = "eu:1001";

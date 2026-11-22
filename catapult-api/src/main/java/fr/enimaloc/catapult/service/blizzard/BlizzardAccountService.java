@@ -59,6 +59,9 @@ public class BlizzardAccountService {
     private final boolean available;
     private final Clock clock;
 
+    /** The region shown (and read) while none is stored. */
+    private static final String DEFAULT_REGION = "eu";
+
     @Autowired
     public BlizzardAccountService(BlizzardAccountRepository accounts, BlizzardWowCharacterRepository characters,
                                   BattleNetFriendLinkRepository links, EnrichmentCache cache,
@@ -202,7 +205,7 @@ public class BlizzardAccountService {
                 .map(c -> new WowCharacterOption(key(c.getRegion(), c.getCharacterId()), label(c))).toList();
         String main = row.filter(r -> r.getWowMainRegion() != null && r.getWowMainCharacterId() != null)
                 .map(r -> key(r.getWowMainRegion(), r.getWowMainCharacterId())).orElse(null);
-        return new BlizzardStatsData(linked, row.map(BlizzardAccount::getRegion).orElse(null),
+        return new BlizzardStatsData(linked, row.map(BlizzardAccount::getRegion).orElse(DEFAULT_REGION),
                 row.map(r -> r.getWowImportedAt() != null).orElse(false), options, main, available,
                 row.map(BlizzardAccount::getWowImportedAt).orElse(null));
     }

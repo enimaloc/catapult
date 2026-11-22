@@ -505,6 +505,8 @@ class MockApiServiceTest {
     void blizzardSettings_followTheChoicesAndTellThePage() {
         assertThat(data.blizzardStatsData().region()).isEqualTo("eu");
         assertThat(data.blizzardStatsData().characters()).hasSize(2);
+        assertThat(data.blizzardStatsData().characters()).extracting(c -> c.label())
+                .containsExactly("Thrall — Draenor (80, Shaman)", "Jaina — Archimonde (70, Mage)");
 
         assertThat(service.saveBlizzardRegion(username, "us")).isEqualTo(204);
         assertThat(service.saveBlizzardRegion(username, "xx")).isEqualTo(400);

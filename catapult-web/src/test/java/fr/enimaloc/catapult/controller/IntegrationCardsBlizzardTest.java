@@ -26,8 +26,8 @@ class IntegrationCardsBlizzardTest {
 
     private static final String PREFIX = "channel.connections.blizzard-stats.";
     private static final List<WowCharacterOption> TWO = List.of(
-            new WowCharacterOption("eu:1001", "Thrall — Draenor (niv. 80, Shaman)"),
-            new WowCharacterOption("us:77", "Jaina — Proudmoore (niv. 70, Mage)"));
+            new WowCharacterOption("eu:1001", "Thrall — Draenor (80, Shaman)"),
+            new WowCharacterOption("us:77", "Jaina — Proudmoore (70, Mage)"));
 
     private static BlizzardStatsData data(boolean linked, boolean imported, List<WowCharacterOption> characters,
                                           String main, boolean available) {
@@ -126,7 +126,7 @@ class IntegrationCardsBlizzardTest {
         Select main = (Select) byId(nodes(data(true, true, TWO, "us:77", true)), "blizzard-main-select");
 
         assertThat(main.options()).extracting(Select.Option::value).containsExactly("eu:1001", "us:77");
-        assertThat(main.options().get(0).text()).isEqualTo(Message.literal("Thrall — Draenor (niv. 80, Shaman)"));
+        assertThat(main.options().get(0).text()).isEqualTo(Message.literal("Thrall — Draenor (80, Shaman)"));
         assertThat(main.value()).isEqualTo("us:77");
         assertThat(shown(main)).isTrue();
         assertThat(main.attrs().state().dataValue()).contains("value:BlizzardAccountChangedEvent.wowMainKey");

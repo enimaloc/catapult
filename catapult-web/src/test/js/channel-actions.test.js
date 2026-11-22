@@ -636,6 +636,39 @@ describe("channel-connections", () => {
             delete document.body.dataset.labelBlizzardStatsDone;
         });
 
+        it("tells an import that found nothing apart from a success, once", () => {
+            document.body.dataset.labelBlizzardStatsEmpty = "Aucun personnage";
+            history.replaceState(null, "", "/channel/enimaloc?imported=wow-empty#integrations");
+
+            render();
+            render();
+
+            expect(snackbars()).toEqual(["Aucun personnage"]);
+            expect(location.search).toBe("");
+            delete document.body.dataset.labelBlizzardStatsEmpty;
+        });
+
+        it("tells a cancelled import as a plain message, not an error", () => {
+            const errors = vi.spyOn(window.CatapultChannel, "showError");
+            history.replaceState(null, "", "/channel/enimaloc?error=battlenet_stats_cancelled#integrations");
+
+            render();
+
+            expect(snackbars()).toEqual(["Import cancelled."]);
+            expect(errors).not.toHaveBeenCalled();
+            errors.mockRestore();
+        });
+
+        it("tells a finished import without going through the error path", () => {
+            const errors = vi.spyOn(window.CatapultChannel, "showError");
+            history.replaceState(null, "", "/channel/enimaloc?imported=wow#integrations");
+
+            render();
+
+            expect(errors).not.toHaveBeenCalled();
+            errors.mockRestore();
+        });
+
         it("leaves any other imported value alone", () => {
             history.replaceState(null, "", "/channel/enimaloc?imported=other#integrations");
 

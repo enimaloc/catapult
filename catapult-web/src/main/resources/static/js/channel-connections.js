@@ -110,7 +110,10 @@ window.CatapultConnections = (function () {
         battlenet_stats_mismatch: ["labelBlizzardStatsMismatch",
             "This is not the Battle.net account linked to Catapult: sign in with the same account."],
         battlenet_stats_failed: ["labelBlizzardStatsFailed", "Importing your characters failed: try again later."],
+        battlenet_stats_cancelled: ["labelBlizzardStatsCancelled", "Import cancelled."],
     };
+    // What is not a failure: shown as a plain message, not an error.
+    const NEUTRAL_LINK_CODES = new Set(["battlenet_stats_cancelled"]);
 
     // Tells a refused Epic login or World of Warcraft import once, or a finished import (?imported=wow): the code
     // leaves the address, so neither a reload nor binding again repeats it.
@@ -120,11 +123,17 @@ window.CatapultConnections = (function () {
         if (Object.hasOwn(EPIC_LINK_ERRORS, code)) {
             url.searchParams.delete("error");
             history.replaceState(history.state, "", url);
-            CatapultChannel.showError(pageLabel(...EPIC_LINK_ERRORS[code]));
+            const show = NEUTRAL_LINK_CODES.has(code) ? CatapultChannel.showMessage : CatapultChannel.showError;
+            show(pageLabel(...EPIC_LINK_ERRORS[code]));
         } else if (url.searchParams.get("imported") === "wow") {
             url.searchParams.delete("imported");
             history.replaceState(history.state, "", url);
-            CatapultChannel.showError(pageLabel("labelBlizzardStatsDone", "World of Warcraft characters imported."));
+            CatapultChannel.showMessage(pageLabel("labelBlizzardStatsDone", "World of Warcraft characters imported."));
+        } else if (url.searchParams.get("imported") === "wow-empty") {
+            url.searchParams.delete("imported");
+            history.replaceState(history.state, "", url);
+            CatapultChannel.showMessage(pageLabel("labelBlizzardStatsEmpty",
+                "No World of Warcraft character was found on your Battle.net account."));
         }
     }
 

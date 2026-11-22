@@ -378,13 +378,18 @@ class BlizzardAccountServiceTest {
     }
 
     @Test
+    void dataShowsTheDefaultRegionWhileNoneIsStored() {
+        assertThat(service.data(user).region()).isEqualTo("eu");
+    }
+
+    @Test
     void dataWithoutALinkOrARow() {
         when(links.findByUserId(user.getId())).thenReturn(Optional.empty());
 
         BlizzardStatsData data = service.data(user);
 
         assertThat(data.linked()).isFalse();
-        assertThat(data.region()).isNull();
+        assertThat(data.region()).isEqualTo("eu");
         assertThat(data.wowImported()).isFalse();
         assertThat(data.wowImportedAt()).isNull();
         assertThat(data.characters()).isEmpty();
