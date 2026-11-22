@@ -112,7 +112,8 @@ public class BlizzardAccountService {
 
     /**
      * Replaces the member's imported characters by {@code imported}. The main stays when it is still listed, else it
-     * becomes the highest level (the first of them on a tie), none for an empty list. Nothing is written without a row.
+     * becomes the highest level (the first of them on a tie), none for an empty list. A member without a row yet (no
+     * region picked) gets one, its region the main's; an empty import starts none. No Battle.net link is a 404.
      */
     public void replaceWowCharacters(UUID userId, List<ImportedCharacter> imported, Instant at) {
         Map<String, BlizzardWowCharacter> rows = new LinkedHashMap<>();
@@ -130,24 +131,35 @@ public class BlizzardAccountService {
             row.setFaction(c.faction());
             rows.putIfAbsent(key(row.getRegion(), row.getCharacterId()), row);
         }
-        boolean written = write(userId, false, row -> {
-            characters.deleteByUserId(userId);
-            characters.saveAll(rows.values());
+        BlizzardWowCharacter best = null;
+        for (BlizzardWowCharacter c : rows.values()) {
+            if (best == null || c.getLevel() > best.getLevel()) {
+                best = c;
+            }
+        }
+        BlizzardWowCharacter fallback = best;
+        Consumer<BlizzardAccount> change = row -> {
+            if (row.getRegion() == null) {
+                row.setRegion(fallback.getRegion());
+            }
             if (row.getWowMainRegion() == null || row.getWowMainCharacterId() == null
                     || !rows.containsKey(key(row.getWowMainRegion(), row.getWowMainCharacterId()))) {
-                BlizzardWowCharacter best = null;
-                for (BlizzardWowCharacter c : rows.values()) {
-                    if (best == null || c.getLevel() > best.getLevel()) {
-                        best = c;
-                    }
-                }
-                row.setWowMainRegion(best == null ? null : best.getRegion());
-                row.setWowMainCharacterId(best == null ? null : best.getCharacterId());
+                row.setWowMainRegion(fallback == null ? null : fallback.getRegion());
+                row.setWowMainCharacterId(fallback == null ? null : fallback.getCharacterId());
             }
             row.setWowImportedAt(at);
-        });
+        };
+        // The characters reference the row: they are written once it is saved
+        Runnable list = () -> {
+            characters.deleteByUserId(userId);
+            characters.saveAll(rows.values());
+        };
+        boolean written = write(userId, !rows.isEmpty(), change, list);
         if (written) {
             done(userId);
+        } else {
+            // No row to keep the date on, and nothing to list: only the link is checked
+            requireLink(userId);
         }
     }
 
@@ -235,11 +247,16 @@ public class BlizzardAccountService {
      * @return false when there was no row and {@code create} is false: nothing was written
      */
     private boolean write(UUID userId, boolean create, Consumer<BlizzardAccount> change) {
+        return write(userId, create, change, () -> { });
+    }
+
+    /** Like {@link #write(UUID, boolean, Consumer)}, {@code afterSave} running in the same transaction once saved. */
+    private boolean write(UUID userId, boolean create, Consumer<BlizzardAccount> change, Runnable afterSave) {
         try {
-            return writeOnce(userId, create, change);
+            return writeOnce(userId, create, change, afterSave);
         } catch (OptimisticLockingFailureException | DataIntegrityViolationException first) {
             try {
-                return writeOnce(userId, create, change);
+                return writeOnce(userId, create, change, afterSave);
             } catch (OptimisticLockingFailureException | DataIntegrityViolationException again) {
                 log.warn("Blizzard settings of {} crossed another write twice: {}", userId,
                         again.getClass().getSimpleName());
@@ -248,7 +265,7 @@ public class BlizzardAccountService {
         }
     }
 
-    private boolean writeOnce(UUID userId, boolean create, Consumer<BlizzardAccount> change) {
+    private boolean writeOnce(UUID userId, boolean create, Consumer<BlizzardAccount> change, Runnable afterSave) {
         return Boolean.TRUE.equals(transactions.execute(status -> {
             if (create) {
                 // The link may have been removed since the caller checked: no row for a member without a link
@@ -262,6 +279,7 @@ public class BlizzardAccountService {
             change.accept(row);
             row.setUpdatedAt(clock.instant());
             accounts.save(row);
+            afterSave.run();
             return true;
         }));
     }

@@ -17,6 +17,7 @@ import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.transaction.support.TransactionOperations;
@@ -33,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -240,9 +242,36 @@ class BlizzardAccountServiceTest {
     }
 
     @Test
-    void replacingForAMemberWithoutARowWritesNothing() {
+    void theFirstImportStartsTheRow() {
+        // A member who never picked a region has no row yet: their first import starts it
         service.replaceWowCharacters(user.getId(), List.of(imported(1, "Alpha", 80)), NOW);
 
+        ArgumentCaptor<BlizzardAccount> saved = ArgumentCaptor.forClass(BlizzardAccount.class);
+        // The characters reference the row: it is saved first
+        InOrder order = inOrder(accounts, characters);
+        order.verify(accounts).save(saved.capture());
+        order.verify(characters).saveAll(any());
+        assertThat(saved.getValue().getRegion()).isEqualTo("eu");
+        assertThat(saved.getValue().getWowMainCharacterId()).isEqualTo(1L);
+        assertThat(saved.getValue().getWowImportedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void anEmptyFirstImportStartsNoRow() {
+        service.replaceWowCharacters(user.getId(), List.of(), NOW);
+
+        verify(characters, never()).saveAll(any());
+        verify(accounts, never()).save(any());
+    }
+
+    @Test
+    void replacingWithoutABattleNetLinkWritesNothing() {
+        when(links.findByUserId(user.getId())).thenReturn(Optional.empty());
+
+        assertProblem(() -> service.replaceWowCharacters(user.getId(), List.of(imported(1, "Alpha", 80)), NOW),
+                ErrorCode.NOT_FOUND);
+
+        verify(characters, never()).deleteByUserId(any());
         verify(characters, never()).saveAll(any());
         verify(accounts, never()).save(any());
     }
