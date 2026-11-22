@@ -138,6 +138,10 @@ public class AccountService {
             account.setSteamId(null);
             userAccountRepository.save(account);
         }
+        if (provider == OAuthToken.Provider.STEAM || provider == OAuthToken.Provider.XBOX) {
+            // the stats read through the link are personal: none of them outlives it
+            enrichmentCache.evictUser(account.getId());
+        }
         if (provider == OAuthToken.Provider.XBOX) {
             xboxUserTokenService.ifPresent(service -> service.evict(account.getId()));
             getterConfigRepository.findByUserAndProvider(account, GetterConfig.Provider.XBOX)

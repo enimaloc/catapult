@@ -2,8 +2,10 @@ package fr.enimaloc.catapult.service.account;
 
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.chatcommand.ChatCommandSetting;
+import fr.enimaloc.catapult.domain.enrichment.GameEnrichmentCacheEntry;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.chatcommand.ChatCommandSettingRepository;
+import fr.enimaloc.catapult.repository.enrichment.GameEnrichmentCacheRepository;
 import fr.enimaloc.catapult.security.TwitchLoginSuccessHandler;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +32,7 @@ class AccountDeletionIntegrationTest {
     @Autowired ExpiredAccountPurge purge;
     @Autowired UserAccountRepository accounts;
     @Autowired ChatCommandSettingRepository settings;
+    @Autowired GameEnrichmentCacheRepository cache;
     @MockitoBean TwitchLoginSuccessHandler twitchLoginSuccessHandler;
 
     private UserAccount account() {
@@ -58,6 +61,28 @@ class AccountDeletionIntegrationTest {
 
         assertThat(accounts.findById(account.getId())).isEmpty();
         assertThat(settings.findByUser(account)).isEmpty();
+    }
+
+    /** The personal stats cached for the member go with the account; the game-wide and other members' ones stay. */
+    @Test
+    void accountDeletionEvictsStats() {
+        UserAccount account = account();
+        UserAccount other = account();
+        String mine = "u:" + account.getId();
+        Instant now = Instant.now();
+        cache.save(new GameEnrichmentCacheEntry("steam-library", mine, "{}", now));
+        cache.save(new GameEnrichmentCacheEntry("steam-achievements", mine + ":app:440", "{}", now));
+        cache.save(new GameEnrichmentCacheEntry("ra-progress", mine + ":game:228", null, now));
+        cache.save(new GameEnrichmentCacheEntry("steam-schema", "app:440:english", "{}", now));
+        cache.save(new GameEnrichmentCacheEntry("steam-library", "u:" + other.getId(), "{}", now));
+
+        accountService.deleteAccountImmediately(account);
+
+        assertThat(cache.findBySourceAndLookupKey("steam-library", mine)).isEmpty();
+        assertThat(cache.findBySourceAndLookupKey("steam-achievements", mine + ":app:440")).isEmpty();
+        assertThat(cache.findBySourceAndLookupKey("ra-progress", mine + ":game:228")).isEmpty();
+        assertThat(cache.findBySourceAndLookupKey("steam-schema", "app:440:english")).isPresent();
+        assertThat(cache.findBySourceAndLookupKey("steam-library", "u:" + other.getId())).isPresent();
     }
 
     @Test

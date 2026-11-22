@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.connections.ProviderConnectionsDto;
 import fr.enimaloc.catapult.service.debug.DebugContext;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
+import fr.enimaloc.catapult.service.enrichment.EnrichmentCache;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -75,6 +76,7 @@ public class SteamOpenIdLinkService {
     private final ChannelEventPublisher channelEventPublisher;
     private final RestClient restClient;
     private final DebugRecording debug;
+    private final EnrichmentCache enrichmentCache;
 
     /** Remembers {@code caller} under a fresh nonce and returns the Steam login URL that will hand it back. */
     public String startRedirect(UUID caller) {
@@ -112,6 +114,8 @@ public class SteamOpenIdLinkService {
         UserAccount account = findOrThrow(caller);
         account.setSteamId(null);
         userAccountRepository.save(account);
+        // the Steam stats read through the link are personal: none of them outlives it
+        enrichmentCache.evictUser(account.getId());
         log.info("Steam disconnected for user {}", account.getId());
         channelEventPublisher.connectionChanged(account.getId(),
                 new ProviderConnectionsDto("STEAM", false, null));
