@@ -60,4 +60,15 @@ public enum EnrichmentSource {
             default -> false;
         };
     }
+
+    /**
+     * Whether a failed fetch of the source is remembered for a while (a per-key backoff) and concurrent fetches of
+     * one key share a single upstream call: the plain public lookups that no service retries or limits on its own.
+     */
+    public boolean backsOff() {
+        return switch (this) {
+            case PROTONDB, STEAMDECK, PCGAMINGWIKI -> true;
+            default -> false;
+        };
+    }
 }

@@ -15,6 +15,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -29,6 +31,24 @@ public class EnrichmentCache {
     private final EnrichmentProperties properties;
     private final JsonMapper mapper;
     private final Clock clock;
+
+    /** First wait after a failed fetch of a key; doubled by each further failure up to {@link #MAX_BACKOFF}. */
+    static final Duration MIN_BACKOFF = Duration.ofMinutes(1);
+    static final Duration MAX_BACKOFF = Duration.ofMinutes(15);
+    private static final int PRUNE_ABOVE = 1_000;
+
+    /** A key's consecutive failures and the instant its upstream may be asked again. */
+    private record Failure(int count, Instant retryAt) {
+    }
+
+    /** What a shared fetch ended with: the value served, or a request to start over (its leader was refused). */
+    private record Shared(Optional<?> value, boolean retry) {
+    }
+
+    private static final Shared RETRY = new Shared(Optional.empty(), true);
+
+    private final ConcurrentHashMap<String, Failure> failures = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, CompletableFuture<Shared>> inFlight = new ConcurrentHashMap<>();
 
     @Autowired
     public EnrichmentCache(GameEnrichmentCacheRepository repository, EnrichmentProperties properties,
@@ -67,6 +87,9 @@ public class EnrichmentCache {
                 }
             }
         }
+        if (source.backsOff()) {
+            return fetchShared(source, lookupKey, type, budget, fetch, cached, now);
+        }
         if (!budget.tryAcquire()) {
             // The budget only gates the upstream call: a stale value is still the last known one.
             if (cached.isPresent()) {
@@ -83,6 +106,73 @@ public class EnrichmentCache {
         }
         store(source, lookupKey, fetched.map(mapper::writeValueAsString).orElse(null), now);
         return fetched;
+    }
+
+    /**
+     * The fetch of a source that {@linkplain EnrichmentSource#backsOff() backs off}. A key whose last fetch failed is
+     * not asked again until its backoff is over (the stale value, else empty, is served: a failure is never
+     * recorded as absent). Concurrent callers of one key share the call of the first: the others wait for its
+     * answer without spending any budget.
+     */
+    @SuppressWarnings("unchecked")
+    private <T> Optional<T> fetchShared(EnrichmentSource source, String lookupKey, Class<T> type, FetchBudget budget,
+                                        Supplier<Optional<T>> fetch, Optional<GameEnrichmentCacheEntry> cached,
+                                        Instant now) {
+        String key = source.key() + '\0' + lookupKey;
+        Supplier<Optional<T>> stale = () -> cached.flatMap(entry -> read(entry, type)).flatMap(v -> v);
+        while (true) {
+            Failure failure = failures.get(key);
+            if (failure != null && failure.retryAt().isAfter(clock.instant())) {
+                log.debug("Enrichment fetch of {} {} skipped: failed {} time(s), next try at {}", source.key(),
+                        lookupKey, failure.count(), failure.retryAt());
+                return stale.get();
+            }
+            CompletableFuture<Shared> mine = new CompletableFuture<>();
+            CompletableFuture<Shared> leader = inFlight.putIfAbsent(key, mine);
+            if (leader != null) {
+                Shared shared = leader.join();
+                if (shared.retry()) {
+                    continue;
+                }
+                return (Optional<T>) shared.value();
+            }
+            try {
+                if (!budget.tryAcquire()) {
+                    if (cached.isPresent()) {
+                        return read(cached.get(), type).orElse(Optional.empty());
+                    }
+                    throw new UpstreamBudgetExceededException(budget.retryAfter());
+                }
+                Optional<T> answer;
+                try {
+                    Optional<T> fetched = fetch.get();
+                    store(source, lookupKey, fetched.map(mapper::writeValueAsString).orElse(null), now);
+                    failures.remove(key);
+                    answer = fetched;
+                } catch (RuntimeException e) {
+                    recordFailure(key);
+                    log.warn("Enrichment fetch failed for {} {}: {}", source.key(), lookupKey, e.toString());
+                    answer = stale.get();
+                }
+                mine.complete(new Shared(answer, false));
+                return answer;
+            } finally {
+                mine.complete(RETRY); // no-op once answered; otherwise the waiters start over
+                inFlight.remove(key, mine);
+            }
+        }
+    }
+
+    private void recordFailure(String key) {
+        Instant now = clock.instant();
+        if (failures.size() >= PRUNE_ABOVE) {
+            failures.values().removeIf(f -> f.retryAt().plus(MAX_BACKOFF).isBefore(now));
+        }
+        failures.merge(key, new Failure(1, now.plus(MIN_BACKOFF)), (old, ignored) -> {
+            int count = old.count() + 1;
+            long millis = Math.min(MAX_BACKOFF.toMillis(), MIN_BACKOFF.toMillis() << Math.min(count - 1, 10));
+            return new Failure(count, now.plusMillis(millis));
+        });
     }
 
     /** How long a "known absent" answer of {@code source} is trusted. */
