@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import static fr.enimaloc.catapult.api.userapi.GameInfoAssembler.LinkStyle.CURRENT;
 import static fr.enimaloc.catapult.api.userapi.GameInfoAssembler.LinkStyle.LEGACY;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class MoreLinksTest {
 
@@ -44,5 +45,16 @@ class MoreLinksTest {
                 .isEqualTo(BASE + "/api/games/steamgriddb/5?version=3");
         assertThat(links.to(MoreLinks.Kind.PCGAMINGWIKI, 42L))
                 .isEqualTo(BASE + "/api/games/pcgamingwiki/42?version=3");
+    }
+
+    /** A personal route only exists since version 3, whatever the style. */
+    @Test
+    void toMe_linksAPersonalRouteInVersion3() {
+        assertThat(new MoreLinks(BASE, CURRENT).toMe("/api/me/stats/steam/440"))
+                .isEqualTo(BASE + "/api/me/stats/steam/440?version=3");
+        assertThat(new MoreLinks(BASE, LEGACY).toMe("/api/me/stats/xbox/1"))
+                .isEqualTo(BASE + "/api/me/stats/xbox/1?version=3");
+        assertThatThrownBy(() -> new MoreLinks(BASE, CURRENT).toMe("/api/games/hltb/1"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

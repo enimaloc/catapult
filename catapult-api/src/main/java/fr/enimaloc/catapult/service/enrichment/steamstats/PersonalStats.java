@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.enrichment.steamstats;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -29,7 +30,10 @@ public final class PersonalStats {
      * One achievement. A locked secret one carries no name nor description; {@code rarity} is the percentage of
      * players who unlocked it, {@code points} the platform's own score for it (null when it has none).
      * {@code secret} is the platform's hidden flag, kept even once the achievement is unlocked (on every platform).
+     * Named for the OpenAPI schema, which takes the simple class name: the Steam store page has an
+     * {@code Achievement} too.
      */
+    @Schema(name = "PersonalAchievement")
     public record Achievement(String id, String name, String description, String iconUrl, boolean unlocked,
                               Instant unlockedAt, BigDecimal rarity, Integer points, boolean secret) {
     }

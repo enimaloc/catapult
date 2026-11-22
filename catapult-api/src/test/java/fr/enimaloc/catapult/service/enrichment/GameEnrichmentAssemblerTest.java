@@ -16,6 +16,7 @@ import fr.enimaloc.catapult.service.enrichment.prices.PricesService;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
+import fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsStatsService;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunEnrichment;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunGame;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunGameService;
@@ -28,6 +29,11 @@ import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckService;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbService;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.PlatformStats;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Status;
+import fr.enimaloc.catapult.service.enrichment.steamstats.SteamStatsService;
+import fr.enimaloc.catapult.service.enrichment.xboxstats.XboxStatsService;
+import fr.enimaloc.catapult.service.enrichment.xboxstats.XboxStatsUnavailableException;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.enrichment.trailer.TrailerSourceResolver;
@@ -44,18 +50,22 @@ import java.net.URI;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /** The parallel, time-boxed gathering of the five enrichment sources and the trailer link. */
@@ -97,6 +107,9 @@ class GameEnrichmentAssemblerTest {
     private final IgdbService igdbService = mock(IgdbService.class);
     private final IgdbGameDetailsService igdbGameDetailsService = mock(IgdbGameDetailsService.class);
     private final TrailerSourceResolver trailers = mock(TrailerSourceResolver.class);
+    private final SteamStatsService steamStats = mock(SteamStatsService.class);
+    private final XboxStatsService xboxStats = mock(XboxStatsService.class);
+    private final RetroAchievementsStatsService raStats = mock(RetroAchievementsStatsService.class);
     private final EnrichmentProperties properties = new EnrichmentProperties();
 
     private GameEnrichmentAssembler assembler;
@@ -106,7 +119,7 @@ class GameEnrichmentAssemblerTest {
         properties.setAggregateTimeout(Duration.ofSeconds(2));
         assembler = new GameEnrichmentAssembler(hltb, protonDb, steamGridDb, steamDeck, pcgw, prices, openCritic,
                 twitch, speedrunGames, speedrunIdentity, speedrunPersonal, igdbService, igdbGameDetailsService,
-                trailers, properties);
+                trailers, steamStats, xboxStats, raStats, properties);
         when(hltb.timeToBeat(any(), any())).thenReturn(Optional.of(TTB));
         when(protonDb.summary(anyString(), any())).thenReturn(Optional.of(PROTON));
         when(steamGridDb.bySteamAppId(anyString(), any())).thenReturn(Optional.of(SGDB));
@@ -140,7 +153,7 @@ class GameEnrichmentAssemblerTest {
                 .thenAnswer(slow(Duration.ofMillis(700), Optional.of(SGDB)));
 
         long start = System.nanoTime();
-        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty());
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
         Duration took = Duration.ofNanos(System.nanoTime() - start);
 
         assertThat(result.hltb()).isEqualTo(TTB);
@@ -163,7 +176,7 @@ class GameEnrichmentAssemblerTest {
         when(protonDb.summary(anyString(), any())).thenAnswer(slow(Duration.ofSeconds(5), Optional.of(PROTON)));
 
         long start = System.nanoTime();
-        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty());
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
         Duration took = Duration.ofNanos(System.nanoTime() - start);
 
         assertThat(result.protondb()).isNull();
@@ -177,7 +190,7 @@ class GameEnrichmentAssemblerTest {
     @Test
     void newSources_askedWithCountryLanguageAndIds() {
         GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "US",
-                "de", LINKS, Optional.empty());
+                "de", LINKS, Optional.empty(), Locale.ENGLISH);
 
         assertThat(result.prices()).isEqualTo(PRICES);
         assertThat(result.opencritic()).isEqualTo(CRITIC);
@@ -192,7 +205,7 @@ class GameEnrichmentAssemblerTest {
         when(igdbService.getGameCache()).thenReturn(Map.of("72", "Portal 2"));
 
         GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"),
-                "Portal 2 - Game of the Year Edition", "FR", null, LINKS, Optional.empty());
+                "Portal 2 - Game of the Year Edition", "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
 
         assertThat(result.opencritic()).isEqualTo(CRITIC);
         verify(openCritic).byName(eq("Portal 2"), eq(FetchBudget.UNLIMITED));
@@ -201,7 +214,7 @@ class GameEnrichmentAssemblerTest {
     @Test
     void newSources_withoutIgdbOrSteamId_pricesByNameOnly() {
         GameEnrichment result = assembler.enrich(HALO, Optional.empty(), Optional.empty(), "Halo", "FR", null,
-                LINKS, Optional.empty());
+                LINKS, Optional.empty(), Locale.ENGLISH);
 
         assertThat(result.prices()).isEqualTo(PRICES);
         assertThat(result.opencritic()).isNull();
@@ -218,7 +231,7 @@ class GameEnrichmentAssemblerTest {
 
         long start = System.nanoTime();
         GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
-                null, LINKS, Optional.empty());
+                null, LINKS, Optional.empty(), Locale.ENGLISH);
         Duration took = Duration.ofNanos(System.nanoTime() - start);
 
         assertThat(result.twitch()).isNull();
@@ -234,7 +247,7 @@ class GameEnrichmentAssemblerTest {
         when(hltb.timeToBeat(any(), any()))
                 .thenThrow(new UpstreamBudgetExceededException(Duration.ofMinutes(1)));
 
-        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty());
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
 
         assertThat(result.steamDeck()).isNull();
         assertThat(result.hltb()).isNull();
@@ -244,7 +257,7 @@ class GameEnrichmentAssemblerTest {
 
     @Test
     void aggregate_nonSteamWithoutAppId_namesOnly() {
-        GameEnrichment result = assembler.enrich(HALO, Optional.empty(), Optional.empty(), "Halo", "FR", null, LINKS, Optional.empty());
+        GameEnrichment result = assembler.enrich(HALO, Optional.empty(), Optional.empty(), "Halo", "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
 
         assertThat(result.protondb()).isNull();
         assertThat(result.steamDeck()).isNull();
@@ -262,7 +275,7 @@ class GameEnrichmentAssemblerTest {
     void xboxGameWithIgdbSteamMapping_usesResolvedAppId() {
         when(igdbService.findExternalUid("1234", GameBinding.SourceType.STEAM)).thenReturn(Optional.of("976730"));
 
-        GameEnrichment result = assembler.enrich(HALO, Optional.of("1234"), Optional.empty(), "Halo", "FR", null, LINKS, Optional.empty());
+        GameEnrichment result = assembler.enrich(HALO, Optional.of("1234"), Optional.empty(), "Halo", "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
 
         assertThat(result.steamAppId()).isEqualTo("976730");
         assertThat(result.protondb()).isEqualTo(PROTON);
@@ -284,32 +297,32 @@ class GameEnrichmentAssemblerTest {
         // Steam: the resolver finds an HLS H.264 stream for the detected app id
         URI hls = URI.create("https://video.akamai.steamstatic.com/hls_264_master.m3u8");
         when(trailers.resolve(eq("620"), isNull(), eq(FetchBudget.UNLIMITED))).thenReturn(Optional.of(hls));
-        GameEnrichment steam = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty());
+        GameEnrichment steam = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
         assertThat(steam.trailer()).isEqualTo(new GameEnrichment.Trailer("mp4", BASE + "/api/me/game/trailer.mp4?version=3"));
 
         // Xbox: IGDB's Steam mapping first, then the detected product, in the resolver's order
         when(igdbService.findExternalUid("72", GameBinding.SourceType.STEAM)).thenReturn(Optional.of("976730"));
         when(trailers.resolve(eq("976730"), eq(HALO.getSourceId()), eq(FetchBudget.UNLIMITED)))
                 .thenReturn(Optional.of(hls));
-        GameEnrichment xbox = assembler.enrich(HALO, Optional.of("72"), Optional.empty(), "Halo", "FR", null, LINKS, Optional.empty());
+        GameEnrichment xbox = assembler.enrich(HALO, Optional.of("72"), Optional.empty(), "Halo", "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
         assertThat(xbox.trailer()).isEqualTo(new GameEnrichment.Trailer("mp4", BASE + "/api/me/game/trailer.mp4?version=3"));
         when(igdbService.findExternalUid("72", GameBinding.SourceType.STEAM)).thenReturn(Optional.empty());
 
         // no HLS stream (none, or the trailer source switched off): IGDB's first video, on YouTube
         when(trailers.resolve(eq("620"), isNull(), any())).thenReturn(Optional.empty());
-        GameEnrichment youtube = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty());
+        GameEnrichment youtube = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
         assertThat(youtube.trailer())
                 .isEqualTo(new GameEnrichment.Trailer("youtube", "https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
 
         // nothing at all
-        GameEnrichment none = assembler.enrich(PORTAL, Optional.empty(), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty());
+        GameEnrichment none = assembler.enrich(PORTAL, Optional.empty(), Optional.of("620"), "Portal 2", "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
         assertThat(none.trailer()).isNull();
     }
 
     @Test
     void enrichAsync_completesWithTheEnrichment() {
         GameEnrichment result = assembler.enrichAsync(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2",
-                "FR", null, LINKS, Optional.empty()).join();
+                "FR", null, LINKS, Optional.empty(), Locale.ENGLISH).join();
 
         assertThat(result.protondb()).isEqualTo(PROTON);
         assertThat(result.steamAppId()).isEqualTo("620");
@@ -334,6 +347,9 @@ class GameEnrichmentAssemblerTest {
                 .withBean(IgdbService.class, () -> igdbService)
                 .withBean(IgdbGameDetailsService.class, () -> igdbGameDetailsService)
                 .withBean(TrailerSourceResolver.class, () -> trailers)
+                .withBean(SteamStatsService.class, () -> steamStats)
+                .withBean(XboxStatsService.class, () -> xboxStats)
+                .withBean(RetroAchievementsStatsService.class, () -> raStats)
                 .withBean(EnrichmentProperties.class)
                 .withUserConfiguration(GameEnrichmentAssembler.class)
                 .run(ctx -> assertThat(ctx).hasSingleBean(GameEnrichmentAssembler.class));
@@ -378,7 +394,7 @@ class GameEnrichmentAssemblerTest {
                 .thenReturn(Optional.of(PENDING));
 
         GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"),
-                "Celeste - Farewell Edition", "FR", null, LINKS, Optional.of(user));
+                "Celeste - Farewell Edition", "FR", null, LINKS, Optional.of(user), Locale.ENGLISH);
 
         assertThat(result.speedrun())
                 .isEqualTo(new SpeedrunEnrichment(RECORDS, RUNNER, PBS, PENDING));
@@ -396,7 +412,7 @@ class GameEnrichmentAssemblerTest {
         when(speedrunGames.records(eq("o1y9j9v6"), any())).thenReturn(Optional.of(RECORDS));
 
         GameEnrichment result = assembler.enrich(HALO, Optional.empty(), Optional.empty(), "Halo", "FR", null,
-                LINKS, Optional.empty());
+                LINKS, Optional.empty(), Locale.ENGLISH);
 
         assertThat(result.speedrun()).isEqualTo(new SpeedrunEnrichment(RECORDS, null, null, null));
         verify(speedrunIdentity, never()).resolve(any(), any());
@@ -409,7 +425,7 @@ class GameEnrichmentAssemblerTest {
         when(speedrunIdentity.resolve(eq(user), any())).thenReturn(Optional.empty());
 
         GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Celeste", "FR",
-                null, LINKS, Optional.of(user));
+                null, LINKS, Optional.of(user), Locale.ENGLISH);
 
         assertThat(result.speedrun()).isEqualTo(new SpeedrunEnrichment(RECORDS, null, null, null));
         verify(speedrunPersonal, never()).personalBests(any(), any(), any());
@@ -424,7 +440,7 @@ class GameEnrichmentAssemblerTest {
                 .thenThrow(new UpstreamBudgetExceededException(Duration.ofMinutes(1)));
 
         GameEnrichment noIdentity = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Celeste",
-                "FR", null, LINKS, Optional.of(user));
+                "FR", null, LINKS, Optional.of(user), Locale.ENGLISH);
         assertThat(noIdentity.speedrun()).isEqualTo(new SpeedrunEnrichment(RECORDS, null, null, null));
 
         when(speedrunIdentity.resolve(eq(user), any())).thenReturn(Optional.of(RUNNER));
@@ -433,21 +449,21 @@ class GameEnrichmentAssemblerTest {
         when(speedrunPersonal.pendingRuns(any(), any(), any(), any())).thenReturn(Optional.of(PENDING));
 
         GameEnrichment noPbs = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Celeste",
-                "FR", null, LINKS, Optional.of(user));
+                "FR", null, LINKS, Optional.of(user), Locale.ENGLISH);
         assertThat(noPbs.speedrun()).isEqualTo(new SpeedrunEnrichment(RECORDS, RUNNER, null, PENDING));
     }
 
     @Test
     void speedrun_unknownGameOrNoRecords_isNull() {
         GameEnrichment unknown = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2",
-                "FR", null, LINKS, Optional.of(member()));
+                "FR", null, LINKS, Optional.of(member()), Locale.ENGLISH);
         assertThat(unknown.speedrun()).isNull();
         verify(speedrunIdentity, never()).resolve(any(), any());
 
         when(speedrunGames.byName(eq("Portal 2"), any())).thenReturn(Optional.of(CELESTE));
         when(speedrunGames.records(eq("o1y9j9v6"), any())).thenReturn(Optional.empty());
         GameEnrichment noRecords = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2",
-                "FR", null, LINKS, Optional.empty());
+                "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
         assertThat(noRecords.speedrun()).isNull();
     }
 
@@ -457,13 +473,131 @@ class GameEnrichmentAssemblerTest {
 
         long start = System.nanoTime();
         GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
-                null, LINKS, Optional.of(member()));
+                null, LINKS, Optional.of(member()), Locale.ENGLISH);
         Duration took = Duration.ofNanos(System.nanoTime() - start);
 
         assertThat(result.speedrun()).isNull();
         assertThat(result.hltb()).isEqualTo(TTB);
         assertThat(result.prices()).isEqualTo(PRICES);
         assertThat(took).isLessThan(Duration.ofSeconds(3));
+    }
+
+    // ---------------------------------------------------------------- personal stats
+
+    private static final PlatformStats STEAM_OK = PlatformStats.of(Status.OK, "620");
+    private static final PlatformStats XBOX_OK = PlatformStats.of(Status.OK, "1144039928");
+    private static final PlatformStats RA_OK = PlatformStats.of(Status.OK, "228");
+
+    private void statsEverywhere(UserAccount user) {
+        when(steamStats.forGame(eq(user), eq("620"), any(), any(), anyBoolean())).thenReturn(Optional.of(STEAM_OK));
+        when(xboxStats.resolveTitle(eq(user), any(), any(), any(), any())).thenReturn(Optional.of("1144039928"));
+        when(xboxStats.forTitle(eq(user), eq("1144039928"), any(), anyBoolean())).thenReturn(Optional.of(XBOX_OK));
+        when(raStats.resolveGame(eq(user), any(), any(), any())).thenReturn(Optional.of(228));
+        when(raStats.forGame(eq(user), eq(228), any(), anyBoolean())).thenReturn(Optional.of(RA_OK));
+    }
+
+    @Test
+    void publicAggregateHasNoStats() {
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
+                null, LINKS, Optional.empty(), Locale.ENGLISH);
+
+        assertThat(result.stats()).isNull();
+        verifyNoInteractions(steamStats, xboxStats, raStats);
+    }
+
+    @Test
+    void memberStats_everyPlatform_summaryOnly() {
+        UserAccount user = member();
+        statsEverywhere(user);
+
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
+                null, LINKS, Optional.of(user), Locale.FRENCH);
+
+        assertThat(result.stats()).isEqualTo(new PersonalStatsEnrichment(STEAM_OK, XBOX_OK, RA_OK,
+                GameBinding.SourceType.STEAM));
+        verify(steamStats).forGame(user, "620", Locale.FRENCH, FetchBudget.UNLIMITED, false);
+        verify(xboxStats).forTitle(user, "1144039928", FetchBudget.UNLIMITED, false);
+        verify(raStats).forGame(user, 228, FetchBudget.UNLIMITED, false);
+    }
+
+    @Test
+    void steamStatsUseIgdbsAppIdAndXboxTheStoreIdIgdbGives() {
+        UserAccount user = member();
+        when(igdbService.findExternalUid("1234", GameBinding.SourceType.STEAM)).thenReturn(Optional.of("620"));
+        when(igdbService.findExternalUid("1234", GameBinding.SourceType.XBOX)).thenReturn(Optional.of("9NBLGGH"));
+        statsEverywhere(user);
+
+        GameEnrichment result = assembler.enrich(HALO, Optional.of("1234"), Optional.empty(), "Halo", "FR", null,
+                LINKS, Optional.of(user), Locale.ENGLISH);
+
+        assertThat(result.stats().steam()).isEqualTo(STEAM_OK);
+        assertThat(result.stats().detectedOn()).isEqualTo(GameBinding.SourceType.XBOX);
+        verify(xboxStats).resolveTitle(eq(user), eq(HALO), eq(Optional.of("9NBLGGH")), eq("Halo"), any());
+    }
+
+    @Test
+    void noPlatformAppliesIsNoStats() {
+        UserAccount user = member();
+        when(steamStats.forGame(any(), any(), any(), any(), anyBoolean())).thenReturn(Optional.empty());
+        when(xboxStats.resolveTitle(any(), any(), any(), any(), any())).thenReturn(Optional.empty());
+        when(raStats.resolveGame(any(), any(), any(), any())).thenReturn(Optional.empty());
+
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
+                null, LINKS, Optional.of(user), Locale.ENGLISH);
+
+        assertThat(result.stats()).isNull();
+        verify(xboxStats, never()).forTitle(any(), any(), any(), anyBoolean());
+        verify(raStats, never()).forGame(any(), anyInt(), any(), anyBoolean());
+    }
+
+    @Test
+    void outageWhileResolvingIsUnavailable() {
+        UserAccount user = member();
+        when(steamStats.forGame(any(), any(), any(), any(), anyBoolean())).thenReturn(Optional.empty());
+        when(xboxStats.resolveTitle(any(), any(), any(), any(), any()))
+                .thenThrow(new XboxStatsUnavailableException("down"));
+        when(raStats.resolveGame(any(), any(), any(), any()))
+                .thenThrow(new fr.enimaloc.catapult.service.enrichment.rastats.RaUnavailableException("down"));
+
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
+                null, LINKS, Optional.of(user), Locale.ENGLISH);
+
+        assertThat(result.stats().xbox()).isEqualTo(PlatformStats.of(Status.UNAVAILABLE, null));
+        assertThat(result.stats().retroachievements()).isEqualTo(PlatformStats.of(Status.UNAVAILABLE, null));
+        assertThat(result.stats().steam()).isNull();
+    }
+
+    @Test
+    void slowXboxDoesNotBlockSteamOrOthers() {
+        properties.setAggregateTimeout(Duration.ofMillis(500));
+        UserAccount user = member();
+        statsEverywhere(user);
+        when(xboxStats.forTitle(any(), any(), any(), anyBoolean()))
+                .thenAnswer(slow(Duration.ofSeconds(3), Optional.of(XBOX_OK)));
+
+        long start = System.nanoTime();
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
+                null, LINKS, Optional.of(user), Locale.ENGLISH);
+        Duration took = Duration.ofNanos(System.nanoTime() - start);
+
+        assertThat(result.stats().xbox()).isNull();
+        assertThat(result.stats().steam()).isEqualTo(STEAM_OK);
+        assertThat(result.stats().retroachievements()).isEqualTo(RA_OK);
+        assertThat(result.hltb()).isEqualTo(TTB);
+        assertThat(took).isLessThan(Duration.ofMillis(1500));
+    }
+
+    @Test
+    void personalStatsAlone_sameLookups() {
+        UserAccount user = member();
+        statsEverywhere(user);
+
+        PersonalStatsEnrichment stats = assembler.personalStats(PORTAL, Optional.of("72"), Optional.of("620"),
+                "Portal 2", user, Locale.ENGLISH);
+
+        assertThat(stats).isEqualTo(new PersonalStatsEnrichment(STEAM_OK, XBOX_OK, RA_OK,
+                GameBinding.SourceType.STEAM));
+        verifyNoInteractions(hltb, protonDb, prices);
     }
 
     private static Answer<Object> slow(Duration delay, Object value) {

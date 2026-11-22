@@ -31,6 +31,7 @@ GET,/api/me/custom-bindings,,ptoken,12,
 GET,/api/me/drops,,ptoken,11,fixed:the token and the drops gate then the current game's binding; the campaigns are Catapult's copy of ttvdrops
 GET,/api/me/game,,ptoken,13,fixed:the one game the channel plays and resolved with its IGDB and DTDD data
 GET,/api/me/game/summary,,ptoken,13,fixed:the one game the channel plays and resolved with its IGDB and DTDD data
+GET,/api/me/stats,?version=3,ptoken,13,fixed:the one game the channel plays; every stats source is off in this context
 GET,/api/me/bindings/{bindingId},,ptoken,5,fixed:one binding
 # public, but GET /api/connect/steam/callback: it only redirects (no SQL) and every row must answer 2xx
 GET,/api/internal/changelog,,anon,0,fixed:read from a file

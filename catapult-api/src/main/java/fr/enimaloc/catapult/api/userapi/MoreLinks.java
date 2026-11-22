@@ -8,14 +8,15 @@ import java.util.Map;
  * Builds the absolute "more" links of an answer: the caller's origin ({@code baseUrl}) followed by the detail route
  * of a kind of object in the given {@link GameInfoAssembler.LinkStyle}. The legacy style keeps the frozen
  * {@code /api/user/{kind}/{id}} links; the current one points at {@code /api/games/{kind}/{id}} and, for a binding,
- * {@code /api/me/bindings/{id}}. A route that only exists since version 3 gets {@link #SINCE_V3_QUERY}: the link
- * must work when opened as is (a browser, OBS or a {@code <video>} tag sends no {@code X-API-Version}, and the
- * default version may be 2).
+ * {@code /api/me/bindings/{id}}; {@link #toMe} links to a personal route. A route that only exists since version 3
+ * gets {@link #SINCE_V3_QUERY}: the link must work when opened as is (a browser, OBS or a {@code <video>} tag sends
+ * no {@code X-API-Version}, and the default version may be 2).
  */
 public record MoreLinks(String baseUrl, GameInfoAssembler.LinkStyle style) {
 
     /** The query that selects version 3 on a link opened without the version header. */
     public static final String SINCE_V3_QUERY = "?" + ApiV2.VERSION_PARAM + "=" + ApiV2.VERSION_3;
+    private static final String ME_PREFIX = "/api/me/";
 
     /** The kinds of object a "more" link can point at. */
     public enum Kind {
@@ -52,6 +53,17 @@ public record MoreLinks(String baseUrl, GameInfoAssembler.LinkStyle style) {
             this.segment = segment;
             this.sinceV3 = sinceV3;
         }
+    }
+
+    /**
+     * The absolute link to the personal route {@code path} (under {@code /api/me}, its ids already in it), which
+     * only exists since version 3.
+     */
+    public String toMe(String path) {
+        if (!path.startsWith(ME_PREFIX)) {
+            throw new IllegalArgumentException("Not a personal route: " + path);
+        }
+        return baseUrl + path + SINCE_V3_QUERY;
     }
 
     /** The absolute link to the detail route of the {@code kind} object named {@code id}. */

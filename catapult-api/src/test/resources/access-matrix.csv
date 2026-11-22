@@ -517,3 +517,8 @@ HEAD,/api/games/xbox/{productId}/trailer.mp4,productId=9NBLGGH4R315;?version=3,,
 GET,/api/me/game/trailer.mp4,?version=3,,401,401,401,401,401,401,PASS
 HEAD,/api/me/game/trailer.mp4,?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/speedrun,?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats,?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/steam/{appId},appId=440;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/xbox/{titleId},titleId=1144039928;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/retroachievements/{gameId},gameId=228;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/retroachievements,?version=3,,401,401,401,401,401,401,PASS

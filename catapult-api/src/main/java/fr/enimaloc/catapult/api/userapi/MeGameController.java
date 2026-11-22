@@ -52,7 +52,10 @@ public class MeGameController {
                     + "\"more\" link), the trailer, prices, opencritic and twitch (store prices in "
                     + "?country=, default FR; Twitch streams in ?language=), and speedrun (speedrun.com world "
                     + "records of the main categories, plus your account, personal bests and pending runs on the "
-                    + "game; these three null when no speedrun.com account is found for you).")
+                    + "game; these three null when no speedrun.com account is found for you), and stats: your own "
+                    + "play time and achievements on the game on steam, xbox and retroachievements (each null when "
+                    + "the platform does not apply, each with a status and a \"more\" link to every achievement). "
+                    + "Personal data, never served on a public route.")
     @ApiResponse(responseCode = "200", description = "inGame=false with every platform object null while no "
             + "game is detected; otherwise the aggregated game info.")
     @GetMapping
@@ -76,7 +79,10 @@ public class MeGameController {
                     + "(SteamGridDB grid, else IGDB cover), trailer ({kind: mp4|youtube, url}), price (best "
                     + "store price), criticScore, liveViewers, worldRecord (speedrun.com's main category: "
                     + "{category, time in seconds, runners}) and personalBest (yours in that category, else your "
-                    + "best place: {category, time, place}).")
+                    + "best place: {category, time, place}), playtime (your play time in minutes on the platform the "
+                    + "game was detected on, else the first answering ok), achievements ({platform, unlocked, total}) "
+                    + "and lastAchievement (your latest unlock on the game, any platform: {platform, name, "
+                    + "unlockedAt, rarity}). These three are personal data, never served on a public route.")
     @ApiResponse(responseCode = "200", description = "inGame=false while no game is detected; otherwise the "
             + "summarized game info.")
     @GetMapping("/summary")

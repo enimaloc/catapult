@@ -17,6 +17,7 @@ import fr.enimaloc.catapult.simulation.panel.MockPanelApiController;
 import fr.enimaloc.catapult.simulation.panel.MockPanelController;
 import fr.enimaloc.catapult.simulation.twitch.SimulatedTwitchService;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -62,7 +63,7 @@ class CatapultApplicationMockTests extends FullContextTestBase {
         GameEnrichment enrichment = context.getBean(GameEnrichmentAssembler.class).enrich(
                 new DetectedGame("570", GameBinding.SourceType.STEAM, "Dota 2"), Optional.empty(),
                 Optional.of("570"), "Dota 2", "FR", null,
-                new MoreLinks("http://localhost", GameInfoAssembler.LinkStyle.CURRENT), Optional.empty());
+                new MoreLinks("http://localhost", GameInfoAssembler.LinkStyle.CURRENT), Optional.empty(), Locale.ENGLISH);
 
         assertThat(enrichment.protondb()).isNotNull();
         assertThat(enrichment.protondb().tier()).isEqualTo("gold");
