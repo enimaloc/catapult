@@ -162,4 +162,16 @@ class HttpTraceLoggingInterceptorTest {
 
         assertThat(logs.list).isEmpty();
     }
+
+    @Test
+    void tokenResponseIsMasked() throws IOException {
+        MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.POST,
+                URI.create("https://oauth.battle.net/token"));
+
+        ClientHttpResponse response = interceptor.intercept(request, "grant_type=client_credentials".getBytes(),
+                respondWith("{\"access_token\":\"SECRETTOKEN\",\"token_type\":\"bearer\",\"expires_in\":86399}"));
+
+        assertThat(messages()).doesNotContain("SECRETTOKEN").contains("token_type");
+        assertThat(new String(response.getBody().readAllBytes(), StandardCharsets.UTF_8)).contains("SECRETTOKEN");
+    }
 }

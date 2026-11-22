@@ -23,7 +23,8 @@ public final class PersonalStats {
         @JsonProperty("not_owned") NOT_OWNED,
         @JsonProperty("no_achievements") NO_ACHIEVEMENTS,
         @JsonProperty("unsupported") UNSUPPORTED,
-        @JsonProperty("unavailable") UNAVAILABLE
+        @JsonProperty("unavailable") UNAVAILABLE,
+        @JsonProperty("not_found") NOT_FOUND
     }
 
     /**

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.enrichment;
 
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -58,6 +59,18 @@ public class EnrichmentProperties {
         private int perMemberPerMinute = 10;
     }
 
+    /** Blizzard API settings that are not a source's own ({@code catapult.enrichment.blizzard.*}). */
+    @Getter
+    @Setter
+    public static class Blizzard {
+        /** Upstream calls per hour (the API allows 36 000). */
+        private int perHour = 30_000;
+        /** Upstream calls per second (the API allows 100). */
+        private int perSecond = 20;
+        /** Region used when the member's account or the request names none. */
+        private BlizzardRegion defaultRegion = BlizzardRegion.EU;
+    }
+
     private SourceSettings hltb = new SourceSettings();
     private SourceSettings protondb = new SourceSettings();
     private SourceSettings steamgriddb = new SourceSettings();
@@ -84,6 +97,15 @@ public class EnrichmentProperties {
     private SourceSettings raUser = new SourceSettings();
     private SourceSettings raProgress = new SourceSettings();
     private SourceSettings raRecent = new SourceSettings();
+    private SourceSettings blizzardWowCharacter = new SourceSettings();
+    private SourceSettings blizzardWowAchievements = new SourceSettings();
+    private SourceSettings blizzardSc2Profile = new SourceSettings();
+    private SourceSettings blizzardD3Profile = new SourceSettings();
+    private SourceSettings blizzardWowToken = new SourceSettings();
+    private SourceSettings blizzardHsSets = new SourceSettings();
+    private SourceSettings blizzardHsDeck = new SourceSettings();
+    private SourceSettings blizzardD3Season = new SourceSettings();
+    private Blizzard blizzard = new Blizzard();
     private Speedrun speedrun = new Speedrun();
     private RetroAchievements retroachievements = new RetroAchievements();
     private XboxStats xboxStats = new XboxStats();
@@ -152,6 +174,18 @@ public class EnrichmentProperties {
         return xboxStats.getPerMemberPerMinute();
     }
 
+    public int blizzardPerHour() {
+        return blizzard.getPerHour();
+    }
+
+    public int blizzardPerSecond() {
+        return blizzard.getPerSecond();
+    }
+
+    public BlizzardRegion blizzardDefaultRegion() {
+        return blizzard.getDefaultRegion();
+    }
+
     public int speedrunPerMinute() {
         return speedrun.getPerMinute();
     }
@@ -192,6 +226,14 @@ public class EnrichmentProperties {
             case RA_USER -> raUser;
             case RA_PROGRESS -> raProgress;
             case RA_RECENT -> raRecent;
+            case BLIZZARD_WOW_CHARACTER -> blizzardWowCharacter;
+            case BLIZZARD_WOW_ACHIEVEMENTS -> blizzardWowAchievements;
+            case BLIZZARD_SC2_PROFILE -> blizzardSc2Profile;
+            case BLIZZARD_D3_PROFILE -> blizzardD3Profile;
+            case BLIZZARD_WOW_TOKEN -> blizzardWowToken;
+            case BLIZZARD_HS_SETS -> blizzardHsSets;
+            case BLIZZARD_HS_DECK -> blizzardHsDeck;
+            case BLIZZARD_D3_SEASON -> blizzardD3Season;
         };
     }
 
@@ -210,6 +252,12 @@ public class EnrichmentProperties {
             case STEAM_SCHEMA -> Duration.ofDays(7);
             case STEAM_RARITY -> Duration.ofDays(1);
             case RA_USER -> Duration.ofMinutes(2);
+            case BLIZZARD_WOW_CHARACTER, BLIZZARD_SC2_PROFILE -> Duration.ofMinutes(10);
+            case BLIZZARD_WOW_ACHIEVEMENTS -> Duration.ofMinutes(30);
+            case BLIZZARD_D3_PROFILE -> Duration.ofMinutes(15);
+            case BLIZZARD_WOW_TOKEN -> Duration.ofMinutes(20);
+            case BLIZZARD_HS_SETS, BLIZZARD_D3_SEASON -> Duration.ofDays(1);
+            case BLIZZARD_HS_DECK -> Duration.ofDays(7);
         };
     }
 }

@@ -57,6 +57,10 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
     private static final Pattern SECRET_QUERY_PARAM =
             Pattern.compile("([?&](?:key|api_key|apikey|token|y)=)[^&#]*", Pattern.CASE_INSENSITIVE);
 
+    /** The Blizzard OAuth token answer: its {@code access_token} is a credential (it never reaches the log). */
+    private static final Pattern ACCESS_TOKEN_FIELD =
+            Pattern.compile("(\"access_token\"\\s*:\\s*\")(?:[^\"\\\\]|\\\\.)*(\")");
+
     private final DebugMemberRegistry registry;
     private final DebugExchangeRecorder recorder;
 
@@ -124,7 +128,7 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
                     request.getMethod(),
                     masked(request.getURI()),
                     elapsedMs,
-                    truncate(respBody));
+                    truncate(logged(request, respBody)));
         }
         if (debug != null) {
             debug.emit(raw(at, request, body, response, respBody, null, elapsedMs));
@@ -219,6 +223,15 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
     /** {@code uri} with the value of every credential query parameter replaced by {@code ***}. */
     static String masked(URI uri) {
         return SECRET_QUERY_PARAM.matcher(uri.toString()).replaceAll("$1***");
+    }
+
+    /** The response body as it may be logged: the token of an OAuth token answer is masked. */
+    private static byte[] logged(HttpRequest request, byte[] respBody) {
+        if (respBody == null || respBody.length == 0 || !"oauth.battle.net".equalsIgnoreCase(request.getURI().getHost())) {
+            return respBody;
+        }
+        String masked = ACCESS_TOKEN_FIELD.matcher(new String(respBody, StandardCharsets.UTF_8)).replaceAll("$1***$2");
+        return masked.getBytes(StandardCharsets.UTF_8);
     }
 
     private static String redactAuth(HttpRequest request) {
