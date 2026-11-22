@@ -94,6 +94,9 @@ public class XboxStatsService {
      * The titleId of the game in the member's Xbox library: the detected Xbox game's numeric id, else the history
      * entry carrying the detected / IGDB Store Product ID, else the one entry whose normalized name is
      * {@code searchName}'s. Empty when none or several match, Xbox is off, or the member has no Xbox link.
+     *
+     * @throws XboxStatsUnavailableException when the history is needed but cannot be read (outage, no session) and
+     *         nothing stale is cached: "unavailable", as opposed to "not found"
      */
     public Optional<String> resolveTitle(UserAccount user, DetectedGame detected, Optional<String> storeIdFromIgdb,
                                          String searchName, FetchBudget budget) {
@@ -110,6 +113,9 @@ public class XboxStatsService {
         }
         Looked<Titles> history = history(user, budget);
         if (history.value().isEmpty()) {
+            if (history.failed()) {
+                throw new XboxStatsUnavailableException("Xbox title history unavailable");
+            }
             return Optional.empty();
         }
         List<XboxTitle> titles = history.value().get().titles();
@@ -302,7 +308,8 @@ public class XboxStatsService {
                 why[0] = true;
                 throw e;
             } catch (XboxStatsForbiddenException e) {
-                why[1] = true;
+                // Only a 403 is a lasting refusal; a 401 can be an expired token, so it is an outage.
+                why[e.status() == 403 ? 1 : 0] = true;
                 throw e;
             } catch (RuntimeException e) {
                 // The cache swallows a fetch failure: record it, or a parsing error would read as "absent".

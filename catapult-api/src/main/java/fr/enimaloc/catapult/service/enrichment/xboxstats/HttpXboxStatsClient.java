@@ -200,7 +200,7 @@ public class HttpXboxStatsClient implements XboxStatsClient {
     private static void failOnRefusal(Answer answer) {
         int status = answer.status().value();
         if (status == 401 || status == 403) {
-            throw new XboxStatsForbiddenException("Xbox answered " + status);
+            throw new XboxStatsForbiddenException("Xbox answered " + status, status);
         }
     }
 

@@ -33,6 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -135,6 +136,25 @@ class XboxStatsServiceTest {
     }
 
     @Test
+    void failingHistoryDuringResolutionIsUnavailableNotAbsent() {
+        when(client.titleHistory(any(), any(), anyInt())).thenThrow(new XboxStatsUnavailableException("503"));
+
+        assertThatThrownBy(() -> resolve(new DetectedGame("9MVXMVT8ZKWC", GameBinding.SourceType.XBOX, "x"),
+                Optional.empty(), "x")).isInstanceOf(XboxStatsUnavailableException.class);
+
+        doReturn(history()).when(client).titleHistory(any(), any(), anyInt());
+        assertThat(resolve(null, Optional.empty(), "Nothing like this")).isEmpty();
+    }
+
+    @Test
+    void missingSessionDuringResolutionIsUnavailable() {
+        when(tokens.getToken(user)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> resolve(null, Optional.empty(), "Forza Horizon 5"))
+                .isInstanceOf(XboxStatsUnavailableException.class);
+    }
+
+    @Test
     void titleNameIsMatchedWhenUnique() {
         assertThat(resolve(null, Optional.empty(), "forza  horizon 5™")).contains("1791712750");
     }
@@ -207,6 +227,16 @@ class XboxStatsServiceTest {
 
         now.set(now.get().plus(Duration.ofMinutes(31)));
         forTitle(false);
+        verify(client, times(2)).achievements(any(), any(), anyString());
+    }
+
+    @Test
+    void unauthorizedAchievementsAreUnavailableAndNotMemorized() {
+        when(client.achievements(any(), any(), anyString()))
+                .thenThrow(new XboxStatsForbiddenException("401", 401));
+
+        assertThat(forTitle(false).orElseThrow().status()).isEqualTo(Status.UNAVAILABLE);
+        assertThat(forTitle(false).orElseThrow().status()).isEqualTo(Status.UNAVAILABLE);
         verify(client, times(2)).achievements(any(), any(), anyString());
     }
 
