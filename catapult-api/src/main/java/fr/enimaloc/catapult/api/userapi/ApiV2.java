@@ -44,6 +44,7 @@ public final class ApiV2 {
     static final String ME_CUSTOM_BINDINGS_PATH = "/api/me/custom-bindings";
     static final String ME_DROPS_PATH = "/api/me/drops";
     static final String ME_SPEEDRUN_PATH = "/api/me/speedrun";
+    static final String ME_STATS_PATH = "/api/me/stats";
 
     // The widget token of the dev backdoor (DevBackdoorResolver) that names no real game, and the
     // example the legacy routes' "uuid" path parameter documents. LegacyRoutesGate does not read it:
@@ -54,6 +55,8 @@ public final class ApiV2 {
     // variable): a malformed id is a 400 before any cache read, upstream call or database write.
     static final String IGDB_ID = "\\d{1,19}";
     static final String STEAM_APP_ID = "\\d{1,10}";
+    static final String XBOX_TITLE_ID = "\\d{1,10}";
+    static final String RA_GAME_ID = "\\d{1,9}";
     static final String XBOX_PRODUCT_ID = "[A-Za-z0-9]{12}";
     static final String ITAD_ID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
     static final String OPENCRITIC_ID = "\\d{1,10}";

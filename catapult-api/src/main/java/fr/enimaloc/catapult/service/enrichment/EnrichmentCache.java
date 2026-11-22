@@ -11,7 +11,10 @@ import tools.jackson.databind.json.JsonMapper;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
@@ -56,7 +59,7 @@ public class EnrichmentCache {
         Optional<GameEnrichmentCacheEntry> cached = repository.findBySourceAndLookupKey(source.key(), lookupKey);
         if (cached.isPresent()) {
             GameEnrichmentCacheEntry entry = cached.get();
-            Duration ttl = entry.getPayload() == null ? properties.absentTtl() : settings.ttl();
+            Duration ttl = entry.getPayload() == null ? absentTtl(source) : settings.ttl();
             if (entry.getFetchedAt().plus(ttl).isAfter(now)) {
                 Optional<Optional<T>> hit = read(entry, type);
                 if (hit.isPresent()) {
@@ -80,6 +83,19 @@ public class EnrichmentCache {
         }
         store(source, lookupKey, fetched.map(mapper::writeValueAsString).orElse(null), now);
         return fetched;
+    }
+
+    /** How long a "known absent" answer of {@code source} is trusted. */
+    Duration absentTtl(EnrichmentSource source) {
+        return source.personal() ? properties.personalAbsentTtl() : properties.absentTtl();
+    }
+
+    /** Forgets everything the personal sources cached for one member ({@code u:<id>} and {@code u:<id>:...}). */
+    public void evictUser(UUID userId) {
+        List<String> sources = Arrays.stream(EnrichmentSource.values())
+                .filter(EnrichmentSource::personal).map(EnrichmentSource::key).toList();
+        String key = "u:" + userId;
+        repository.deleteByKeyOfSources(sources, key, key + ":%");
     }
 
     /**

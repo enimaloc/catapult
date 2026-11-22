@@ -264,4 +264,64 @@ class EnrichmentCacheTest {
         assertThat(bound.source(EnrichmentSource.STEAMGRIDDB).ttl()).isEqualTo(Duration.ofDays(3));
         assertThat(bound.source(EnrichmentSource.TRAILER).ttl()).isEqualTo(Duration.ofDays(1));
     }
+
+    @Test
+    void evictUserDropsOnlyThatMembersPersonalEntries() {
+        java.util.UUID a = java.util.UUID.randomUUID();
+        cache.evictUser(a);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<java.util.Collection<String>> sources = ArgumentCaptor.forClass(java.util.Collection.class);
+        verify(repository).deleteByKeyOfSources(sources.capture(), org.mockito.ArgumentMatchers.eq("u:" + a),
+                org.mockito.ArgumentMatchers.eq("u:" + a + ":%"));
+        assertThat(sources.getValue()).contains("steam-library", "steam-achievements", "xbox-titles",
+                "xbox-achievements", "xbox-playtime", "ra-user", "ra-progress", "ra-recent")
+                .doesNotContain("steam-schema", "steam-rarity", "hltb", "speedrun-user");
+    }
+
+    @Test
+    void personalSourcesAreTheMemberOnes() {
+        assertThat(EnrichmentSource.STEAM_SCHEMA.personal()).isFalse();
+        assertThat(EnrichmentSource.STEAM_RARITY.personal()).isFalse();
+        assertThat(EnrichmentSource.STEAM_LIBRARY.personal()).isTrue();
+        assertThat(EnrichmentSource.RA_RECENT.personal()).isTrue();
+        assertThat(EnrichmentSource.PROTONDB.personal()).isFalse();
+    }
+
+    @Test
+    void personalAbsentAnswerIsTrustedFifteenMinutes_sharedOneADay() {
+        String key = "u:x:app:440";
+        when(repository.findBySourceAndLookupKey("steam-library", key)).thenReturn(Optional.of(
+                new GameEnrichmentCacheEntry("steam-library", key, null, NOW.minus(Duration.ofMinutes(20)))));
+        when(repository.findBySourceAndLookupKey("steam-schema", "app:440:english")).thenReturn(Optional.of(
+                new GameEnrichmentCacheEntry("steam-schema", "app:440:english", null, NOW.minus(Duration.ofHours(2)))));
+        AtomicInteger fetches = new AtomicInteger();
+
+        cache.get(EnrichmentSource.STEAM_LIBRARY, key, Payload.class, FetchBudget.UNLIMITED,
+                () -> { fetches.incrementAndGet(); return Optional.empty(); });
+        assertThat(fetches).hasValue(1);
+
+        cache.get(EnrichmentSource.STEAM_SCHEMA, "app:440:english", Payload.class, FetchBudget.UNLIMITED,
+                () -> { fetches.incrementAndGet(); return Optional.empty(); });
+        assertThat(fetches).hasValue(1);
+    }
+
+    @Test
+    void newSourcesHaveTheirDefaultTtls() {
+        assertThat(properties.source(EnrichmentSource.STEAM_LIBRARY).ttl()).isEqualTo(Duration.ofMinutes(15));
+        assertThat(properties.source(EnrichmentSource.STEAM_ACHIEVEMENTS).ttl()).isEqualTo(Duration.ofMinutes(5));
+        assertThat(properties.source(EnrichmentSource.STEAM_SCHEMA).ttl()).isEqualTo(Duration.ofDays(7));
+        assertThat(properties.source(EnrichmentSource.STEAM_RARITY).ttl()).isEqualTo(Duration.ofDays(1));
+        assertThat(properties.source(EnrichmentSource.XBOX_TITLES).ttl()).isEqualTo(Duration.ofMinutes(5));
+        assertThat(properties.source(EnrichmentSource.XBOX_ACHIEVEMENTS).ttl()).isEqualTo(Duration.ofMinutes(5));
+        assertThat(properties.source(EnrichmentSource.XBOX_PLAYTIME).ttl()).isEqualTo(Duration.ofMinutes(15));
+        assertThat(properties.source(EnrichmentSource.RA_USER).ttl()).isEqualTo(Duration.ofMinutes(2));
+        assertThat(properties.source(EnrichmentSource.RA_PROGRESS).ttl()).isEqualTo(Duration.ofMinutes(5));
+        assertThat(properties.source(EnrichmentSource.RA_RECENT).ttl()).isEqualTo(Duration.ofMinutes(5));
+        assertThat(properties.memberPerMinute()).isEqualTo(20);
+        assertThat(properties.raPerMinute()).isEqualTo(30);
+        assertThat(properties.xboxStatsPerMinute()).isEqualTo(120);
+        assertThat(properties.xboxStatsPerMemberPerMinute()).isEqualTo(10);
+        assertThat(properties.personalAbsentTtl()).isEqualTo(Duration.ofMinutes(15));
+    }
 }

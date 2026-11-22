@@ -222,7 +222,8 @@ public class DebugRedactor {
                 continue;
             }
             String name = parts[i].substring(0, eq);
-            if (isSecretName(decode(name))) {
+            String decoded = decode(name);
+            if (isSecretName(decoded) || "y".equalsIgnoreCase(decoded)) {
                 parts[i] = name + "=" + MASK;
             }
         }

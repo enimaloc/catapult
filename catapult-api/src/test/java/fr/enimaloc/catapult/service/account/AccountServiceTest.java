@@ -56,6 +56,7 @@ class AccountServiceTest {
     @Mock private BotToggleService botToggleService;
     @Mock private TwitchChatService twitchChatService;
     @Mock private EventSubService twitchEventSubService;
+    @Mock private fr.enimaloc.catapult.service.enrichment.EnrichmentCache enrichmentCache;
     @InjectMocks private AccountService accountService;
 
     private UserAccount account;
@@ -124,6 +125,16 @@ class AccountServiceTest {
         order.verify(twitchatActionTokenRepository).deleteByUserId(account.getId());
         order.verify(twitchatEventActionService).deleteAllOfUser(account);
         order.verify(userAccountRepository).delete(account);
+    }
+
+    @Test
+    void accountDeletionEvictsEnrichment() {
+        when(oAuthTokenRepository.findByUserAndProvider(account, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.empty());
+
+        accountService.deleteAccountImmediately(account);
+
+        verify(enrichmentCache).evictUser(account.getId());
     }
 
     @Test

@@ -55,7 +55,7 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
     static final int MAX_BODY_CHARS = 4096;
     /** A credential query parameter: its name and {@code =} (group 1), then its value up to the next one. */
     private static final Pattern SECRET_QUERY_PARAM =
-            Pattern.compile("([?&](?:key|api_key|apikey|token)=)[^&#]*", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("([?&](?:key|api_key|apikey|token|y)=)[^&#]*", Pattern.CASE_INSENSITIVE);
 
     private final DebugMemberRegistry registry;
     private final DebugExchangeRecorder recorder;
