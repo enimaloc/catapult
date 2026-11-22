@@ -145,8 +145,9 @@ public class HttpRetroAchievementsClient implements RetroAchievementsClient {
     // --- HTTP ---
 
     /**
-     * GET, parsed; empty on a 404 with a JSON body when {@code absentOn404} (an unknown profile or game). A 401 is a rejected key, a 429 pauses the limiter, everything else that is not a
-     * readable 2xx (3xx included) is {@link RaUnavailableException}.
+     * GET, parsed; empty on a 404 with a JSON body when {@code absentOn404} (an unknown profile or game). A 401 is
+     * a rejected key, a 429 pauses the limiter, everything else that is not a readable 2xx (3xx included) is
+     * {@link RaUnavailableException}.
      */
     private Optional<JsonNode> get(String template, boolean absentOn404, RaCredentials credentials,
                                    Object... variables) {
@@ -249,12 +250,12 @@ public class HttpRetroAchievementsClient implements RetroAchievementsClient {
         return node.isString() && !node.asString().isBlank() ? node.asString() : null;
     }
 
-    /** A number, which the API sometimes sends as a string. */
     /** {@code Untracked} as a boolean or as 0/1. */
     private static boolean untracked(JsonNode node) {
         return node.isBoolean() ? node.booleanValue() : integer(node, 0) != 0;
     }
 
+    /** A number, which the API sometimes sends as a string. */
     private static Integer integer(JsonNode node, Integer fallback) {
         if (node.isNumber()) {
             return node.intValue();
