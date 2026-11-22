@@ -105,8 +105,8 @@ import tools.jackson.databind.json.JsonMapper;
  * (which also says who moderates the channel), {@link SteamStoreService}, {@link XboxService},
  * {@link MsaAuthClient}, {@link SteamApiClient} and {@link SteamPlaytestRedirectResolver}, and the two a run was
  * seen to call: {@link IgdbService} (its app token, from {@code id.twitch.tv}) and {@link XboxStoreService} (the
- * Microsoft display catalog), and {@link SpeedrunClient} (the speedrun.com settings check the name or key a
- * member saves). The configurable ones point at a closed local port ({@code full-context.properties}).
+ * Microsoft display catalog), {@link SpeedrunClient} (the speedrun.com settings check the name or key a
+ * member saves) and {@code RetroAchievementsClient} (the same check for a RetroAchievements name or key). The configurable ones point at a closed local port ({@code full-context.properties}).
  *
  * <p>Each caller's request runs in its own transaction, rolled back after it, so no caller sees what another did
  * (a slug one created, a statement that failed and aborted the transaction); the accounts are committed once, before
@@ -201,6 +201,9 @@ abstract class AccessMatrixSupport {
 
     @MockitoBean
     SpeedrunClient speedrunClient;
+
+    @MockitoBean
+    fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsClient retroAchievementsClient;
 
     @Autowired
     MockMvc mvc;

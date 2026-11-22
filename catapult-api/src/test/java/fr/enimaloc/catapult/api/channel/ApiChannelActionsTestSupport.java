@@ -88,6 +88,7 @@ abstract class ApiChannelActionsTestSupport {
     @MockitoBean fr.enimaloc.catapult.service.emergency.EmergencyViews emergencyViews;
     @MockitoBean fr.enimaloc.catapult.service.emergency.EmergencyStopService emergencyStopService;
     @MockitoBean fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService speedrunAccountService;
+    @MockitoBean fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService retroAchievementsAccountService;
 
     static RequestPostProcessor userJwt(UUID id) {
         return jwt().jwt(j -> j.subject(id.toString()).claim("twitchId", "123"))

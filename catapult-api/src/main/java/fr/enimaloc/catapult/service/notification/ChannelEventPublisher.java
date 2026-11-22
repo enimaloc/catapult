@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
@@ -152,6 +153,12 @@ public class ChannelEventPublisher {
     public void speedrunAccountChanged(UUID channelOwnerId, SpeedrunData account) {
         publish(channelOwnerId, ChannelEvents.SPEEDRUN_ACCOUNT_CHANGED,
                 (id, login) -> new ChannelEvents.SpeedrunAccountChanged(id, login, account));
+    }
+
+    /** The owner's RetroAchievements settings now stand as {@code account} (the name only, never the key). */
+    public void retroAchievementsAccountChanged(UUID channelOwnerId, RetroAchievementsData account) {
+        publish(channelOwnerId, ChannelEvents.RETROACHIEVEMENTS_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.RetroAchievementsAccountChanged(id, login, account));
     }
 
     /** The channel's active custom binding is now {@code activeId}; null once deactivated. */

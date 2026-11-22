@@ -204,6 +204,10 @@ PUT,/api/internal/users/{userId}/settings/speedrun/username,,"{""username"":""ma
 DELETE,/api/internal/users/{userId}/settings/speedrun/username,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/speedrun/api-key,,"{""apiKey"":""matrix""}",401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/settings/speedrun/api-key,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/retroachievements/username,,"{""username"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/retroachievements/username,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/retroachievements/api-key,,"{""apiKey"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/retroachievements/api-key,,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/settings/twitchat,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat,,"{""enabled"":false}",401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat/branch,,,401,401,403,403,PASS,403,401

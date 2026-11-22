@@ -1,0 +1,35 @@
+{
+  "ID": 228,
+  "Title": "Super Mario World",
+  "ConsoleID": 3,
+  "ConsoleName": "SNES/Super Famicom",
+  "ImageIcon": "/Images/112233.png",
+  "ImageBoxArt": "/Images/000003.png",
+  "NumAchievements": 3,
+  "NumDistinctPlayers": 1000,
+  "NumDistinctPlayersCasual": 1000,
+  "NumDistinctPlayersHardcore": 800,
+  "NumAwardedToUser": 2,
+  "NumAwardedToUserHardcore": 1,
+  "UserCompletion": "66.67%",
+  "UserCompletionHardcore": "33.33%",
+  "UserTotalPlaytime": 7200,
+  "HighestAwardKind": "beaten-hardcore",
+  "HighestAwardDate": "2026-11-21T09:00:00+00:00",
+  "Achievements": {
+    "9": {
+      "ID": 9, "Title": "Third", "Description": "Do the third thing", "Points": 25, "TrueRatio": 90,
+      "BadgeName": "00009", "DisplayOrder": 3, "type": null, "NumAwarded": 100, "NumAwardedHardcore": 50
+    },
+    "3": {
+      "ID": 3, "Title": "First", "Description": "Do the first thing", "Points": 5, "TrueRatio": 7,
+      "BadgeName": "00003", "DisplayOrder": 1, "type": "progression", "NumAwarded": 900, "NumAwardedHardcore": 700,
+      "DateEarned": "2026-11-20 12:00:00", "DateEarnedHardcore": "2026-11-20 12:00:00"
+    },
+    "5": {
+      "ID": 5, "Title": "Second", "Description": "Do the second thing", "Points": 10, "TrueRatio": 20,
+      "BadgeName": "00005", "DisplayOrder": 2, "type": "win_condition", "NumAwarded": 500, "NumAwardedHardcore": 300,
+      "DateEarned": "2026-11-21 09:00:00"
+    }
+  }
+}

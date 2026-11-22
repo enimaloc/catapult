@@ -13,6 +13,8 @@ import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.ObsSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsApiKeyRequest;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
@@ -39,6 +41,7 @@ import fr.enimaloc.catapult.service.title.StreamTitleService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventActionService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
+import fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService;
 import fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService;
 import fr.enimaloc.catapult.service.steam.SteamPersonalTokenService;
 import lombok.RequiredArgsConstructor;
@@ -88,6 +91,7 @@ public class ApiChannelActionsController {
     private final EmergencyViews emergencyViews;
     private final EmergencyStopService emergencyStopService;
     private final SpeedrunAccountService speedrunAccountService;
+    private final RetroAchievementsAccountService retroAchievementsAccountService;
 
 
     // ── Binding actions ───────────────────────────────────────────────────────
@@ -415,6 +419,46 @@ public class ApiChannelActionsController {
             @PathVariable UUID userId) {
 
         speedrunAccountService.deleteApiKey(userResolver.user(userId));
+    }
+
+    /** 400 when RetroAchievements does not know the name, 503 when it cannot be asked (or no key can ask it). */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/retroachievements/username")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveRetroAchievementsUsername(
+            @PathVariable UUID userId,
+            @RequestBody RetroAchievementsUsernameRequest body) {
+
+        retroAchievementsAccountService.saveUsername(userResolver.user(userId), body.username());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/retroachievements/username")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRetroAchievementsUsername(
+            @PathVariable UUID userId) {
+
+        retroAchievementsAccountService.deleteUsername(userResolver.user(userId));
+    }
+
+    /** The key is in the body only; 400 when RetroAchievements refuses it or no name is declared, 503 when down. */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/retroachievements/api-key")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveRetroAchievementsApiKey(
+            @PathVariable UUID userId,
+            @RequestBody RetroAchievementsApiKeyRequest body) {
+
+        retroAchievementsAccountService.saveApiKey(userResolver.user(userId), body.apiKey());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/retroachievements/api-key")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRetroAchievementsApiKey(
+            @PathVariable UUID userId) {
+
+        retroAchievementsAccountService.deleteApiKey(userResolver.user(userId));
     }
 
     @PreAuthorize("@authz.ownsChannel(#userId)")

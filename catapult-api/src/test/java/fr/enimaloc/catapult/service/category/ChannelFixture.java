@@ -263,7 +263,8 @@ public class ChannelFixture {
                 mock(TwitchatWidgetSettingsService.class), mock(TwitchatEventActionService.class), dispatcher,
                 mock(fr.enimaloc.catapult.service.emergency.EmergencyViews.class),
                 mock(fr.enimaloc.catapult.service.emergency.EmergencyStopService.class),
-                mock(fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService.class));
+                mock(fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService.class),
+                mock(fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService.class));
     }
 
     /** The category events and Twitch writes, in order. */

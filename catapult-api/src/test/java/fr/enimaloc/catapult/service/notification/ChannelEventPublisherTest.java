@@ -158,6 +158,17 @@ class ChannelEventPublisherTest {
     }
 
     @Test
+    void retroAchievementsAccountChanged_publishesTheCardsData() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData("Scott",
+                "https://retroachievements.org/user/Scott", true, false, true);
+
+        publisher.retroAchievementsAccountChanged(ownerId, account);
+
+        assertThat(published(ChannelEvents.RETROACHIEVEMENTS_ACCOUNT_CHANGED)).isEqualTo(
+                new ChannelEvents.RetroAchievementsAccountChanged(ownerId.toString(), "streamername", account));
+    }
+
+    @Test
     void speedrunAccountChanged_publishesTheCardsData() {
         var account = new fr.enimaloc.catapult.common.dto.channel.SpeedrunData("n1", true, false, "KeyOwner",
                 "KeyOwner", "https://www.speedrun.com/users/KeyOwner", "api_key");
