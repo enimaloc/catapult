@@ -80,19 +80,19 @@ public class HttpRetroAchievementsClient implements RetroAchievementsClient {
 
     @Override
     public Optional<RaUser> profile(String userOrUlid, RaCredentials credentials) {
-        Optional<JsonNode> answer = get("API_GetUserProfile.php?u={u}&y={y}", credentials, userOrUlid,
+        Optional<JsonNode> answer = get("API_GetUserProfile.php?u={u}&y={y}", true, credentials, userOrUlid,
                 credentials.key());
         return answer.filter(json -> json.hasNonNull("ULID") && json.hasNonNull("User")).map(json -> new RaUser(
                 json.get("User").asString(), json.get("ULID").asString(), site(text(json.path("UserPic"))),
                 integer(json.path("TotalPoints"), 0), integer(json.path("TotalSoftcorePoints"), 0),
                 integer(json.path("TotalTruePoints"), 0), text(json.path("RichPresenceMsg")),
-                integer(json.path("LastGameID"), null), integer(json.path("Untracked"), 0) != 0));
+                integer(json.path("LastGameID"), null), untracked(json.path("Untracked"))));
     }
 
     @Override
     public List<RaRecentGame> recentlyPlayed(String ulid, int count, RaCredentials credentials) {
         List<RaRecentGame> games = new ArrayList<>();
-        for (JsonNode node : array(get("API_GetUserRecentlyPlayedGames.php?u={u}&c={c}&y={y}", credentials, ulid,
+        for (JsonNode node : array(get("API_GetUserRecentlyPlayedGames.php?u={u}&c={c}&y={y}", false, credentials, ulid,
                 count, credentials.key()))) {
             if (node.hasNonNull("GameID")) {
                 games.add(new RaRecentGame(integer(node.path("GameID"), 0), text(node.path("ConsoleName")),
@@ -107,7 +107,7 @@ public class HttpRetroAchievementsClient implements RetroAchievementsClient {
 
     @Override
     public Optional<RaGameProgress> progress(int gameId, String ulid, RaCredentials credentials) {
-        Optional<JsonNode> answer = get("API_GetGameInfoAndUserProgress.php?g={g}&u={u}&a=1&y={y}", credentials,
+        Optional<JsonNode> answer = get("API_GetGameInfoAndUserProgress.php?g={g}&u={u}&a=1&y={y}", true, credentials,
                 gameId, ulid, credentials.key());
         return answer.filter(json -> json.hasNonNull("ID")).map(json -> {
             List<RaAchievement> achievements = new ArrayList<>();
@@ -130,7 +130,7 @@ public class HttpRetroAchievementsClient implements RetroAchievementsClient {
     @Override
     public List<RaAchievement> recentAchievements(String ulid, int minutes, RaCredentials credentials) {
         List<RaAchievement> recent = new ArrayList<>();
-        for (JsonNode node : array(get("API_GetUserRecentAchievements.php?u={u}&m={m}&y={y}", credentials, ulid,
+        for (JsonNode node : array(get("API_GetUserRecentAchievements.php?u={u}&m={m}&y={y}", false, credentials, ulid,
                 minutes, credentials.key()))) {
             Instant at = date(node.path("Date"));
             recent.add(new RaAchievement(integer(node.path("AchievementID"), 0), text(node.path("Title")),
@@ -145,10 +145,11 @@ public class HttpRetroAchievementsClient implements RetroAchievementsClient {
     // --- HTTP ---
 
     /**
-     * GET, parsed; empty on 404. A 401 is a rejected key, a 429 pauses the limiter, everything else that is not a
+     * GET, parsed; empty on a 404 with a JSON body when {@code absentOn404} (an unknown profile or game). A 401 is a rejected key, a 429 pauses the limiter, everything else that is not a
      * readable 2xx (3xx included) is {@link RaUnavailableException}.
      */
-    private Optional<JsonNode> get(String template, RaCredentials credentials, Object... variables) {
+    private Optional<JsonNode> get(String template, boolean absentOn404, RaCredentials credentials,
+                                   Object... variables) {
         if (limiter.paused()) {
             throw new RaUnavailableException("RetroAchievements is paused after a rate limit answer");
         }
@@ -164,7 +165,7 @@ public class HttpRetroAchievementsClient implements RetroAchievementsClient {
             answer = restClient.get().uri(API + template, variables).header(HttpHeaders.ACCEPT, "application/json")
                     .exchange((req, res) -> new Answer(res.getStatusCode(), res.getHeaders().getFirst(
                             HttpHeaders.RETRY_AFTER), res.getStatusCode().is2xxSuccessful()
-                            ? res.bodyTo(String.class) : null));
+                            || res.getStatusCode().value() == 404 ? res.bodyTo(String.class) : null));
         } catch (RestClientException e) {
             // The message of a transport failure names the URL, and so the key: it is not kept.
             log.warn("RetroAchievements call failed: {}", e.getClass().getSimpleName());
@@ -182,6 +183,11 @@ public class HttpRetroAchievementsClient implements RetroAchievementsClient {
             throw new RaUnavailableException("RetroAchievements rate limit hit (429)");
         }
         if (status == 404) {
+            // Only a JSON "not found" of a lookup means absent; a CDN or maintenance page is an outage.
+            if (!absentOn404) {
+                throw new RaUnavailableException("RetroAchievements answered 404");
+            }
+            parse(answer.body());
             return Optional.empty();
         }
         if (!answer.status().is2xxSuccessful()) {
@@ -207,7 +213,7 @@ public class HttpRetroAchievementsClient implements RetroAchievementsClient {
         try {
             return mapper.readTree(body);
         } catch (JacksonException e) {
-            log.warn("RetroAchievements answer is not JSON: {}", e.getOriginalMessage());
+            log.warn("RetroAchievements answer is not JSON: {}", e.getClass().getSimpleName());
             throw new RaUnavailableException("RetroAchievements answered something that is not JSON");
         }
     }
@@ -242,6 +248,11 @@ public class HttpRetroAchievementsClient implements RetroAchievementsClient {
     }
 
     /** A number, which the API sometimes sends as a string. */
+    /** {@code Untracked} as a boolean or as 0/1. */
+    private static boolean untracked(JsonNode node) {
+        return node.isBoolean() ? node.booleanValue() : integer(node, 0) != 0;
+    }
+
     private static Integer integer(JsonNode node, Integer fallback) {
         if (node.isNumber()) {
             return node.intValue();

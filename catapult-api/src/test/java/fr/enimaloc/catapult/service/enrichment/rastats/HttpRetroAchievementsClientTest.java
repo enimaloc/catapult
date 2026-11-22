@@ -136,6 +136,36 @@ class HttpRetroAchievementsClientTest {
     }
 
     @Test
+    void anUntrackedBooleanIsRead() {
+        server.expect(once(), requestTo(API + "API_GetUserProfile.php?u=Scott&y=poolkey0123456789"))
+                .andRespond(withSuccess("{\"User\":\"Scott\",\"ULID\":\"U1\",\"Untracked\":true}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(client.profile("Scott", POOL).orElseThrow().untracked()).isTrue();
+    }
+
+    @Test
+    void aNon_jsonOrMisplaced404IsUnavailable() {
+        server.expect(once(), requestTo(API + "API_GetUserProfile.php?u=Scott&y=poolkey0123456789"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.TEXT_HTML)
+                        .body("<html>cdn</html>"));
+        server.expect(once(), requestTo(API + "API_GetUserRecentlyPlayedGames.php?u=" + ULID + "&c=5&y=poolkey0123456789"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON).body("{}"));
+        server.expect(once(), requestTo(API + "API_GetUserRecentAchievements.php?u=" + ULID + "&m=60&y=poolkey0123456789"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON).body("{}"));
+        server.expect(once(), requestTo(API + "API_GetGameInfoAndUserProgress.php?g=7&u=" + ULID
+                        + "&a=1&y=poolkey0123456789"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON)
+                        .body("{\"message\":\"Not Found.\"}"));
+
+        assertThatThrownBy(() -> client.profile("Scott", POOL)).isInstanceOf(RaUnavailableException.class);
+        assertThatThrownBy(() -> client.recentlyPlayed(ULID, 5, POOL)).isInstanceOf(RaUnavailableException.class);
+        assertThatThrownBy(() -> client.recentAchievements(ULID, 60, POOL))
+                .isInstanceOf(RaUnavailableException.class);
+        assertThat(client.progress(7, ULID, POOL)).as("a JSON 404 of a game lookup is absent").isEmpty();
+    }
+
+    @Test
     void recentlyPlayedIsRead() throws IOException {
         server.expect(once(), requestTo(API + "API_GetUserRecentlyPlayedGames.php?u=" + ULID + "&c=10&y=poolkey0123456789"))
                 .andRespond(withSuccess(fixture("recently-played"), MediaType.APPLICATION_JSON));
