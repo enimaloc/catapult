@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.enrichment.blizzard;
 
 import fr.enimaloc.catapult.service.enrichment.EnrichmentProperties;
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.ClientHttpRequestFactory;
@@ -35,7 +36,7 @@ import java.util.function.Predicate;
 public class HttpBlizzardClient implements BlizzardClient {
 
     static final String USERINFO = "https://oauth.battle.net/userinfo";
-    static final String USER_AGENT = "Catapult/1.0 (+https://catapult.enimaloc.fr)";
+    static final String USER_AGENT = EnrichmentUserAgent.VALUE;
     private static final Duration PAUSE = Duration.ofSeconds(60);
     /** The longest pause a 429 can ask for: a larger Retry-After is not trusted. */
     private static final Duration MAX_PAUSE = Duration.ofMinutes(10);
