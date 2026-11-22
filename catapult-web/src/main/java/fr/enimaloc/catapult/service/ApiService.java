@@ -113,6 +113,16 @@ public interface ApiService {
     int saveSteamToken(String username, String token, boolean shared);
     int steamTokenSharing(String username, boolean shared);
     int deleteSteamToken(String username);
+
+    /**
+     * Declares {@code speedrunName} as the channel owner's speedrun.com name; catapult-api's status: 400 when
+     * speedrun.com does not know it, 503 when it cannot be asked.
+     */
+    int saveSpeedrunUsername(String username, String speedrunName);
+    int deleteSpeedrunUsername(String username);
+    /** Saves the owner's personal speedrun.com key (never logged); 400 when speedrun.com refuses it, 503 when unreachable. */
+    int saveSpeedrunApiKey(String username, String apiKey);
+    int deleteSpeedrunApiKey(String username);
     int refreshSteamProfileCache(String username);
     LinkStateResponse minecraftStatus(String username);
     int minecraftEnroll(String username, String name);

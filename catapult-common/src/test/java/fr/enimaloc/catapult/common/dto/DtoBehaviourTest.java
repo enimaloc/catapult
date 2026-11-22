@@ -14,6 +14,7 @@ import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.EpicData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatDispatch;
 import fr.enimaloc.catapult.common.dto.notification.BroadcastRequestDto;
@@ -292,5 +293,39 @@ class DtoBehaviourTest {
 
     private static java.util.Map.Entry<String, Object> entry(String key, Object value) {
         return new java.util.AbstractMap.SimpleEntry<>(key, value);
+    }
+
+    @Nested
+    class SpeedrunApiKeys {
+        @Test
+        void toStringNeverShowsTheKey() {
+            assertThat(new SpeedrunApiKeyRequest("s3cretKey").toString())
+                    .doesNotContain("s3cretKey").isEqualTo("SpeedrunApiKeyRequest[apiKey=***]");
+            assertThat(new SpeedrunApiKeyRequest(null).toString()).isEqualTo("SpeedrunApiKeyRequest[apiKey=null]");
+        }
+    }
+
+    @Nested
+    class ChannelPageSpeedrun {
+        @Test
+        void aPageWithoutTheEpicLinkHasNoSpeedrunAccountEither() {
+            var page = new fr.enimaloc.catapult.common.dto.channel.ChannelPageData(null, "streamer", true, false,
+                    true, null, null, List.of(), java.util.Set.of(), List.of(), java.util.Set.of(), null, null, null,
+                    null, null, null, null, null, null, null, null);
+
+            assertThat(page.epic()).isNull();
+            assertThat(page.speedrun()).isNull();
+        }
+
+        @Test
+        void aPageWithTheEpicLinkButNotTheSpeedrunAccount() {
+            var epic = new EpicData("ACCEPTED", "Me", null);
+            var page = new fr.enimaloc.catapult.common.dto.channel.ChannelPageData(null, "streamer", true, false,
+                    true, null, null, List.of(), java.util.Set.of(), List.of(), java.util.Set.of(), null, null, null,
+                    null, null, null, null, null, null, null, null, epic);
+
+            assertThat(page.epic()).isEqualTo(epic);
+            assertThat(page.speedrun()).isNull();
+        }
     }
 }

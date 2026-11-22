@@ -105,6 +105,7 @@ import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
+import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftEnrollEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
@@ -582,6 +583,38 @@ public class MockApiService implements ApiService {
     public EpicLinkStateResponse epicStatus(String username) {
         log.trace("epicStatus({})", username);
         return currentData().getEpicLink();
+    }
+
+    // The key is never logged, in the mock either.
+    @Override
+    public int saveSpeedrunUsername(String username, String speedrunName) {
+        log.trace("saveSpeedrunUsername({}, {})", username, speedrunName);
+        return speedrunChanged(username, data -> data.saveSpeedrunUsername(speedrunName));
+    }
+
+    @Override
+    public int deleteSpeedrunUsername(String username) {
+        log.trace("deleteSpeedrunUsername({})", username);
+        return speedrunChanged(username, MockData::deleteSpeedrunUsername);
+    }
+
+    @Override
+    public int saveSpeedrunApiKey(String username, String apiKey) {
+        log.trace("saveSpeedrunApiKey({})", username);
+        return speedrunChanged(username, MockData::saveSpeedrunKey);
+    }
+
+    @Override
+    public int deleteSpeedrunApiKey(String username) {
+        log.trace("deleteSpeedrunApiKey({})", username);
+        return speedrunChanged(username, MockData::deleteSpeedrunKey);
+    }
+
+    private int speedrunChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(SpeedrunAccountChangedEvent.of(username, data.speedrunData()));
+        return NO_CONTENT;
     }
 
     @Override

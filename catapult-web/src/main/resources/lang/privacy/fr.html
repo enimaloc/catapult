@@ -8,6 +8,8 @@
     <ul>
         <li>Token OAuth Twitch</li>
         <li>Steam ID</li>
+        <li>Nom d'utilisateur et clé d'API speedrun.com (facultatifs), pour retrouver vos records sur
+            speedrun.com ; la clé est stockée chiffrée et jamais réaffichée</li>
         <li>Rapports d'erreur : quand une page rencontre une erreur, l'identifiant de votre compte, le
             déroulé des dernières actions (clics, pages, requêtes) et un enregistrement de la page,
             sans ce que vous tapez dans les champs, pour reproduire le problème</li>
@@ -16,7 +18,8 @@
 
 <section>
     <h2>Transferts de données</h2>
-    <p>Les rapports d'erreur sont envoyés à Sentry (sentry.io), en passant par Catapult : votre
+    <p>Votre nom d'utilisateur et votre clé speedrun.com, si vous les renseignez, ne sont transmis qu'à
+        speedrun.com. Les rapports d'erreur sont envoyés à Sentry (sentry.io), en passant par Catapult : votre
         navigateur ne contacte jamais Sentry directement. Aucun autre transfert à des tiers.</p>
 </section>
 

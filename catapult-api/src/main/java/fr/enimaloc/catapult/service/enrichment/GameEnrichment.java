@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
 import fr.enimaloc.catapult.service.enrichment.prices.GamePrices;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunEnrichment;
 import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
 import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbAssets;
 import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivity;
@@ -17,11 +18,11 @@ import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivity;
 public record GameEnrichment(TimeToBeat hltb, ProtonDbSummary protondb, SteamGridDbAssets steamgriddb,
                              SteamDeckCompatibility steamDeck, PcGamingWikiPage pcgamingwiki, Trailer trailer,
                              String steamAppId, GamePrices prices, OpenCriticGame opencritic,
-                             TwitchActivity twitch) {
+                             TwitchActivity twitch, SpeedrunEnrichment speedrun) {
 
     /** Nothing known from any source. */
     public static final GameEnrichment EMPTY = new GameEnrichment(null, null, null, null, null, null, null, null, null,
-            null);
+            null, null);
 
     /**
      * Where to watch the game's trailer: {@code kind} {@value #MP4} for the MP4 the API rebuilds from a store's HLS

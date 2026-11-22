@@ -49,8 +49,10 @@ public class MeGameController {
                     + "(igdb/steam/xbox/dtdd/catapult, each null if unavailable), each carrying a \"more\" link "
                     + "to its own detail route. Version 3 adds the enrichment objects hltb, protondb, steamgriddb, "
                     + "steamDeck and pcgamingwiki (each null if unavailable or too slow to answer, each with its "
-                    + "\"more\" link), the trailer, and prices, opencritic and twitch (store prices in "
-                    + "?country=, default FR; Twitch streams in ?language=).")
+                    + "\"more\" link), the trailer, prices, opencritic and twitch (store prices in "
+                    + "?country=, default FR; Twitch streams in ?language=), and speedrun (speedrun.com world "
+                    + "records of the main categories, plus your account, personal bests and pending runs on the "
+                    + "game; these three null when no speedrun.com account is found for you).")
     @ApiResponse(responseCode = "200", description = "inGame=false with every platform object null while no "
             + "game is detected; otherwise the aggregated game info.")
     @GetMapping
@@ -72,7 +74,9 @@ public class MeGameController {
                     + "igdb/steam/xbox/dtdd/catapult, in that priority order), not the per-platform objects. Version 3 adds "
                     + "timeToBeat (HowLongToBeat's normal duration, in seconds), protonTier, deckStatus, coverUrl "
                     + "(SteamGridDB grid, else IGDB cover), trailer ({kind: mp4|youtube, url}), price (best "
-                    + "store price), criticScore and liveViewers.")
+                    + "store price), criticScore, liveViewers, worldRecord (speedrun.com's main category: "
+                    + "{category, time in seconds, runners}) and personalBest (yours in that category, else your "
+                    + "best place: {category, time, place}).")
     @ApiResponse(responseCode = "200", description = "inGame=false while no game is detected; otherwise the "
             + "summarized game info.")
     @GetMapping("/summary")

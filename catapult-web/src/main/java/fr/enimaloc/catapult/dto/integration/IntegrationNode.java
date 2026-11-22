@@ -31,11 +31,20 @@ public sealed interface IntegrationNode {
         }
     }
 
-    /** A native input; {@code text} is its placeholder, {@code ariaLabel} defaults to it. */
+    /**
+     * A native input; {@code text} is its placeholder, {@code ariaLabel} defaults to it. {@code autocomplete}, when
+     * set, is the input's attribute of that name ({@code new-password} keeps a browser from filling in a saved
+     * password where a secret of another site is typed).
+     */
     record Input(Attrs attrs, String inputType, Message text, Message ariaLabel, Object value,
-                 Integer min, Integer max) implements IntegrationNode {
+                 Integer min, Integer max, String autocomplete) implements IntegrationNode {
         public Input {
             ariaLabel = ariaLabel == null ? text : ariaLabel;
+        }
+
+        public Input(Attrs attrs, String inputType, Message text, Message ariaLabel, Object value,
+                     Integer min, Integer max) {
+            this(attrs, inputType, text, ariaLabel, value, min, max, null);
         }
 
         public String type() {

@@ -160,7 +160,7 @@ class MeGameControllerTest {
                         "https://www.protondb.com/app/400"),
                 null, new SteamDeckCompatibility(SteamDeckCompatibility.Category.VERIFIED, List.of()), null,
                 new GameEnrichment.Trailer(GameEnrichment.Trailer.YOUTUBE, "https://www.youtube.com/watch?v=x"),
-                "400", null, null, null);
+                "400", null, null, null, null);
         when(games.gameInfoV3(eq(user), any(Locale.class), any(), any())).thenReturn(GameInfoV3Response.of(base, enrichment,
                 new MoreLinks("http://localhost", GameInfoAssembler.LinkStyle.CURRENT), Optional.of("1942")));
     }

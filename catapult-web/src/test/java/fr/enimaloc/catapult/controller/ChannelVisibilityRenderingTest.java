@@ -922,6 +922,59 @@ class ChannelVisibilityRenderingTest {
         assertThat(html).doesNotContain("data-conn=\"ankama\"").doesNotContain("ankama-status-body");
     }
 
+    private String speedrunPage(fr.enimaloc.catapult.common.dto.channel.SpeedrunData speedrun) throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null, new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null, null, null, null, null, null,
+                null, null, speedrun));
+        return mvc.perform(get("/spa/channel/enimaloc").locale(java.util.Locale.ENGLISH))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    @Test
+    void speedrunCardShowsTheAccountUsedAndFollowsItsEvent() throws Exception {
+        String html = speedrunPage(new fr.enimaloc.catapult.common.dto.channel.SpeedrunData("n1", false, false, null,
+                "Linkus7", "https://www.speedrun.com/users/Linkus7", "twitch"));
+
+        String card = html.substring(html.indexOf("data-conn=\"speedrun\""));
+        assertThat(card).contains("<span>Speedrun.com</span>").contains("Account used:").contains("Linkus7")
+                .contains("(account linked to your Twitch channel)")
+                .contains("data-on=\"speedrunViaTwitch:SpeedrunAccountChangedEvent.resolvedSource=twitch\"")
+                .contains("data-value=\"textContent:SpeedrunAccountChangedEvent.resolvedName\"");
+        assertThat(countOccurrences(card, "speedrun-account hidden")).isEqualTo(2); // the other two sources
+        assertThat(card).contains("href=\"https://www.speedrun.com/settings/api\"").contains("rel=\"noopener noreferrer\"");
+        assertThat(openingTagForId(html, "speedrun-username-input")).contains("placeholder=\"speedrun.com username\"")
+                .contains("value=\"n1\"");
+        assertThat(openingTagForId(html, "speedrun-key-input")).contains("type=\"password\"")
+                .contains("placeholder=\"speedrun.com API key (optional)\"").contains("autocomplete=\"new-password\"")
+                .doesNotContain("hidden");
+        assertThat(openingTagForId(html, "speedrun-username-input")).doesNotContain("autocomplete");
+        assertThat(openingTagForId(html, "speedrun-key-delete-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "speedrun-username-delete-btn")).doesNotContain("hidden");
+    }
+
+    @Test
+    void speedrunCardWithAKeyWarnsWhenItIsRefused_andNeverRendersTheKey() throws Exception {
+        String html = speedrunPage(new fr.enimaloc.catapult.common.dto.channel.SpeedrunData(null, true, true,
+                "KeyOwner", "KeyOwner", "https://www.speedrun.com/users/KeyOwner", "api_key"));
+
+        assertThat(html).contains("speedrun.com refused your API key").contains("API key saved.");
+        assertThat(openingTagForId(html, "speedrun-key-input")).contains("hidden").contains("value=\"\"");
+        assertThat(openingTagForId(html, "speedrun-key-delete-btn")).doesNotContain("hidden");
+        assertThat(openingTagForId(html, "speedrun-key-save-btn")).contains("hidden");
+    }
+
+    @Test
+    void speedrunCardWithoutAnAccountSaysSo_andOtherViewersHaveNoCard() throws Exception {
+        String html = speedrunPage(new fr.enimaloc.catapult.common.dto.channel.SpeedrunData(null, false, false, null,
+                null, null, null));
+
+        assertThat(html).contains("No account found");
+        assertThat(speedrunPage(null)).doesNotContain("data-conn=\"speedrun\"").doesNotContain("speedrun-key-input");
+    }
+
     private String epicPage(fr.enimaloc.catapult.common.dto.channel.EpicData epic) throws Exception {
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
                 new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),

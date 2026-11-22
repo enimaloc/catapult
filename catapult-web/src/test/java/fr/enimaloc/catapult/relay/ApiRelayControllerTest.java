@@ -229,6 +229,12 @@ class ApiRelayControllerTest {
         mvc.perform(get("/api/me/drops?categoryId=7").header("Authorization", "Bearer catr_TOKEN"))
                 .andExpect(status().isOk()).andExpect(content().string("[]"));
         assertThat(RECEIVED.get().uri()).isEqualTo("/api/me/drops?categoryId=7");
+
+        answer = exchange -> respond(exchange, 200, "{\"account\":null}",
+                Map.of("Content-Type", List.of("application/json")));
+        mvc.perform(get("/api/me/speedrun").header("Authorization", "Bearer catr_TOKEN"))
+                .andExpect(status().isOk()).andExpect(content().string("{\"account\":null}"));
+        assertThat(RECEIVED.get().uri()).isEqualTo("/api/me/speedrun");
     }
 
     /** The public API by resource, the read-only token in the query included: relayed as sent. */

@@ -19,6 +19,7 @@ import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
+import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
 import fr.enimaloc.catapult.event.steam.SteamConnectionStateEvent;
@@ -158,6 +159,11 @@ public class ChannelEventRedisBridge {
             case ChannelEvents.EPIC_LINK_CHANGED -> {
                 var link = read(data, ChannelEvents.EpicLinkChanged.class);
                 yield List.of(new EpicLinkEvent(login, link.status(), link.displayName(), link.serviceAccountName()));
+            }
+            case ChannelEvents.SPEEDRUN_ACCOUNT_CHANGED -> {
+                var changed = read(data, ChannelEvents.SpeedrunAccountChanged.class);
+                if (changed.account() == null) throw new IllegalArgumentException("no speedrun account");
+                yield List.of(SpeedrunAccountChangedEvent.of(login, changed.account()));
             }
             default -> List.of();
         };

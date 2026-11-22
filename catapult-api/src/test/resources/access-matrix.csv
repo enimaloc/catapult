@@ -200,6 +200,10 @@ POST,/api/internal/users/{userId}/title/preview,,"{""template"":""Live""}",401,4
 PUT,/api/internal/users/{userId}/settings/steam-personal-token,,"{""token"":""matrix"",""shared"":false}",401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/settings/steam-personal-token,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/steam-personal-token/sharing,,"{""shared"":false}",401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/speedrun/username,,"{""username"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/speedrun/username,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/speedrun/api-key,,"{""apiKey"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/speedrun/api-key,,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/settings/twitchat,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat,,"{""enabled"":false}",401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat/branch,,,401,401,403,403,PASS,403,401
@@ -496,6 +500,7 @@ GET,/api/games/pcgamingwiki/{pageId},pageId=1;?version=3,,PASS,PASS,PASS,PASS,PA
 GET,/api/games/prices/{itadId},itadId=018d937f-590c-70fa-bd4f-b95ee2c2e2f1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/games/opencritic/{ocId},ocId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/games/twitch/{twitchGameId},twitchGameId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/speedrun/{srcGameId},srcGameId=o1y9j9v6;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 # trailer.mp4 (version 3): public per platform, the current game's by personal token
 GET,/api/games/steam/{appId}/trailer.mp4,appId=990000;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 HEAD,/api/games/steam/{appId}/trailer.mp4,appId=990000;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
@@ -503,3 +508,4 @@ GET,/api/games/xbox/{productId}/trailer.mp4,productId=9NBLGGH4R315;?version=3,,P
 HEAD,/api/games/xbox/{productId}/trailer.mp4,productId=9NBLGGH4R315;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
 GET,/api/me/game/trailer.mp4,?version=3,,401,401,401,401,401,401,PASS
 HEAD,/api/me/game/trailer.mp4,?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/speedrun,?version=3,,401,401,401,401,401,401,PASS

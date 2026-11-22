@@ -234,6 +234,23 @@ class ChannelEventRedisBridgeTest {
     }
 
     @Test
+    void bridgeRelaysSpeedrunAccountChanged() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.SpeedrunData("n1", true, false, "KeyOwner", "KeyOwner",
+                "https://www.speedrun.com/users/KeyOwner", "api_key");
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.SPEEDRUN_ACCOUNT_CHANGED,
+                new ChannelEvents.SpeedrunAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent("streamer", "n1",
+                        true, false, "KeyOwner", "KeyOwner", "https://www.speedrun.com/users/KeyOwner", "api_key"));
+    }
+
+    @Test
+    void bridgeDropsASpeedrunEventWithoutItsData() {
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.SPEEDRUN_ACCOUNT_CHANGED,
+                new ChannelEvents.SpeedrunAccountChanged(owner.toString(), "streamer", null)))).isEmpty();
+    }
+
+    @Test
     void bridgeRelaysEpicLinkChanged() {
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.EPIC_LINK_CHANGED,
                 new ChannelEvents.EpicLinkChanged(owner.toString(), "streamer", "PENDING", "Me", "Bot"))))

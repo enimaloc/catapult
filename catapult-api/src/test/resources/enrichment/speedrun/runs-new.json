@@ -1,0 +1,194 @@
+{
+ "data": [
+  {
+   "id": "m7k97dez",
+   "weblink": "https://www.speedrun.com/mk64/runs/m7k97dez",
+   "game": {
+    "data": {
+     "id": "m9dok1pr",
+     "names": {
+      "international": "Mario Kart 64",
+      "japanese": null,
+      "twitch": "Mario Kart 64"
+     },
+     "abbreviation": "mk64",
+     "weblink": "https://www.speedrun.com/mk64",
+     "released": 1996,
+     "release-date": "1996-12-14",
+     "ruleset": {
+      "show-milliseconds": true,
+      "require-verification": true,
+      "require-video": true,
+      "run-times": [
+       "realtime",
+       "ingame"
+      ],
+      "default-time": "realtime",
+      "emulators-allowed": true
+     },
+     "romhack": false,
+     "gametypes": [],
+     "created": "2014-11-14T06:21:48Z",
+     "assets": {
+      "logo": {
+       "uri": "https://www.speedrun.com/static/theme/prdndz8n/logo?v=dd8eae1"
+      },
+      "cover-large": {
+       "uri": "https://www.speedrun.com/static/game/m9dok1pr/cover?v=3a39e42"
+      }
+     }
+    }
+   },
+   "level": null,
+   "category": {
+    "data": {
+     "id": "pmker8d6",
+     "name": "All Cups (No Skips)",
+     "weblink": "https://www.speedrun.com/mk64?h=all-cups-no-skips&x=pmker8d6",
+     "type": "per-game",
+     "players": {
+      "type": "exactly",
+      "value": 1
+     },
+     "miscellaneous": false
+    }
+   },
+   "videos": {
+    "links": [
+     {
+      "uri": "https://www.twitch.tv/videos/2935426025"
+     }
+    ]
+   },
+   "status": {
+    "status": "new"
+   },
+   "players": [
+    {
+     "rel": "user",
+     "id": "v8lme4vj",
+     "uri": "https://www.speedrun.com/api/v1/users/v8lme4vj"
+    }
+   ],
+   "date": "2026-11-20",
+   "date-time": "2026-11-20T22:18:27Z",
+   "submitted": "2026-11-20T22:18:27Z",
+   "times": {
+    "primary": "PT39M14.080S",
+    "primary_t": 2354.08,
+    "realtime": "PT39M14.080S",
+    "realtime_t": 2354.08,
+    "realtime_noloads": null,
+    "realtime_noloads_t": 0,
+    "ingame": null,
+    "ingame_t": 0
+   },
+   "system": {
+    "platform": "w89rwelk",
+    "emulated": false,
+    "region": "o316x197"
+   },
+   "values": {
+    "2lg3xenp": "8148j0ld"
+   }
+  },
+  {
+   "id": "y9r7xony",
+   "weblink": "https://www.speedrun.com/mk64/runs/y9r7xony",
+   "game": {
+    "data": {
+     "id": "m9dok1pr",
+     "names": {
+      "international": "Mario Kart 64",
+      "japanese": null,
+      "twitch": "Mario Kart 64"
+     },
+     "abbreviation": "mk64",
+     "weblink": "https://www.speedrun.com/mk64",
+     "released": 1996,
+     "release-date": "1996-12-14",
+     "ruleset": {
+      "show-milliseconds": true,
+      "require-verification": true,
+      "require-video": true,
+      "run-times": [
+       "realtime",
+       "ingame"
+      ],
+      "default-time": "realtime",
+      "emulators-allowed": true
+     },
+     "romhack": false,
+     "gametypes": [],
+     "created": "2014-11-14T06:21:48Z",
+     "assets": {
+      "logo": {
+       "uri": "https://www.speedrun.com/static/theme/prdndz8n/logo?v=dd8eae1"
+      },
+      "cover-large": {
+       "uri": "https://www.speedrun.com/static/game/m9dok1pr/cover?v=3a39e42"
+      }
+     }
+    }
+   },
+   "level": null,
+   "category": {
+    "data": {
+     "id": "mkeje462",
+     "name": "Special Cup",
+     "weblink": "https://www.speedrun.com/mk64?h=special-cup&x=mkeje462",
+     "type": "per-game",
+     "players": {
+      "type": "exactly",
+      "value": 1
+     },
+     "miscellaneous": true
+    }
+   },
+   "videos": {
+    "links": [
+     {
+      "uri": "https://youtu.be/amSLL8Gmtw8"
+     }
+    ]
+   },
+   "status": {
+    "status": "new"
+   },
+   "players": [
+    {
+     "rel": "user",
+     "id": "8e9eer7j",
+     "uri": "https://www.speedrun.com/api/v1/users/8e9eer7j"
+    }
+   ],
+   "date": "2026-11-21",
+   "date-time": "2026-11-21T14:03:26Z",
+   "submitted": "2026-11-21T14:03:26Z",
+   "times": {
+    "primary": "PT5M39S",
+    "primary_t": 339,
+    "realtime": "PT5M39S",
+    "realtime_t": 339,
+    "realtime_noloads": null,
+    "realtime_noloads_t": 0,
+    "ingame": null,
+    "ingame_t": 0
+   },
+   "system": {
+    "platform": "w89rwelk",
+    "emulated": false,
+    "region": null
+   },
+   "values": {
+    "9l7404l1": "810652o1"
+   }
+  }
+ ],
+ "pagination": {
+  "offset": 0,
+  "max": 3,
+  "size": 2,
+  "links": []
+ }
+}

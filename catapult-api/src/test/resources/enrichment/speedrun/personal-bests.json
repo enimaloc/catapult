@@ -1,0 +1,462 @@
+{
+ "data": [
+  {
+   "place": 28,
+   "run": {
+    "id": "2ywo5pm4",
+    "weblink": "https://www.speedrun.com/lm/runs/2ywo5pm4",
+    "game": "o1y9lk6q",
+    "level": null,
+    "category": "z27g0og2",
+    "videos": {
+     "links": [
+      {
+       "uri": "https://www.youtube.com/watch?v=H3BSf0EGYL4"
+      }
+     ]
+    },
+    "status": {
+     "status": "verified",
+     "examiner": "qj26goxk",
+     "verify-date": null
+    },
+    "players": [
+     {
+      "rel": "user",
+      "id": "qj26goxk",
+      "uri": "https://www.speedrun.com/api/v1/users/qj26goxk"
+     }
+    ],
+    "date": "2013-09-16",
+    "date-time": "2013-09-16T10:00:00Z",
+    "submitted": "2014-12-02T22:13:01Z",
+    "times": {
+     "primary": "PT1H22M54S",
+     "primary_t": 4974,
+     "realtime": "PT1H22M54S",
+     "realtime_t": 4974,
+     "realtime_noloads": null,
+     "realtime_noloads_t": 0,
+     "ingame": null,
+     "ingame_t": 0
+    },
+    "links": [
+     {
+      "rel": "self",
+      "uri": "https://www.speedrun.com/api/v1/runs/2ywo5pm4"
+     },
+     {
+      "rel": "game",
+      "uri": "https://www.speedrun.com/api/v1/games/o1y9lk6q"
+     },
+     {
+      "rel": "category",
+      "uri": "https://www.speedrun.com/api/v1/categories/z27g0og2"
+     },
+     {
+      "rel": "platform",
+      "uri": "https://www.speedrun.com/api/v1/platforms/4p9z06rn"
+     },
+     {
+      "rel": "region",
+      "uri": "https://www.speedrun.com/api/v1/regions/e6lxy1dz"
+     },
+     {
+      "rel": "examiner",
+      "uri": "https://www.speedrun.com/api/v1/users/qj26goxk"
+     }
+    ]
+   },
+   "game": {
+    "data": {
+     "id": "o1y9lk6q",
+     "names": {
+      "international": "Luigi's Mansion",
+      "japanese": null,
+      "twitch": "Luigi's Mansion"
+     },
+     "abbreviation": "lm",
+     "weblink": "https://www.speedrun.com/lm",
+     "released": 2001,
+     "release-date": "2001-09-14",
+     "ruleset": {
+      "show-milliseconds": true,
+      "require-verification": true,
+      "require-video": false,
+      "run-times": [
+       "realtime"
+      ],
+      "default-time": "realtime",
+      "emulators-allowed": true
+     },
+     "romhack": false,
+     "gametypes": [],
+     "created": "2014-12-02T21:01:02Z",
+     "assets": {
+      "logo": {
+       "uri": "https://www.speedrun.com/static/theme/zr0qmgwm/logo?v=6a3b715"
+      },
+      "cover-large": {
+       "uri": "https://www.speedrun.com/static/game/o1y9lk6q/cover?v=7b7c085"
+      }
+     }
+    }
+   },
+   "category": {
+    "data": {
+     "id": "z27g0og2",
+     "name": "Any% (No OoB) [PAL]",
+     "weblink": "https://www.speedrun.com/lm?h=any-no-oob-pal&x=z27g0og2",
+     "type": "per-game",
+     "players": {
+      "type": "exactly",
+      "value": 1
+     },
+     "miscellaneous": false
+    }
+   }
+  },
+  {
+   "place": 15,
+   "run": {
+    "id": "9medp9y7",
+    "weblink": "https://www.speedrun.com/lm/runs/9medp9y7",
+    "game": "o1y9lk6q",
+    "level": null,
+    "category": "zdnw51qd",
+    "videos": {
+     "links": [
+      {
+       "uri": "https://www.youtube.com/watch?v=8tETg9I7ySM"
+      }
+     ]
+    },
+    "status": {
+     "status": "verified",
+     "examiner": "qj26goxk",
+     "verify-date": null
+    },
+    "players": [
+     {
+      "rel": "user",
+      "id": "qj26goxk",
+      "uri": "https://www.speedrun.com/api/v1/users/qj26goxk"
+     }
+    ],
+    "date": "2013-09-24",
+    "date-time": "2013-09-24T10:00:00Z",
+    "submitted": "2014-12-02T22:15:53Z",
+    "times": {
+     "primary": "PT1H44M47S",
+     "primary_t": 6287,
+     "realtime": "PT1H44M47S",
+     "realtime_t": 6287,
+     "realtime_noloads": null,
+     "realtime_noloads_t": 0,
+     "ingame": null,
+     "ingame_t": 0
+    },
+    "links": [
+     {
+      "rel": "self",
+      "uri": "https://www.speedrun.com/api/v1/runs/9medp9y7"
+     },
+     {
+      "rel": "game",
+      "uri": "https://www.speedrun.com/api/v1/games/o1y9lk6q"
+     },
+     {
+      "rel": "category",
+      "uri": "https://www.speedrun.com/api/v1/categories/zdnw51qd"
+     },
+     {
+      "rel": "platform",
+      "uri": "https://www.speedrun.com/api/v1/platforms/4p9z06rn"
+     },
+     {
+      "rel": "region",
+      "uri": "https://www.speedrun.com/api/v1/regions/e6lxy1dz"
+     },
+     {
+      "rel": "examiner",
+      "uri": "https://www.speedrun.com/api/v1/users/qj26goxk"
+     }
+    ]
+   },
+   "game": {
+    "data": {
+     "id": "o1y9lk6q",
+     "names": {
+      "international": "Luigi's Mansion",
+      "japanese": null,
+      "twitch": "Luigi's Mansion"
+     },
+     "abbreviation": "lm",
+     "weblink": "https://www.speedrun.com/lm",
+     "released": 2001,
+     "release-date": "2001-09-14",
+     "ruleset": {
+      "show-milliseconds": true,
+      "require-verification": true,
+      "require-video": false,
+      "run-times": [
+       "realtime"
+      ],
+      "default-time": "realtime",
+      "emulators-allowed": true
+     },
+     "romhack": false,
+     "gametypes": [],
+     "created": "2014-12-02T21:01:02Z",
+     "assets": {
+      "logo": {
+       "uri": "https://www.speedrun.com/static/theme/zr0qmgwm/logo?v=6a3b715"
+      },
+      "cover-large": {
+       "uri": "https://www.speedrun.com/static/game/o1y9lk6q/cover?v=7b7c085"
+      }
+     }
+    }
+   },
+   "category": {
+    "data": {
+     "id": "zdnw51qd",
+     "name": "100% [PAL]",
+     "weblink": "https://www.speedrun.com/lm?h=100-pal&x=zdnw51qd",
+     "type": "per-game",
+     "players": {
+      "type": "exactly",
+      "value": 1
+     },
+     "miscellaneous": false
+    }
+   }
+  },
+  {
+   "place": 22,
+   "run": {
+    "id": "kz5n6gzr",
+    "weblink": "https://www.speedrun.com/lm/runs/kz5n6gzr",
+    "game": "o1y9lk6q",
+    "level": null,
+    "category": "02qo17ky",
+    "videos": null,
+    "status": {
+     "status": "verified",
+     "examiner": "5j5vkn8v",
+     "verify-date": null
+    },
+    "players": [
+     {
+      "rel": "user",
+      "id": "qj26goxk",
+      "uri": "https://www.speedrun.com/api/v1/users/qj26goxk"
+     }
+    ],
+    "date": null,
+    "date-time": null,
+    "submitted": "2014-12-02T22:23:44Z",
+    "times": {
+     "primary": "PT1H20M6S",
+     "primary_t": 4806,
+     "realtime": "PT1H20M6S",
+     "realtime_t": 4806,
+     "realtime_noloads": null,
+     "realtime_noloads_t": 0,
+     "ingame": null,
+     "ingame_t": 0
+    },
+    "links": [
+     {
+      "rel": "self",
+      "uri": "https://www.speedrun.com/api/v1/runs/kz5n6gzr"
+     },
+     {
+      "rel": "game",
+      "uri": "https://www.speedrun.com/api/v1/games/o1y9lk6q"
+     },
+     {
+      "rel": "category",
+      "uri": "https://www.speedrun.com/api/v1/categories/02qo17ky"
+     },
+     {
+      "rel": "platform",
+      "uri": "https://www.speedrun.com/api/v1/platforms/4p9z06rn"
+     },
+     {
+      "rel": "region",
+      "uri": "https://www.speedrun.com/api/v1/regions/o316x197"
+     },
+     {
+      "rel": "examiner",
+      "uri": "https://www.speedrun.com/api/v1/users/5j5vkn8v"
+     }
+    ]
+   },
+   "game": {
+    "data": {
+     "id": "o1y9lk6q",
+     "names": {
+      "international": "Luigi's Mansion",
+      "japanese": null,
+      "twitch": "Luigi's Mansion"
+     },
+     "abbreviation": "lm",
+     "weblink": "https://www.speedrun.com/lm",
+     "released": 2001,
+     "release-date": "2001-09-14",
+     "ruleset": {
+      "show-milliseconds": true,
+      "require-verification": true,
+      "require-video": false,
+      "run-times": [
+       "realtime"
+      ],
+      "default-time": "realtime",
+      "emulators-allowed": true
+     },
+     "romhack": false,
+     "gametypes": [],
+     "created": "2014-12-02T21:01:02Z",
+     "assets": {
+      "logo": {
+       "uri": "https://www.speedrun.com/static/theme/zr0qmgwm/logo?v=6a3b715"
+      },
+      "cover-large": {
+       "uri": "https://www.speedrun.com/static/game/o1y9lk6q/cover?v=7b7c085"
+      }
+     }
+    }
+   },
+   "category": {
+    "data": {
+     "id": "02qo17ky",
+     "name": "Low%",
+     "weblink": "https://www.speedrun.com/lm?h=low&x=02qo17ky",
+     "type": "per-game",
+     "players": {
+      "type": "exactly",
+      "value": 1
+     },
+     "miscellaneous": true
+    }
+   }
+  },
+  {
+   "place": 2,
+   "run": {
+    "id": "ilrun001",
+    "weblink": "https://www.speedrun.com/lm/runs/ilrun001",
+    "game": "o1y9lk6q",
+    "level": "lvl12345",
+    "category": "z27g0og2",
+    "videos": {
+     "links": [
+      {
+       "uri": "https://www.youtube.com/watch?v=H3BSf0EGYL4"
+      }
+     ]
+    },
+    "status": {
+     "status": "verified",
+     "examiner": "qj26goxk",
+     "verify-date": null
+    },
+    "players": [
+     {
+      "rel": "user",
+      "id": "qj26goxk",
+      "uri": "https://www.speedrun.com/api/v1/users/qj26goxk"
+     }
+    ],
+    "date": "2013-09-16",
+    "date-time": "2013-09-16T10:00:00Z",
+    "submitted": "2014-12-02T22:13:01Z",
+    "times": {
+     "primary": "PT1H22M54S",
+     "primary_t": 4974,
+     "realtime": "PT1H22M54S",
+     "realtime_t": 4974,
+     "realtime_noloads": null,
+     "realtime_noloads_t": 0,
+     "ingame": null,
+     "ingame_t": 0
+    },
+    "links": [
+     {
+      "rel": "self",
+      "uri": "https://www.speedrun.com/api/v1/runs/2ywo5pm4"
+     },
+     {
+      "rel": "game",
+      "uri": "https://www.speedrun.com/api/v1/games/o1y9lk6q"
+     },
+     {
+      "rel": "category",
+      "uri": "https://www.speedrun.com/api/v1/categories/z27g0og2"
+     },
+     {
+      "rel": "platform",
+      "uri": "https://www.speedrun.com/api/v1/platforms/4p9z06rn"
+     },
+     {
+      "rel": "region",
+      "uri": "https://www.speedrun.com/api/v1/regions/e6lxy1dz"
+     },
+     {
+      "rel": "examiner",
+      "uri": "https://www.speedrun.com/api/v1/users/qj26goxk"
+     }
+    ]
+   },
+   "game": {
+    "data": {
+     "id": "o1y9lk6q",
+     "names": {
+      "international": "Luigi's Mansion",
+      "japanese": null,
+      "twitch": "Luigi's Mansion"
+     },
+     "abbreviation": "lm",
+     "weblink": "https://www.speedrun.com/lm",
+     "released": 2001,
+     "release-date": "2001-09-14",
+     "ruleset": {
+      "show-milliseconds": true,
+      "require-verification": true,
+      "require-video": false,
+      "run-times": [
+       "realtime"
+      ],
+      "default-time": "realtime",
+      "emulators-allowed": true
+     },
+     "romhack": false,
+     "gametypes": [],
+     "created": "2014-12-02T21:01:02Z",
+     "assets": {
+      "logo": {
+       "uri": "https://www.speedrun.com/static/theme/zr0qmgwm/logo?v=6a3b715"
+      },
+      "cover-large": {
+       "uri": "https://www.speedrun.com/static/game/o1y9lk6q/cover?v=7b7c085"
+      }
+     }
+    }
+   },
+   "category": {
+    "data": {
+     "id": "z27g0og2",
+     "name": "Any% (No OoB) [PAL]",
+     "weblink": "https://www.speedrun.com/lm?h=any-no-oob-pal&x=z27g0og2",
+     "type": "per-game",
+     "players": {
+      "type": "exactly",
+      "value": 1
+     },
+     "miscellaneous": false
+    }
+   }
+  }
+ ]
+}

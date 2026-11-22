@@ -795,6 +795,37 @@ class RealApiServiceTest {
     }
 
     @Test
+    void speedrunUsername_isSavedAndRemovedOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/speedrun/username", "{\"username\":\"Linkus7\"}");
+        expectDelete(channel("enimaloc") + "/settings/speedrun/username");
+
+        assertThat(service.saveSpeedrunUsername("enimaloc", "Linkus7")).isEqualTo(204);
+        assertThat(service.deleteSpeedrunUsername("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void speedrunApiKey_isSavedAndRemovedOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/speedrun/api-key", "{\"apiKey\":\"abc123\"}");
+        expectDelete(channel("enimaloc") + "/settings/speedrun/api-key");
+
+        assertThat(service.saveSpeedrunApiKey("enimaloc", "abc123")).isEqualTo(204);
+        assertThat(service.deleteSpeedrunApiKey("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void speedrunRefusals_keepTheirStatus() {
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/speedrun/api-key")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/speedrun/username")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThat(service.saveSpeedrunApiKey("enimaloc", "bad")).isEqualTo(400);
+        assertThat(service.saveSpeedrunUsername("enimaloc", "n1")).isEqualTo(503);
+    }
+
+    @Test
     void refreshSteamProfileCache() {
         expectPost(channel("enimaloc") + "/steam-profile/refresh");
         service.refreshSteamProfileCache("enimaloc");

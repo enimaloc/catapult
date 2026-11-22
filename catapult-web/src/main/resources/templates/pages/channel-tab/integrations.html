@@ -20,6 +20,7 @@
             <span th:replace="~{pages/channel-tab/integrations :: message(${integration.name()})}">Twitch</span>
             <th:block th:each="node : ${integration.nodes()}"><th:block th:insert="~{pages/channel-tab/integrations :: node(${node})}"></th:block></th:block>
             <th:block th:if="${integration.id() == 'obs' and widgetUrl != null}" th:insert="~{pages/channel-tab/integrations :: obs-widget}"></th:block>
+            <p th:if="${integration.id() == 'speedrun'}" class="speedrun-help-link"><a id="speedrun-settings-link" href="https://www.speedrun.com/settings/api" target="_blank" rel="noopener noreferrer" th:text="#{channel.connections.speedrun.help.link}">Ouvrir les réglages speedrun.com</a></p>
             <p th:if="${integration.id() == 'obs' and widgetUrl == null and widgetUnavailable == true}" id="obs-widget-unavailable" th:text="#{channel.connections.obs.widget.link_unavailable}">Lien du widget indisponible.</p>
         </mdui-card>
     </div>
@@ -44,7 +45,7 @@
            th:classappend="${n.attrs().className()}" spa:state="${n.attrs().state()}"
            th:placeholder="${text}"
            th:aria-label="${n.ariaLabel().isKey() ? #messages.msgWithParams(n.ariaLabel().key(), n.ariaLabel().argsArray()) : n.ariaLabel().literal()}"
-           th:value="${n.value()}" th:min="${n.min()}" th:max="${n.max()}"/>
+           th:value="${n.value()}" th:min="${n.min()}" th:max="${n.max()}" th:autocomplete="${n.autocomplete()}"/>
     <label th:case="'switch'">
         <mdui-switch th:id="${n.attrs().id()}" th:data-field="${n.attrs().field()}" th:classappend="${n.attrs().className()}"
                      spa:state="${n.attrs().state()}" th:checked="${n.checked()}"></mdui-switch>

@@ -83,14 +83,15 @@ class GameInfoAssemblerV3Test {
     void steamGame_enrichedWithItsAppIdIgdbIdAndDetectedName_currentLinks() {
         DetectedGame detected = playing(Duration.ZERO);
         ProtonDbSummary proton = new ProtonDbSummary("gold", "gold", "gold", "good", 0.7, 10, "https://p");
-        when(enrichmentAssembler.enrichAsync(any(), any(), any(), any(), any(), any(), any())).thenReturn(
-                CompletableFuture.completedFuture(new GameEnrichment(null, proton, null, null, null, null, "620", null, null, null)));
+        when(enrichmentAssembler.enrichAsync(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(
+                CompletableFuture.completedFuture(new GameEnrichment(null, proton, null, null, null, null, "620", null, null, null, null)));
 
         GameInfoV3Response response = assembler.gameInfoV3(user, Locale.FRENCH, null, null);
 
         // the detected name, not the localized store name the v2 answer shows
         verify(enrichmentAssembler).enrichAsync(eq(detected), eq(Optional.of("72")), eq(Optional.of("620")),
-                eq("Portal 2"), eq("FR"), isNull(), eq(new MoreLinks(BASE, GameInfoAssembler.LinkStyle.CURRENT)));
+                eq("Portal 2"), eq("FR"), isNull(), eq(new MoreLinks(BASE, GameInfoAssembler.LinkStyle.CURRENT)),
+                eq(Optional.of(user)));
         verify(igdbService, times(1)).resolveDetected(any(), any(), any());
         assertThat(response.inGame()).isTrue();
         assertThat(response.name()).isEqualTo("Portail 2");
@@ -102,7 +103,7 @@ class GameInfoAssemblerV3Test {
     @Test
     void enrichment_overlapsTheV2Aggregation() {
         playing(Duration.ofSeconds(1));
-        when(enrichmentAssembler.enrichAsync(any(), any(), any(), any(), any(), any(), any())).thenAnswer(invocation ->
+        when(enrichmentAssembler.enrichAsync(any(), any(), any(), any(), any(), any(), any(), any())).thenAnswer(invocation ->
                 CompletableFuture.supplyAsync(() -> {
                     sleep(Duration.ofSeconds(1));
                     return GameEnrichment.EMPTY;
