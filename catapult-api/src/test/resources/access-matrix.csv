@@ -554,4 +554,5 @@ GET,/api/me/stats/bungie/{game},game=destiny2;?version=3,,401,401,401,401,401,40
 GET,/api/me/stats/riot/{game},game=lol;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/faceit/{game},game=cs2;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/chess,?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/osu/{game},game=osu;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/retroachievements,?version=3,,401,401,401,401,401,401,PASS

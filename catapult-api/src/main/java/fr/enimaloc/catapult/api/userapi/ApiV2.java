@@ -68,6 +68,7 @@ public final class ApiV2 {
     static final String HEARTHSTONE_DECK_CODE = "[A-Za-z0-9+=_-]{8,200}";
     static final String BUNGIE_GAME = "destiny2";
     static final String RIOT_GAME = "lol|tft";
+    static final String OSU_GAME = "osu";
 
     // Shapes of the optional "country" and "language" query parameters of the enrichment routes.
     static final String COUNTRY = "[A-Za-z]{2}";

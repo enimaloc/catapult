@@ -17,6 +17,9 @@ import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.FaceitGa
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BlizzardGame;
 import fr.enimaloc.catapult.service.enrichment.bungie.BungieStats;
 import fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService;
+import fr.enimaloc.catapult.service.enrichment.osu.OsuStats;
+import fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService;
+import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.OsuGame;
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BungieGame;
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame;
 import fr.enimaloc.catapult.service.enrichment.rastats.RaAccountView;
@@ -81,6 +84,7 @@ public class MeStatsController {
     private final BungieStatsService bungieStatsService;
     private final RiotStatsService riotStatsService;
     private final FaceitStatsService faceitStatsService;
+    private final OsuStatsService osuStatsService;
     private final MemberFetchBudgets memberFetchBudgets;
     private final ApiUserResolver userResolver;
     private final PublicBaseUrl publicBaseUrl;
@@ -93,14 +97,15 @@ public class MeStatsController {
     @GetMapping
     @Operation(summary = "Get your stats on the game your channel plays now",
             description = "The stats object of GET /api/me/game (version 3): steam, xbox, retroachievements, "
-                    + "blizzard, bungie, riot and faceit, each null when it does not apply (not linked, game not "
+                    + "blizzard, bungie, riot, faceit, chess and osu, each null when it does not apply (not linked, game not "
                     + "found there), each with its status and a \"more\" link to its detail; the platforms with their "
                     + "play time and achievements summary (unlocked, total, percent, the 5 latest, the rarest), "
                     + "blizzard with your BattleTag, region and the game's object (wow main character, sc2 or d3 "
                     + "profile), bungie with your Bungie Name and destiny2 profile, riot with your Riot ID, platform "
                     + "and the game's object (lol summoner, ranks and game in progress, tft rank), faceit with your "
                     + "nickname and your CS2 level, Elo and last match, chess with your Chess.com and Lichess ratings "
-                    + "(see GET /api/me/stats/chess). stats is null when nothing applies.")
+                    + "(see GET /api/me/stats/chess), osu with your osu! username and profile (pp, ranks, accuracy, "
+                    + "play count and time, latest score). stats is null when nothing applies.")
     @ApiResponse(responseCode = "200", description = "inGame=false while no game is detected; otherwise your stats.")
     public CurrentStats current(
             @AuthenticationPrincipal UUID userId,
@@ -221,6 +226,31 @@ public class MeStatsController {
         BlizzardStats stats = detail(userId, notFound, (user, budget) -> blizzardStatsService.forGame(user,
                 blizzardGame, RequestLocale.parse(lang, acceptLanguage), budget, true));
         return GameInfoV3Response.blizzardStats(stats, links());
+    }
+
+    @GetMapping("/osu/{game}")
+    @Operation(summary = "Get your stats on osu!",
+            description = "The osu object of GET /api/me/stats (status, game, account = your osu! username, and osu: "
+                    + "your default ruleset and its pp, global and country rank, country, accuracy, play count, play "
+                    + "time and level, and your latest passed score), plus what only the detail has: osu.rulesets "
+                    + "(the numbers of every ruleset) and osu.recentScores (your 5 latest passed scores). osu! asks "
+                    + "that a player be read at most once a minute: the numbers are at most 2 minutes old."
+                    + STATUS_NOTE + BUDGET_NOTE)
+    @ApiResponse(responseCode = "200", description = "Your stats on the game.")
+    @ApiResponse(responseCode = "400", description = "Unknown game (osu).", content = @Content)
+    @ApiResponse(responseCode = "404", description = "No osu! account linked (or osu! refused the link since), or "
+            + "osu! stats unavailable on this instance.", content = @Content)
+    @ApiResponse(responseCode = "429", description = "Your refreshes are spent; retry after Retry-After seconds.",
+            content = @Content)
+    public OsuStats osu(
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "osu! game: osu (osu! and osu!lazer).", in = ParameterIn.PATH, example = "osu")
+            @PathVariable @Pattern(regexp = ApiV2.OSU_GAME) String game) {
+        String notFound = "No osu! stats for you: osu! not linked (or the link has to be made again), or osu! stats "
+                + "unavailable";
+        OsuStats stats = detail(userId, notFound, (user, budget) -> osuStatsService.forGame(user, OsuGame.OSU,
+                budget, true));
+        return GameInfoV3Response.osuStats(stats, links());
     }
 
     @GetMapping("/bungie/{game}")

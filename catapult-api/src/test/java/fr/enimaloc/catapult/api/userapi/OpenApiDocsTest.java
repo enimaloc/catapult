@@ -121,6 +121,7 @@ class OpenApiDocsTest {
     @MockitoBean fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService bungieStatsService;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService riotStatsService;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.faceit.FaceitStatsService faceitStatsService;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService osuStatsService;
 
     private JsonNode docs() throws Exception {
         String body = mvc.perform(get("/api/v3/api-docs")).andExpect(status().isOk())
