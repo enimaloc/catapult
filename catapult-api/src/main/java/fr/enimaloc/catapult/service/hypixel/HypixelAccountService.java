@@ -16,6 +16,7 @@ import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelClient;
 import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelModels.HypixelPlayer;
 import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelModels.MinecraftProfile;
 import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelNotFoundException;
+import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -134,6 +135,9 @@ public class HypixelAccountService {
         if (changed[0]) {
             cache.evictUser(user.getId(), SOURCES);
         }
+        // the player just checked serves the first read too (after the eviction, which would remove it)
+        cache.put(EnrichmentSource.HYPIXEL_PLAYER, "u:" + user.getId() + ":" + uuid,
+                new HypixelStatsService.PlayerCell(found));
         publish(user.getId());
     }
 
@@ -158,7 +162,8 @@ public class HypixelAccountService {
         Optional<HypixelAccount> row = accounts.findById(userId);
         return new HypixelData(row.map(HypixelAccount::getMinecraftName).orElse(null),
                 row.map(HypixelAccount::getMinecraftUuid).orElse(null),
-                properties.hypixelEnabled() && keys.hasKeys());
+                properties.hypixelEnabled() && keys.hasKeys()
+                        && properties.source(EnrichmentSource.HYPIXEL_PLAYER).enabled());
     }
 
     private void publish(UUID userId) {

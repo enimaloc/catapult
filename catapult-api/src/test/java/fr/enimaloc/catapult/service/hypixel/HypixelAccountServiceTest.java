@@ -95,6 +95,12 @@ class HypixelAccountServiceTest {
         assertThat(row.getMinecraftName()).isEqualTo("Notch");
         assertThat(row.getUpdatedAt()).isEqualTo(Instant.parse("2026-11-23T10:00:00Z"));
         verify(cache).evictUser(user.getId(), HypixelAccountService.SOURCES);
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(cache);
+        order.verify(cache).evictUser(user.getId(), HypixelAccountService.SOURCES);
+        order.verify(cache).put(eq(fr.enimaloc.catapult.service.enrichment.EnrichmentSource.HYPIXEL_PLAYER),
+                eq("u:" + user.getId() + ":" + MC),
+                eq(new fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService.PlayerCell(
+                        new HypixelPlayer(MC, "Notch", null, 0, null, null, false, null, null, null, null))));
         ArgumentCaptor<HypixelData> data = ArgumentCaptor.forClass(HypixelData.class);
         verify(events).hypixelAccountChanged(eq(user.getId()), data.capture());
     }
@@ -192,6 +198,13 @@ class HypixelAccountServiceTest {
 
         assertThat(service.data(user)).isEqualTo(new HypixelData("Notch", MC, false));
         verifyNoInteractions(client);
+    }
+
+    @Test
+    void data_saysUnavailable_whenThePlayerSourceIsOff() {
+        properties.getHypixelPlayer().setEnabled(false);
+
+        assertThat(service.data(user).available()).isFalse();
     }
 
     @Test
