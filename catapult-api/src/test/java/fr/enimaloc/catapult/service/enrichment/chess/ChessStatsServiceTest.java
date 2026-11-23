@@ -208,6 +208,17 @@ class ChessStatsServiceTest {
     }
 
     @Test
+    void aClosedChesscomAccountIsNotFoundAndItsRatingsAreNotRead() {
+        declared(true, false);
+        when(client.chesscomPlayer("hikaru")).thenThrow(new ChessNotFoundException("closed"));
+
+        ChessStats stats = service.forMember(user, FetchBudget.UNLIMITED, false).orElseThrow();
+
+        assertThat(stats.chesscom().status()).isEqualTo(Status.NOT_FOUND);
+        verify(client, never()).chesscomStats(anyString());
+    }
+
+    @Test
     void oneSiteReadIsEnoughForAnOkHead() {
         declared(true, true);
         when(client.chesscomStats("hikaru")).thenThrow(new ChessUnavailableException("down"));

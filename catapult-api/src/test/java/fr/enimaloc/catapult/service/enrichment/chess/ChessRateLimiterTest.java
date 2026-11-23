@@ -115,6 +115,31 @@ class ChessRateLimiterTest {
     }
 
     @Test
+    void aCallerQueuedBehindA429IsRefusedNotSent() throws Exception {
+        ChessRateLimiter limiter = new ChessRateLimiter(Duration.ofSeconds(5), Clock.systemUTC());
+        CountDownLatch inFirst = new CountDownLatch(1);
+        CountDownLatch answered = new CountDownLatch(1);
+        AtomicInteger sent = new AtomicInteger();
+        CompletableFuture<String> first = CompletableFuture.supplyAsync(() -> limiter.call(ChessSite.LICHESS, () -> {
+            inFirst.countDown();
+            await(answered);
+            // the 429 is seen, and the site paused, before the slot is given back
+            limiter.pause(ChessSite.LICHESS, Duration.ofSeconds(60));
+            return "429";
+        }));
+        assertThat(inFirst.await(2, TimeUnit.SECONDS)).isTrue();
+        CompletableFuture<Integer> queued = CompletableFuture.supplyAsync(() ->
+                limiter.call(ChessSite.LICHESS, sent::incrementAndGet));
+        Thread.sleep(100);
+
+        answered.countDown();
+
+        assertThat(first.get(2, TimeUnit.SECONDS)).isEqualTo("429");
+        assertThatThrownBy(() -> queued.get(2, TimeUnit.SECONDS)).hasCauseInstanceOf(ChessUnavailableException.class);
+        assertThat(sent.get()).isZero();
+    }
+
+    @Test
     void aPauseRefusesTheSiteUntilItEnds() {
         MutableClock clock = new MutableClock();
         ChessRateLimiter limiter = new ChessRateLimiter(Duration.ofMillis(50), clock);

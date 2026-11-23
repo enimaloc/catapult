@@ -97,7 +97,11 @@ public class ChessStatsService {
         String url = ChessProfiles.chesscom(username);
         String key = member + ":chesscom:" + username;
         Looked<ChesscomStats> stats = look(EnrichmentSource.CHESS_CHESSCOM_STATS, key, ChesscomStatsCell.class,
-                ChesscomStatsCell::new, ChesscomStatsCell::value, budget, () -> client.chesscomStats(username));
+                ChesscomStatsCell::new, ChesscomStatsCell::value, budget, () -> {
+                    // the profile first: a closed account is not found, its frozen ratings are not served
+                    client.chesscomPlayer(username);
+                    return client.chesscomStats(username);
+                });
         if (stats.value().isEmpty()) {
             return new ChessStats.Chesscom(stats.failed() ? Status.UNAVAILABLE : Status.NOT_FOUND, username, url,
                     null, null, null, null, null);

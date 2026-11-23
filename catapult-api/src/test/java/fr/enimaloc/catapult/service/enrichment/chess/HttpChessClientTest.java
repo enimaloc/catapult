@@ -37,6 +37,9 @@ class HttpChessClientTest {
     private static final class RecordingLimiter extends ChessRateLimiter {
         final List<ChessSite> calls = new ArrayList<>();
         final List<Duration> pauses = new ArrayList<>();
+        /** Whether each pause came while the call still held the site's slot. */
+        final List<Boolean> pausedInCall = new ArrayList<>();
+        private boolean inCall;
 
         RecordingLimiter() {
             super(Duration.ofMillis(10), java.time.Clock.systemUTC());
@@ -45,12 +48,18 @@ class HttpChessClientTest {
         @Override
         public <T> T call(ChessSite site, Supplier<T> request) {
             calls.add(site);
-            return request.get();
+            inCall = true;
+            try {
+                return request.get();
+            } finally {
+                inCall = false;
+            }
         }
 
         @Override
         public void pause(ChessSite site, Duration duration) {
             pauses.add(duration);
+            pausedInCall.add(inCall);
         }
     }
 
@@ -158,6 +167,15 @@ class HttpChessClientTest {
     }
 
     @Test
+    void aClosedChesscomAccountIsNotFound() throws IOException {
+        String closed = fixture("chesscom-player.json").replace("\"status\":\"premium\"",
+                "\"status\":\"closed:fair_play_violations\"");
+        server.expect(requestTo(CHESSCOM + "hikaru")).andRespond(withSuccess(closed, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.chesscomPlayer("hikaru")).isInstanceOf(ChessNotFoundException.class);
+    }
+
+    @Test
     void chesscomRecognisedNotFoundIsNotFound() throws IOException {
         status(CHESSCOM + "zzzznotauserqq123", HttpStatus.NOT_FOUND, fixture("chesscom-404.json"),
                 MediaType.APPLICATION_JSON);
@@ -202,6 +220,7 @@ class HttpChessClientTest {
 
         assertThatThrownBy(() -> client.chesscomStats("foo")).isInstanceOf(ChessUnavailableException.class);
         assertThat(limiter.pauses).containsExactly(Duration.ofSeconds(30));
+        assertThat(limiter.pausedInCall).as("paused before the slot is given back").containsExactly(true);
     }
 
     @Test
@@ -302,6 +321,26 @@ class HttpChessClientTest {
         answer(LICHESS + "Thibault2", "lichess-user-disabled.json");
 
         assertThatThrownBy(() -> client.lichessUser("Thibault2")).isInstanceOf(ChessNotFoundException.class);
+    }
+
+    @Test
+    void lichessAccountMarkedForBreakingTheTermsIsNotFound() throws IOException {
+        String marked = fixture("lichess-user.json").replace("\"id\":\"drnykterstein\",",
+                "\"id\":\"drnykterstein\",\"tosViolation\":true,");
+        server.expect(requestTo(LICHESS + "DrNykterstein")).andRespond(withSuccess(marked,
+                MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.lichessUser("DrNykterstein")).isInstanceOf(ChessNotFoundException.class);
+    }
+
+    @Test
+    void lichessPuzzleRatingIsNotAGameRating() throws IOException {
+        String withPuzzle = fixture("lichess-user.json").replace("\"perfs\":{",
+                "\"perfs\":{\"puzzle\":{\"games\":120,\"rating\":2100,\"rd\":80,\"prog\":5},");
+        server.expect(requestTo(LICHESS + "DrNykterstein")).andRespond(withSuccess(withPuzzle,
+                MediaType.APPLICATION_JSON));
+
+        assertThat(client.lichessUser("DrNykterstein").perfs()).doesNotContainKey("puzzle").containsKey("bullet");
     }
 
     @Test

@@ -52,6 +52,9 @@ public class HttpChessClient implements ChessClient {
             "chess_blitz", "blitz",
             "chess_bullet", "bullet");
 
+    /** The Lichess puzzle rating, which is not a rating of games. */
+    private static final String PUZZLE = "puzzle";
+
     private record Answer(int status, String retryAfter, byte[] body, boolean tooBig) {
     }
 
@@ -88,6 +91,11 @@ public class HttpChessClient implements ChessClient {
         JsonNode json = object(get(ChessSite.CHESSCOM, chesscom(username), chesscomNotFound()));
         if (!json.path("player_id").isNumber() || text(json.path("username")) == null) {
             throw garbled();
+        }
+        String status = text(json.path("status"));
+        // "closed", "closed:fair_play_violations"...: the account is gone, its frozen ratings are not served
+        if (status != null && status.startsWith("closed")) {
+            throw new ChessNotFoundException("the Chess.com account is closed");
         }
         return new ChesscomPlayer(json.get("player_id").asLong(), json.get("username").asString(),
                 text(json.path("url")), text(json.path("title")), text(json.path("avatar")));
@@ -168,15 +176,17 @@ public class HttpChessClient implements ChessClient {
         if (text(json.path("id")) == null || text(json.path("username")) == null) {
             throw garbled();
         }
-        if (json.path("disabled").asBoolean(false)) {
-            throw new ChessNotFoundException("the Lichess account is closed");
+        // a closed account, or one Lichess marked for breaking its terms (cheating...): not served
+        if (json.path("disabled").asBoolean(false) || json.path("tosViolation").asBoolean(false)) {
+            throw new ChessNotFoundException("the Lichess account is closed or marked");
         }
         Map<String, ChessRating> perfs = new LinkedHashMap<>();
         for (Map.Entry<String, JsonNode> perf : json.path("perfs").properties()) {
             JsonNode node = perf.getValue();
             Integer games = integer(node.path("games"));
-            // puzzles, storm and the like have no rating; a variant never played is left out
-            if (!node.path("rating").isNumber() || games == null || games <= 0) {
+            // the puzzle rating is not a game rating (storm, racer, streak have none); a variant never played
+            // is left out
+            if (PUZZLE.equals(perf.getKey()) || !node.path("rating").isNumber() || games == null || games <= 0) {
                 continue;
             }
             perfs.put(perf.getKey(), new ChessRating(node.get("rating").asInt(), integer(node.path("rd")),
@@ -193,7 +203,14 @@ public class HttpChessClient implements ChessClient {
     // --- transport ---
 
     private JsonNode get(ChessSite site, URI uri, Predicate<JsonNode> notFound) {
-        return interpret(site, limiter.call(site, () -> send(uri)), notFound);
+        return interpret(site, limiter.call(site, () -> {
+            Answer answer = send(uri);
+            if (answer.status() == 429) {
+                // paused before the slot is given back: the next caller in line is refused, never sent
+                limiter.pause(site, retryAfter(answer.retryAfter()));
+            }
+            return answer;
+        }), notFound);
     }
 
     private Answer send(URI uri) {
@@ -223,7 +240,6 @@ public class HttpChessClient implements ChessClient {
     private JsonNode interpret(ChessSite site, Answer answer, Predicate<JsonNode> notFound) {
         int status = answer.status();
         if (status == 429) {
-            limiter.pause(site, retryAfter(answer.retryAfter()));
             throw new ChessUnavailableException(site + " rate limit hit (429)");
         }
         if (answer.tooBig()) {
