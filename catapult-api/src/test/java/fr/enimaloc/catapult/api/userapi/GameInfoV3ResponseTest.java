@@ -698,4 +698,31 @@ class GameInfoV3ResponseTest {
                 .doesNotContain("GOLD");
         assertThat(withRiot(null, patch).stats()).isNull();
     }
+
+    // ---------------------------------------------------------------- FACEIT
+
+    @Test
+    void faceitStatsCarryTheirMoreLink_withoutTheDetailFields() {
+        var cs2 = new fr.enimaloc.catapult.service.enrichment.faceit.FaceitStats.Cs2Stats(Status.OK, 8, 1850, "EU",
+                420, 231, 55, 1.12, 48, 2, 9, new fr.enimaloc.catapult.service.enrichment.faceit.FaceitModels
+                .LastMatch("m1", "de_mirage", "13 / 9", true, 21, 15, 1.4, null), null);
+        var faceit = new fr.enimaloc.catapult.service.enrichment.faceit.FaceitStats(Status.OK,
+                fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.FaceitGame.CS2, "Catapult", cs2,
+                null);
+        PersonalStatsEnrichment stats = PersonalStatsEnrichment.of(null, null, null, null,
+                GameBinding.SourceType.STEAM, faceit);
+        GameEnrichment enrichment = new GameEnrichment(null, null, null, null, null, null, null, null, null, null,
+                null, stats, null);
+
+        JsonNode json = MAPPER.readTree(MAPPER.writeValueAsString(GameInfoV3Response.of(BASE_V2, enrichment, LINKS,
+                Optional.of("242408")))).path("stats").path("faceit");
+
+        assertThat(json.path("status").asString()).isEqualTo("ok");
+        assertThat(json.path("game").asString()).isEqualTo("cs2");
+        assertThat(json.path("account").asString()).isEqualTo("Catapult");
+        assertThat(json.path("cs2").path("elo").asInt()).isEqualTo(1850);
+        assertThat(json.path("cs2").path("lastMatch").path("map").asString()).isEqualTo("de_mirage");
+        assertThat(json.path("cs2").has("recentResults")).isFalse();
+        assertThat(json.path("more").asString()).isEqualTo(BASE + "/api/me/stats/faceit/cs2?version=3");
+    }
 }

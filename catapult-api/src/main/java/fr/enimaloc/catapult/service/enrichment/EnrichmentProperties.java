@@ -157,6 +157,9 @@ public class EnrichmentProperties {
     private SourceSettings riotTftLeague = new SourceSettings();
     private SourceSettings riotLolPatch = new SourceSettings();
     private SourceSettings riotLolChampions = new SourceSettings();
+    private SourceSettings faceitPlayer = new SourceSettings();
+    private SourceSettings faceitStats = new SourceSettings();
+    private SourceSettings faceitLastMatch = new SourceSettings();
     private Blizzard blizzard = new Blizzard();
     private SourceSettings bungieProfile = new SourceSettings();
     private SourceSettings bungieTriumphs = new SourceSettings();
@@ -319,6 +322,9 @@ public class EnrichmentProperties {
             case RIOT_TFT_LEAGUE -> riotTftLeague;
             case RIOT_LOL_PATCH -> riotLolPatch;
             case RIOT_LOL_CHAMPIONS -> riotLolChampions;
+            case FACEIT_PLAYER -> faceitPlayer;
+            case FACEIT_STATS -> faceitStats;
+            case FACEIT_LAST_MATCH -> faceitLastMatch;
         };
     }
 
@@ -350,6 +356,8 @@ public class EnrichmentProperties {
             case RIOT_LOL_LIVE -> Duration.ofMinutes(1);
             case RIOT_LOL_PATCH -> Duration.ofHours(1);
             case RIOT_LOL_CHAMPIONS -> Duration.ofDays(1);
+            case FACEIT_PLAYER, FACEIT_STATS -> Duration.ofMinutes(10);
+            case FACEIT_LAST_MATCH -> Duration.ofMinutes(5);
         };
     }
 }

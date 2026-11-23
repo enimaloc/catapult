@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
 import fr.enimaloc.catapult.common.dto.channel.RiotData;
+import fr.enimaloc.catapult.common.dto.channel.FaceitData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 
 import java.util.List;
@@ -48,6 +49,7 @@ public final class ChannelEvents {
     public static final String BLIZZARD_ACCOUNT_CHANGED = "blizzard.account.changed";
     public static final String BUNGIE_ACCOUNT_CHANGED = "bungie.account.changed";
     public static final String RIOT_ACCOUNT_CHANGED = "riot.account.changed";
+    public static final String FACEIT_ACCOUNT_CHANGED = "faceit.account.changed";
     public static final String CUSTOM_BINDING_CHANGED = "custom.binding.changed";
     public static final String CUSTOM_BINDINGS_UPDATED = "custom.bindings.updated";
 
@@ -141,6 +143,8 @@ public final class ChannelEvents {
     public record BungieAccountChanged(String channelId, String channelLogin, BungieAccountData account) {}
     /** The owner's Riot settings changed: {@code account} is how the settings card stands now (no secret). */
     public record RiotAccountChanged(String channelId, String channelLogin, RiotData account) {}
+    /** The owner's FACEIT settings changed: {@code account} is how the settings card stands now (no secret). */
+    public record FaceitAccountChanged(String channelId, String channelLogin, FaceitData account) {}
 
     /**
      * The owner's RetroAchievements settings changed: {@code account} is how the settings card stands now. It

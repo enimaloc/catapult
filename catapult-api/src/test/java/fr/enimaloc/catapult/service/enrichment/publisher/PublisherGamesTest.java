@@ -67,4 +67,21 @@ class PublisherGamesTest {
         assertThat(PublisherGames.riot(null, "115", "", "126459")).isEmpty();
         assertThat(PublisherGames.riot("123", "115", "", "126459")).isEmpty();
     }
+
+    @Test
+    void counterStrike2_isTheFaceitGame_bySteamAppIdOrIgdbId() {
+        assertThat(PublisherGames.faceit(new DetectedGame("730", SourceType.STEAM, "CS2"), null, "242408"))
+                .contains(PublisherGames.FaceitGame.CS2);
+        DetectedGame manual = new DetectedGame("x", SourceType.MANUAL, "x");
+        assertThat(PublisherGames.faceit(manual, "242408", "242408")).contains(PublisherGames.FaceitGame.CS2);
+        assertThat(PublisherGames.faceit(manual, "1", "242408")).isEmpty();
+        assertThat(PublisherGames.faceit(manual, "242408", "")).isEmpty();
+        assertThat(PublisherGames.faceit(manual, null, "242408")).isEmpty();
+        assertThat(PublisherGames.faceit(new DetectedGame("440", SourceType.STEAM, "TF2"), null, "242408")).isEmpty();
+        // another store's 730 is not Counter-Strike 2
+        assertThat(PublisherGames.faceit(new DetectedGame("730", SourceType.XBOX, "x"), null, "242408")).isEmpty();
+        assertThat(PublisherGames.faceit(null, null, "242408")).isEmpty();
+        assertThat(JsonMapper.builder().build().writeValueAsString(PublisherGames.FaceitGame.CS2))
+                .isEqualTo("\"cs2\"");
+    }
 }

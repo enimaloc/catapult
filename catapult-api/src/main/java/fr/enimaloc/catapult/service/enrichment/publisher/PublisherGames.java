@@ -63,6 +63,33 @@ public final class PublisherGames {
         return DESTINY2_IGDB_ID.equals(igdbId) ? Optional.of(BungieGame.DESTINY2) : Optional.empty();
     }
 
+    /** The FACEIT games the enrichment knows. */
+    public enum FaceitGame {
+        @JsonProperty("cs2") CS2;
+
+        /** FACEIT's own id of the game. */
+        public String faceitId() {
+            return "cs2";
+        }
+    }
+
+    /** Counter-Strike 2's Steam app id. */
+    static final String CS2_STEAM_APP_ID = "730";
+
+    /**
+     * The FACEIT game of a detected one: by Steam app id when detected on Steam, else by IGDB id ({@code cs2IgdbId}
+     * is Counter-Strike 2's; an empty one maps nothing).
+     */
+    public static Optional<FaceitGame> faceit(DetectedGame game, String igdbId, String cs2IgdbId) {
+        if (game != null && game.getSourceType() == SourceType.STEAM && CS2_STEAM_APP_ID.equals(game.getSourceId())) {
+            return Optional.of(FaceitGame.CS2);
+        }
+        if (igdbId != null && !igdbId.isBlank() && igdbId.equals(cs2IgdbId)) {
+            return Optional.of(FaceitGame.CS2);
+        }
+        return Optional.empty();
+    }
+
     /** A Battle.net variant of a game (the source id carries a {@code :}, like {@code WoW:Forever}). */
     public static boolean isBlizzardVariant(DetectedGame game) {
         return game != null && game.getSourceType() == SourceType.BATTLENET && game.getSourceId() != null

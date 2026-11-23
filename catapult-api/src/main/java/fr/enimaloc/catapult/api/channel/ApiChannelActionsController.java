@@ -49,6 +49,8 @@ import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService;
 import fr.enimaloc.catapult.service.riot.RiotAccountService;
 import fr.enimaloc.catapult.common.dto.channel.RiotAccountRequest;
+import fr.enimaloc.catapult.service.faceit.FaceitAccountService;
+import fr.enimaloc.catapult.common.dto.channel.FaceitNicknameRequest;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
 import fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService;
 import fr.enimaloc.catapult.service.steam.SteamPersonalTokenService;
@@ -105,6 +107,7 @@ public class ApiChannelActionsController {
     private final Optional<BlizzardAccountService> blizzardAccountService;
     private final fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinkService;
     private final RiotAccountService riotAccountService;
+    private final FaceitAccountService faceitAccountService;
 
 
     // ── Binding actions ───────────────────────────────────────────────────────
@@ -503,6 +506,29 @@ public class ApiChannelActionsController {
             @PathVariable UUID userId) {
 
         riotAccountService.delete(userResolver.user(userId));
+    }
+
+    /**
+     * 400 for a malformed nickname or one FACEIT does not know; 503 when FACEIT cannot be asked (down, the source
+     * off, or no key in the pool).
+     */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/faceit/nickname")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveFaceitNickname(
+            @PathVariable UUID userId,
+            @RequestBody FaceitNicknameRequest body) {
+
+        faceitAccountService.save(userResolver.user(userId), body.nickname());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/faceit/nickname")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteFaceitNickname(
+            @PathVariable UUID userId) {
+
+        faceitAccountService.delete(userResolver.user(userId));
     }
 
     /** 400 when RetroAchievements does not know the name, 503 when it cannot be asked (or no key can ask it). */

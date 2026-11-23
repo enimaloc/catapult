@@ -11,6 +11,9 @@ import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardPublisher;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStats;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStatsService;
+import fr.enimaloc.catapult.service.enrichment.faceit.FaceitStats;
+import fr.enimaloc.catapult.service.enrichment.faceit.FaceitStatsService;
+import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.FaceitGame;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BlizzardGame;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
@@ -126,6 +129,7 @@ class GameEnrichmentAssemblerTest {
             mock(fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService.class);
     private final fr.enimaloc.catapult.service.enrichment.riot.RiotGameDataService riotData =
             mock(fr.enimaloc.catapult.service.enrichment.riot.RiotGameDataService.class);
+    private final FaceitStatsService faceitStats = mock(FaceitStatsService.class);
     private final EnrichmentProperties properties = new EnrichmentProperties();
 
     private GameEnrichmentAssembler assembler;
@@ -136,7 +140,7 @@ class GameEnrichmentAssemblerTest {
         assembler = new GameEnrichmentAssembler(hltb, protonDb, steamGridDb, steamDeck, pcgw, prices, openCritic,
                 twitch, speedrunGames, speedrunIdentity, speedrunPersonal, igdbService, igdbGameDetailsService,
                 trailers, steamStats, xboxStats, raStats, blizzardStats, blizzardData, bungieStats, bungieData,
-                riotStats, riotData,
+                riotStats, riotData, faceitStats,
                 properties);
         when(hltb.timeToBeat(any(), any())).thenReturn(Optional.of(TTB));
         when(protonDb.summary(anyString(), any())).thenReturn(Optional.of(PROTON));
@@ -384,6 +388,7 @@ class GameEnrichmentAssemblerTest {
                 .withBean(fr.enimaloc.catapult.service.enrichment.bungie.BungieGameDataService.class, () -> bungieData)
                 .withBean(fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService.class, () -> riotStats)
                 .withBean(fr.enimaloc.catapult.service.enrichment.riot.RiotGameDataService.class, () -> riotData)
+                .withBean(FaceitStatsService.class, () -> faceitStats)
                 .withBean(EnrichmentProperties.class)
                 .withUserConfiguration(GameEnrichmentAssembler.class)
                 .run(ctx -> assertThat(ctx).hasSingleBean(GameEnrichmentAssembler.class));
@@ -867,6 +872,53 @@ class GameEnrichmentAssemblerTest {
         statsEverywhere(user);
         when(riotStats.forDetected(any(), any(), any(), any()))
                 .thenAnswer(slow(Duration.ofSeconds(3), Optional.of(LOL_STATS)));
+    }
+
+    // ---------------------------------------------------------------- FACEIT
+
+    private static final DetectedGame CS2 = new DetectedGame("730", GameBinding.SourceType.STEAM, "Counter-Strike 2");
+    private static final FaceitStats CS2_STATS = new FaceitStats(Status.OK, FaceitGame.CS2, "Catapult", null, null);
+
+    @Test
+    void publicAggregateHasNoFaceitStats() {
+        GameEnrichment result = assembler.enrich(CS2, Optional.of("242408"), Optional.of("730"), "Counter-Strike 2",
+                "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
+
+        assertThat(result.stats()).isNull();
+        verifyNoInteractions(faceitStats);
+    }
+
+    @Test
+    void memberFaceitStats_areInTheStatsObject() {
+        UserAccount user = member();
+        when(faceitStats.forDetected(eq(user), eq(CS2), eq("242408"), any())).thenReturn(Optional.of(CS2_STATS));
+
+        GameEnrichment result = assembler.enrich(CS2, Optional.of("242408"), Optional.of("730"), "Counter-Strike 2",
+                "FR", null, LINKS, Optional.of(user), Locale.ENGLISH);
+
+        assertThat(result.stats().faceit()).isEqualTo(CS2_STATS);
+        assertThat(result.publisher()).isNull();
+        verify(faceitStats).forDetected(user, CS2, "242408", FetchBudget.UNLIMITED);
+    }
+
+    @Test
+    void faceitAlone_isEnoughForAStatsObject() {
+        UserAccount user = member();
+        when(faceitStats.forDetected(eq(user), eq(CS2), any(), any())).thenReturn(Optional.of(CS2_STATS));
+
+        PersonalStatsEnrichment stats = assembler.personalStats(CS2, Optional.empty(), Optional.of("730"),
+                "Counter-Strike 2", user, Locale.ENGLISH);
+
+        assertThat(stats.faceit()).isEqualTo(CS2_STATS);
+    }
+
+    @Test
+    void slowFaceitDoesNotBlockOthers() {
+        properties.setAggregateTimeout(Duration.ofMillis(500));
+        UserAccount user = member();
+        statsEverywhere(user);
+        when(faceitStats.forDetected(any(), any(), any(), any()))
+                .thenAnswer(slow(Duration.ofSeconds(3), Optional.of(CS2_STATS)));
 
         long start = System.nanoTime();
         GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
@@ -876,5 +928,8 @@ class GameEnrichmentAssemblerTest {
         assertThat(result.stats().riot()).isNull();
         assertThat(result.stats().steam()).isEqualTo(STEAM_OK);
         assertThat(took).isLessThan(Duration.ofSeconds(2));
+        assertThat(result.stats().faceit()).isNull();
+        assertThat(result.stats().steam()).isEqualTo(STEAM_OK);
+        assertThat(took).isLessThan(Duration.ofMillis(1500));
     }
 }
