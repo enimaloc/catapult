@@ -303,10 +303,10 @@ GET,/api/internal/admin/hypixel-keys,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/hypixel-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/hypixel-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/hypixel-keys/refresh,,,401,PASS,403,403,403,PASS,401
-GET,/api/internal/admin/supercell-keys/{game},game=clash-of-clans,,401,PASS,403,403,403,PASS,401
-POST,/api/internal/admin/supercell-keys/{game},game=clash-of-clans,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
-DELETE,/api/internal/admin/supercell-keys/{game}/{keyId},game=clash-of-clans;keyId=matrix,,401,PASS,403,403,403,PASS,401
-POST,/api/internal/admin/supercell-keys/{game}/refresh,game=clash-of-clans,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/supercell-keys/{game}/keys,game=clash-of-clans,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/supercell-keys/{game}/keys,game=clash-of-clans,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/supercell-keys/{game}/keys/{keyId},game=clash-of-clans;keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/supercell-keys/{game}/keys/refresh,game=clash-of-clans,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/opencritic-keys,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/opencritic-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/opencritic-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401

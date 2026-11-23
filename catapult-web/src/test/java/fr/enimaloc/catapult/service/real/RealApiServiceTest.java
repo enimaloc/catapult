@@ -2150,12 +2150,12 @@ class RealApiServiceTest {
     @Test
     void supercellKeys_areReadAndManagedThroughTheirGamesRoutes() {
         var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.CLASHROYALE;
-        respond(HttpMethod.GET, "/api/internal/admin/supercell-keys/clash-royale",
+        respond(HttpMethod.GET, "/api/internal/admin/supercell-keys/clash-royale/keys",
                 "{\"keys\":[],\"supercellEnabled\":true}");
-        expect(HttpMethod.POST, "/api/internal/admin/supercell-keys/clash-royale")
+        expect(HttpMethod.POST, "/api/internal/admin/supercell-keys/clash-royale/keys")
                 .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
-        expect(HttpMethod.DELETE, "/api/internal/admin/supercell-keys/clash-royale/k1").andRespond(withNoContent());
-        expectPost("/api/internal/admin/supercell-keys/clash-royale/refresh");
+        expect(HttpMethod.DELETE, "/api/internal/admin/supercell-keys/clash-royale/keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/supercell-keys/clash-royale/keys/refresh");
 
         assertThat(service.adminApiKeys(provider).enabled()).isTrue();
         assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);

@@ -14,9 +14,9 @@ public enum ApiKeyProvider {
     RIOT("riot-keys", "riot"),
     FACEIT("faceit-keys", "faceit"),
     HYPIXEL("hypixel-keys", "hypixel"),
-    CLASHOFCLANS("supercell-keys/clash-of-clans", "clashofclans"),
-    CLASHROYALE("supercell-keys/clash-royale", "clashroyale"),
-    BRAWLSTARS("supercell-keys/brawl-stars", "brawlstars");
+    CLASHOFCLANS("supercell-keys/clash-of-clans/keys", "clashofclans"),
+    CLASHROYALE("supercell-keys/clash-royale/keys", "clashroyale"),
+    BRAWLSTARS("supercell-keys/brawl-stars/keys", "brawlstars");
 
     private final String apiPath;
     private final String pathName;

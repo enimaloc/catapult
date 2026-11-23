@@ -1661,7 +1661,7 @@ public class RealApiService implements ApiService {
                 yield page == null ? null : ApiKeysPageDto.of(page);
             }
             case CLASHOFCLANS, CLASHROYALE, BRAWLSTARS -> {
-                SupercellKeysPageData page = client.get("/api/internal/admin/supercell-keys/{game}",
+                SupercellKeysPageData page = client.get("/api/internal/admin/supercell-keys/{game}/keys",
                         SupercellKeysPageData.class, supercellGame(provider));
                 yield page == null ? null : ApiKeysPageDto.of(page);
             }
@@ -1682,7 +1682,7 @@ public class RealApiService implements ApiService {
             case FACEIT -> client.call(HttpMethod.POST, "/api/internal/admin/faceit-keys", body, Void.class);
             case HYPIXEL -> client.call(HttpMethod.POST, "/api/internal/admin/hypixel-keys", body, Void.class);
             case CLASHOFCLANS, CLASHROYALE, BRAWLSTARS -> client.call(HttpMethod.POST,
-                    "/api/internal/admin/supercell-keys/{game}", body, Void.class, supercellGame(provider));
+                    "/api/internal/admin/supercell-keys/{game}/keys", body, Void.class, supercellGame(provider));
         };
         return result.status();
     }
@@ -1700,7 +1700,7 @@ public class RealApiService implements ApiService {
             case FACEIT -> client.call(HttpMethod.DELETE, "/api/internal/admin/faceit-keys/{keyId}", null, Void.class, keyId);
             case HYPIXEL -> client.call(HttpMethod.DELETE, "/api/internal/admin/hypixel-keys/{keyId}", null, Void.class, keyId);
             case CLASHOFCLANS, CLASHROYALE, BRAWLSTARS -> client.call(HttpMethod.DELETE,
-                    "/api/internal/admin/supercell-keys/{game}/{keyId}", null, Void.class, supercellGame(provider),
+                    "/api/internal/admin/supercell-keys/{game}/keys/{keyId}", null, Void.class, supercellGame(provider),
                     keyId);
         };
         return result.status();
@@ -1719,14 +1719,18 @@ public class RealApiService implements ApiService {
             case FACEIT -> client.call(HttpMethod.POST, "/api/internal/admin/faceit-keys/refresh", null, Void.class);
             case HYPIXEL -> client.call(HttpMethod.POST, "/api/internal/admin/hypixel-keys/refresh", null, Void.class);
             case CLASHOFCLANS, CLASHROYALE, BRAWLSTARS -> client.call(HttpMethod.POST,
-                    "/api/internal/admin/supercell-keys/{game}/refresh", null, Void.class, supercellGame(provider));
+                    "/api/internal/admin/supercell-keys/{game}/keys/refresh", null, Void.class, supercellGame(provider));
         };
         return result.status();
     }
 
-    /** The catapult-api game segment of a Supercell key pool: {@code clash-of-clans} for {@code supercell-keys/clash-of-clans}. */
+    /**
+     * The catapult-api game segment of a Supercell key pool: {@code clash-of-clans} for
+     * {@code supercell-keys/clash-of-clans/keys}.
+     */
     static String supercellGame(ApiKeyProvider provider) {
-        return provider.apiPath().substring(provider.apiPath().indexOf('/') + 1);
+        String path = provider.apiPath();
+        return path.substring(path.indexOf('/') + 1, path.lastIndexOf('/'));
     }
 
     @Override

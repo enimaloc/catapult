@@ -15,11 +15,11 @@ import java.util.List;
 
 /**
  * The shared Supercell API keys, one pool per game ({@code clash-of-clans}, {@code clash-royale},
- * {@code brawl-stars}): each game has its own developer portal, whose keys are JWTs bound to IP addresses. A key whose
+ * {@code brawl-stars}), each a collection under {@code /supercell-keys/{game}/keys}: each game has its own developer portal, whose keys are JWTs bound to IP addresses. A key whose
  * JWT names other scopes than the game's is refused (a Clash Royale key in the Clash of Clans pool would never work).
  */
 @RestController
-@RequestMapping(ApiPaths.ADMIN + "/supercell-keys/{game}")
+@RequestMapping(ApiPaths.ADMIN + "/supercell-keys/{game}/keys")
 @RequiredArgsConstructor
 public class ApiAdminSupercellKeysController {
 
