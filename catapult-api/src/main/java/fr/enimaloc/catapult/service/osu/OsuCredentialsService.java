@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.osu.OsuAppCredentials;
+import fr.enimaloc.catapult.repository.osu.OsuAccountRepository;
 import fr.enimaloc.catapult.repository.osu.OsuAppCredentialsRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import lombok.extern.slf4j.Slf4j;
@@ -48,15 +49,19 @@ public class OsuCredentialsService {
 
     private final OsuAppCredentialsRepository repository;
     private final TokenEncryptionService encryption;
+    private final OsuAccountRepository links;
     private final Clock clock;
     private volatile Memo memo;
 
     @Autowired
-    public OsuCredentialsService(OsuAppCredentialsRepository repository, TokenEncryptionService encryption) {
-        this(repository, encryption, Clock.systemUTC());
+    public OsuCredentialsService(OsuAppCredentialsRepository repository, TokenEncryptionService encryption,
+                                 OsuAccountRepository links) {
+        this(repository, encryption, links, Clock.systemUTC());
     }
 
-    OsuCredentialsService(OsuAppCredentialsRepository repository, TokenEncryptionService encryption, Clock clock) {
+    OsuCredentialsService(OsuAppCredentialsRepository repository, TokenEncryptionService encryption,
+                          OsuAccountRepository links, Clock clock) {
+        this.links = links;
         this.repository = repository;
         this.encryption = encryption;
         this.clock = clock;
@@ -100,17 +105,26 @@ public class OsuCredentialsService {
         if (!secret.isEmpty() && !CLIENT_SECRET.matcher(secret).matches()) {
             throw new ApiProblem(ErrorCode.BAD_REQUEST, "Invalid osu! OAuth client secret");
         }
+        boolean newApplication;
         try {
-            saveOnce(id, secret);
+            newApplication = saveOnce(id, secret);
         } catch (OptimisticLockingFailureException | DataIntegrityViolationException first) {
             try {
-                saveOnce(id, secret);
+                newApplication = saveOnce(id, secret);
             } catch (OptimisticLockingFailureException | DataIntegrityViolationException again) {
                 throw new ApiProblem(ErrorCode.CONFLICT, "The osu! credentials changed meanwhile, try again");
             }
         }
         memo = null;
-        log.info("osu! application credentials set (client {})", id);
+        if (newApplication) {
+            // A refresh token belongs to the client that issued it: the links made with another one are dead, each
+            // member is asked to link again (rather than shown linked and unavailable)
+            int invalidated = links.invalidateAll(clock.instant());
+            log.info("osu! application credentials set (client {}, a new application: {} link(s) to make again)",
+                    id, invalidated);
+        } else {
+            log.info("osu! application credentials set (client {})", id);
+        }
     }
 
     /** Removes the application: the osu! source and login go off. */
@@ -120,7 +134,8 @@ public class OsuCredentialsService {
         log.info("osu! application credentials removed");
     }
 
-    private void saveOnce(String id, String secret) {
+    /** Writes the row; true when it is another application than the one set (or none was). */
+    private boolean saveOnce(String id, String secret) {
         Optional<OsuAppCredentials> found = repository.findById(OsuAppCredentials.ID);
         boolean newApplication = found.isEmpty() || !found.get().getClientId().equals(id);
         if (newApplication && secret.isEmpty()) {
@@ -134,6 +149,7 @@ public class OsuCredentialsService {
         }
         row.setUpdatedAt(clock.instant());
         repository.save(row);
+        return newApplication;
     }
 
     private Optional<Credentials> read() {

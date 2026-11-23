@@ -37,6 +37,8 @@ class OsuCredentialsServiceTest {
 
     private final TokenEncryptionService encryption = new TokenEncryptionService("0123456789abcdef0123456789abcdef");
     private final OsuAppCredentialsRepository repository = mock(OsuAppCredentialsRepository.class);
+    private final fr.enimaloc.catapult.repository.osu.OsuAccountRepository links =
+            mock(fr.enimaloc.catapult.repository.osu.OsuAccountRepository.class);
     private final AtomicReference<OsuAppCredentials> stored = new AtomicReference<>();
     private final MutableClock clock = new MutableClock();
     private OsuCredentialsService service;
@@ -52,7 +54,7 @@ class OsuCredentialsServiceTest {
             stored.set(null);
             return null;
         }).when(repository).deleteAllInBatch();
-        service = new OsuCredentialsService(repository, encryption, clock);
+        service = new OsuCredentialsService(repository, encryption, links, clock);
     }
 
     @Test
@@ -92,6 +94,19 @@ class OsuCredentialsServiceTest {
         assertThatThrownBy(() -> service.save("67890", null))
                 .isInstanceOfSatisfying(ApiProblem.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.BAD_REQUEST));
         assertThat(service.current()).contains(new OsuCredentialsService.Credentials("12345", SECRET));
+    }
+
+    @Test
+    void anotherApplication_asksEveryMemberToLinkAgain_theSameOneDoesNot() {
+        service.save("12345", SECRET);
+        verify(links, times(1)).invalidateAll(clock.instant());
+
+        service.save("12345", " ");
+        service.save("12345", SECRET);
+        verify(links, times(1)).invalidateAll(any());
+
+        service.save("67890", SECRET);
+        verify(links, times(2)).invalidateAll(any());
     }
 
     @ParameterizedTest
