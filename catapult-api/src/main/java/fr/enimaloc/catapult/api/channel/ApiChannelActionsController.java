@@ -111,6 +111,7 @@ public class ApiChannelActionsController {
     private final RiotAccountService riotAccountService;
     private final FaceitAccountService faceitAccountService;
     private final ChessAccountService chessAccountService;
+    private final fr.enimaloc.catapult.service.osu.OsuLinkService osuLinkService;
 
 
     // ── Binding actions ───────────────────────────────────────────────────────
@@ -481,6 +482,16 @@ public class ApiChannelActionsController {
             @PathVariable UUID userId) {
 
         bungieLinkService.unlink(userResolver.user(userId));
+    }
+
+    /** Unlinks the owner's osu! account (nothing linked: nothing to do), and forgets their cached stats. */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/osu")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteOsuLink(
+            @PathVariable UUID userId) {
+
+        osuLinkService.unlink(userResolver.user(userId));
     }
 
     private BlizzardAccountService blizzard() {

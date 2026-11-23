@@ -125,6 +125,19 @@ class ChannelStateTest {
     }
 
     @Test
+    void osuLink_asItsEvent() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.OsuAccountData(true, "Inspector", false, true,
+                        java.time.Instant.parse("2026-11-20T23:30:00Z")));
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent("enimaloc", true, true,
+                        "Inspector", false, true, false));
+    }
+
+    @Test
     void bungieLink_asItsEvent() {
         ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
                 false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,

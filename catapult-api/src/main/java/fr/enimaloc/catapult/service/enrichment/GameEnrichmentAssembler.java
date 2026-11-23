@@ -18,6 +18,8 @@ import fr.enimaloc.catapult.service.enrichment.faceit.FaceitStats;
 import fr.enimaloc.catapult.service.enrichment.faceit.FaceitStatsService;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessStats;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessStatsService;
+import fr.enimaloc.catapult.service.enrichment.osu.OsuStats;
+import fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticService;
@@ -130,6 +132,7 @@ public class GameEnrichmentAssembler {
     private final FaceitStatsService faceitStatsService;
     private final EnrichmentProperties properties;
     private final ChessStatsService chessStatsService;
+    private final OsuStatsService osuStatsService;
 
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
@@ -253,7 +256,9 @@ public class GameEnrichmentAssembler {
                 .forDetected(user, detected, igdb, FetchBudget.UNLIMITED).orElse(null));
         CompletableFuture<ChessStats> chess = supply("chess stats", () -> chessStatsService
                 .forDetected(user, detected, igdb, FetchBudget.UNLIMITED).orElse(null));
-        return new Stats(steam, xbox, retro, blizzard, detected.getSourceType(), bungie, riot, faceit, chess);
+        CompletableFuture<OsuStats> osu = supply("osu stats", () -> osuStatsService
+                .forDetected(user, igdb, FetchBudget.UNLIMITED).orElse(null));
+        return new Stats(steam, xbox, retro, blizzard, detected.getSourceType(), bungie, riot, faceit, chess, osu);
     }
 
     private PlatformStats xboxStats(UserAccount user, DetectedGame detected, String igdb, String searched,
@@ -287,7 +292,8 @@ public class GameEnrichmentAssembler {
                          CompletableFuture<PlatformStats> retroachievements,
                          CompletableFuture<BlizzardStats> blizzard, GameBinding.SourceType detectedOn,
                          CompletableFuture<BungieStats> bungie, CompletableFuture<RiotStats> riot,
-                         CompletableFuture<FaceitStats> faceit, CompletableFuture<ChessStats> chess) {
+                         CompletableFuture<FaceitStats> faceit, CompletableFuture<ChessStats> chess,
+                         CompletableFuture<OsuStats> osu) {
 
         /** What arrived before {@code deadline}; null when no platform applies. */
         PersonalStatsEnrichment await(long deadline) {
@@ -299,7 +305,8 @@ public class GameEnrichmentAssembler {
                     GameEnrichmentAssembler.await(bungie, deadline, "bungie stats"),
                     GameEnrichmentAssembler.await(riot, deadline, "riot stats"),
                     GameEnrichmentAssembler.await(faceit, deadline, "faceit stats"),
-                    GameEnrichmentAssembler.await(chess, deadline, "chess stats"));
+                    GameEnrichmentAssembler.await(chess, deadline, "chess stats"),
+                    GameEnrichmentAssembler.await(osu, deadline, "osu stats"));
         }
     }
 

@@ -44,6 +44,8 @@ class TwitchLoginSuccessHandlerTest {
 
     @Mock org.springframework.beans.factory.ObjectProvider<fr.enimaloc.catapult.service.bungie.BungieLinkService> bungieLinkProvider;
     @Mock fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinks;
+    @Mock org.springframework.beans.factory.ObjectProvider<fr.enimaloc.catapult.service.osu.OsuLinkService> osuLinkProvider;
+    @Mock fr.enimaloc.catapult.service.osu.OsuLinkService osuLinks;
     @InjectMocks TwitchLoginSuccessHandler handler;
 
     private MockHttpServletRequest request;
@@ -53,6 +55,9 @@ class TwitchLoginSuccessHandlerTest {
 
     @BeforeEach
     void setup() {
+        // two providers of one raw type: each is set by name, never left to injection by type
+        ReflectionTestUtils.setField(handler, "bungieLinks", bungieLinkProvider);
+        ReflectionTestUtils.setField(handler, "osuLinks", osuLinkProvider);
         handler.init();
         request = new MockHttpServletRequest();
         response = new MockHttpServletResponse();
@@ -417,5 +422,69 @@ class TwitchLoginSuccessHandlerTest {
         handler.onAuthenticationSuccess(request, response, authToken);
 
         assertThat(response.getRedirectedUrl()).contains("error=bungie_failed");
+    }
+
+    private org.springframework.security.oauth2.client.OAuth2AuthorizedClient osuClient(String refresh) {
+        var registration = org.springframework.security.oauth2.client.registration.ClientRegistration
+                .withRegistrationId("osu").clientId("12345").redirectUri("http://localhost/cb")
+                .authorizationGrantType(org.springframework.security.oauth2.core.AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationUri("https://osu.ppy.sh/oauth/authorize")
+                .tokenUri("https://osu.ppy.sh/oauth/token").build();
+        var access = new org.springframework.security.oauth2.core.OAuth2AccessToken(
+                org.springframework.security.oauth2.core.OAuth2AccessToken.TokenType.BEARER, "access",
+                java.time.Instant.now(), java.time.Instant.now().plusSeconds(86_400));
+        return new org.springframework.security.oauth2.client.OAuth2AuthorizedClient(registration, "42", access,
+                refresh == null ? null : new org.springframework.security.oauth2.core.OAuth2RefreshToken(refresh,
+                        java.time.Instant.now()));
+    }
+
+    @Test
+    void osuLink_isWrittenWithItsRefreshToken_andSpringsCopyIsForgotten() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("osu");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("osu", authToken, request))
+                .thenReturn(osuClient("refresh-token"));
+        when(osuLinkProvider.getIfAvailable()).thenReturn(osuLinks);
+        var pending = new fr.enimaloc.catapult.service.osu.OsuLinkService.PendingLink(42L, "Inspector", "osu");
+        request.setAttribute(fr.enimaloc.catapult.service.osu.OsuLinkService.PENDING_ATTRIBUTE, pending);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(osuLinks).complete(eq(userAccount), eq(pending), eq("refresh-token"), eq("access"), any());
+        verify(authorizedClientRepository).removeAuthorizedClient("osu", authToken, request, response);
+        verify(oAuthTokenRepository, never()).save(any());
+        verifyNoInteractions(bungieLinks);
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("https://web.example.com/channel/jeb_?linked=osu#integrations");
+    }
+
+    @Test
+    void osuLink_withoutARefreshToken_orAFailedWrite_isAFailedLink_andTheTokenIsStillForgotten() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("osu");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("osu", authToken, request))
+                .thenReturn(osuClient(null), osuClient("refresh-token"));
+        when(osuLinkProvider.getIfAvailable()).thenReturn(osuLinks);
+        var pending = new fr.enimaloc.catapult.service.osu.OsuLinkService.PendingLink(42L, null, null);
+        request.setAttribute(fr.enimaloc.catapult.service.osu.OsuLinkService.PENDING_ATTRIBUTE, pending);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(osuLinks, never()).complete(any(), any(), any(), any(), any());
+        verify(authorizedClientRepository).removeAuthorizedClient("osu", authToken, request, response);
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("https://web.example.com/channel/jeb_?error=osu_failed#integrations");
+
+        response = new MockHttpServletResponse();
+        org.mockito.Mockito.doThrow(new IllegalStateException("refresh-token")).when(osuLinks)
+                .complete(any(), any(), any(), any(), any());
+        handler.onAuthenticationSuccess(request, response, authToken);
+        assertThat(response.getRedirectedUrl()).contains("error=osu_failed");
     }
 }

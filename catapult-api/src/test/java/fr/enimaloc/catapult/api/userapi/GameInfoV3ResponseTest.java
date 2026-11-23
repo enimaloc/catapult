@@ -745,4 +745,34 @@ class GameInfoV3ResponseTest {
         assertThat(json.path("cs2").has("recentResults")).isFalse();
         assertThat(json.path("more").asString()).isEqualTo(BASE + "/api/me/stats/faceit/cs2?version=3");
     }
+
+    // --- osu! ---
+
+    @Test
+    void osuStatsCarryTheirMoreLink_andTheDetailPartsStayOut() throws Exception {
+        var score = new fr.enimaloc.catapult.service.enrichment.osu.OsuStats.Score("Some Song", "Some Artist",
+                "Insane", 5.42, "https://osu.ppy.sh/b/1001", "S", 256.43, 97.51, 790, List.of("HD"), null);
+        var stats = new fr.enimaloc.catapult.service.enrichment.osu.OsuStats(Status.OK,
+                fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.OsuGame.OSU, "Inspector",
+                new fr.enimaloc.catapult.service.enrichment.osu.OsuStats.Profile(Status.OK, "osu", 4321.5, 12_345, 678,
+                        "FR", 98.77, 23_456L, 1_234_567L, 101, score, null, null), null);
+        PersonalStatsEnrichment personal = PersonalStatsEnrichment.of(null, null, null, null,
+                GameBinding.SourceType.MANUAL, stats);
+        GameEnrichment enrichment = new GameEnrichment(null, null, null, null, null, null, null, null, null, null,
+                null, personal, null);
+
+        JsonNode json = MAPPER.readTree(MAPPER.writeValueAsString(GameInfoV3Response.of(BASE_V2, enrichment, LINKS,
+                Optional.of("3012"))));
+
+        JsonNode osu = json.path("stats").path("osu");
+        assertThat(osu.path("status").asString()).isEqualTo("ok");
+        assertThat(osu.path("game").asString()).isEqualTo("osu");
+        assertThat(osu.path("account").asString()).isEqualTo("Inspector");
+        assertThat(osu.path("osu").path("pp").asDouble()).isEqualTo(4321.5);
+        assertThat(osu.path("osu").path("lastScore").path("rank").asString()).isEqualTo("S");
+        assertThat(osu.path("osu").has("rulesets")).isFalse();
+        assertThat(osu.path("osu").has("recentScores")).isFalse();
+        assertThat(osu.path("more").asString()).isEqualTo(BASE + "/api/me/stats/osu/osu?version=3");
+        assertThat(json.path("publisher").isNull() || json.path("publisher").isMissingNode()).isTrue();
+    }
 }

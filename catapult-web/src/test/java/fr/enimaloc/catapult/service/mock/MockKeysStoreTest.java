@@ -73,4 +73,21 @@ class MockKeysStoreTest {
         assertThat(store.saveBungie("42", "", RAW)).isEqualTo(400);
         assertThat(store.saveBungie("42", "a-long-enough-secret", RAW)).isEqualTo(204);
     }
+
+    @Test
+    void osu_isSetFromTheStart_andRefusesWhatCatapultApiRefuses() {
+        assertThat(store.osu().configured()).isTrue();
+
+        assertThat(store.saveOsu("abc", "")).isEqualTo(400);
+        assertThat(store.saveOsu("42", "short")).isEqualTo(400);
+        assertThat(store.saveOsu(" 42 ", "")).isEqualTo(400);
+        assertThat(store.saveOsu(" 42 ", "a-long-enough-secret")).isEqualTo(204);
+        assertThat(store.saveOsu("42", "")).isEqualTo(204);
+        assertThat(store.osu().clientId()).isEqualTo("42");
+
+        assertThat(store.deleteOsu()).isEqualTo(204);
+        assertThat(store.osu().configured()).isFalse();
+        assertThat(store.saveOsu("42", "")).isEqualTo(400);
+        assertThat(store.saveOsu("42", "a-long-enough-secret")).isEqualTo(204);
+    }
 }

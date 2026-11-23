@@ -354,6 +354,16 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void osuLink_isUnlinkedThroughTheApi() throws Exception {
+        org.mockito.Mockito.when(apiService.deleteOsuLink("enimaloc")).thenReturn(204);
+
+        mvc.perform(post("/channel/enimaloc/settings/osu/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).deleteOsuLink("enimaloc");
+    }
+
+    @Test
     void bungieLink_isUnlinkedThroughTheApi() throws Exception {
         org.mockito.Mockito.when(apiService.deleteBungieLink("enimaloc")).thenReturn(204);
 

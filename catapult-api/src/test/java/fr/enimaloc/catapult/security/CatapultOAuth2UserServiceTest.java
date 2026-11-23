@@ -80,6 +80,8 @@ class CatapultOAuth2UserServiceTest {
     @Mock private ObjectProvider<BlizzardWowImportService> wowImportProvider;
     @Mock private ObjectProvider<fr.enimaloc.catapult.service.bungie.BungieLinkService> bungieLinkProvider;
     @Mock private fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinks;
+    @Mock private ObjectProvider<fr.enimaloc.catapult.service.osu.OsuLinkService> osuLinkProvider;
+    @Mock private fr.enimaloc.catapult.service.osu.OsuLinkService osuLinks;
 
     @Mock private RestClient.RequestHeadersUriSpec getSpec;
     @Mock private RestClient.RequestHeadersSpec headersSpec;
@@ -94,7 +96,7 @@ class CatapultOAuth2UserServiceTest {
             getterConfigRepository, tokenEncryptionService, eventPublisher, restClient, whitelistService,
             adminMigrationService, inviteService, battleNetGate, battleNetFriendsProvider,
             epicGate, epicFriendsProvider, new TransactionTemplate(transactionManager), wowImportProvider,
-            bungieLinkProvider
+            bungieLinkProvider, osuLinkProvider
         );
         ReflectionTestUtils.setField(service, "ownerId", "");
         ReflectionTestUtils.setField(service, "defaultNoGameName", "");
@@ -644,5 +646,61 @@ class CatapultOAuth2UserServiceTest {
             new fr.enimaloc.catapult.service.bungie.BungieLinkService.RefusedException(
                 fr.enimaloc.catapult.service.bungie.BungieLinkService.Refusal.MISMATCH));
         assertThat(errorCodeOf(bungieRequest(parameters))).isEqualTo("bungie_mismatch");
+    }
+
+    // --- osu! ---
+
+    private OAuth2UserRequest osuRequest() {
+        ClientRegistration reg = ClientRegistration.withRegistrationId("osu")
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .clientId("12345")
+            .redirectUri("http://localhost/callback")
+            .authorizationUri("https://osu.ppy.sh/oauth/authorize")
+            .tokenUri("https://osu.ppy.sh/oauth/token")
+            .build();
+        OAuth2AccessToken token = new OAuth2AccessToken(
+            OAuth2AccessToken.TokenType.BEARER, "osu-token", Instant.now(), Instant.now().plusSeconds(86_400));
+        return new OAuth2UserRequest(reg, token);
+    }
+
+    @Test
+    void osuLink_isCheckedAndLeftPending_nothingWritten() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        signedInStreamer(account);
+        when(osuLinkProvider.getIfAvailable()).thenReturn(osuLinks);
+        var pending = new fr.enimaloc.catapult.service.osu.OsuLinkService.PendingLink(42L, "Inspector", "osu");
+        when(osuLinks.check("osu-token")).thenReturn(pending);
+        var web = new org.springframework.mock.web.MockHttpServletRequest();
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(web));
+        try {
+            service.loadUser(osuRequest());
+        } finally {
+            org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+        }
+
+        assertThat(web.getAttribute(fr.enimaloc.catapult.service.osu.OsuLinkService.PENDING_ATTRIBUTE))
+            .isSameAs(pending);
+        verify(osuLinks, never()).complete(any(), any(), any(), any(), any());
+        verifyNoInteractions(oAuthTokenRepository, transactionManager);
+    }
+
+    @Test
+    void osuLink_refusalsHaveTheirCodes() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+
+        assertThat(errorCodeOf(osuRequest())).isEqualTo("unauthorized");
+
+        signedInStreamer(account);
+        when(osuLinkProvider.getIfAvailable()).thenReturn(null);
+        assertThat(errorCodeOf(osuRequest())).isEqualTo("osu_unavailable");
+
+        when(osuLinkProvider.getIfAvailable()).thenReturn(osuLinks);
+        when(osuLinks.check("osu-token")).thenThrow(
+            new fr.enimaloc.catapult.service.osu.OsuLinkService.RefusedException(
+                fr.enimaloc.catapult.service.osu.OsuLinkService.Refusal.MISMATCH));
+        assertThat(errorCodeOf(osuRequest())).isEqualTo("osu_mismatch");
     }
 }

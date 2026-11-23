@@ -851,6 +851,13 @@ class RealApiServiceTest {
     }
 
     @Test
+    void osuLink_isDeletedOnTheChannel() {
+        expectDelete(channel("enimaloc") + "/settings/osu");
+
+        assertThat(service.deleteOsuLink("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
     void bungieLink_isDeletedOnTheChannel() {
         expectDelete(channel("enimaloc") + "/settings/bungie");
 
@@ -2092,6 +2099,22 @@ class RealApiServiceTest {
         assertThat(page.apiKeyMasked()).isEqualTo("abcd…wxyz");
         assertThat(service.adminSaveBungieCredentials("12345", "s", "")).isEqualTo(400);
         assertThat(service.adminDeleteBungieCredentials()).isEqualTo(204);
+    }
+
+    @Test
+    void osuCredentials_readSetAndRemove() {
+        respond(HttpMethod.GET, "/api/internal/admin/osu-credentials",
+                "{\"configured\":true,\"clientId\":\"12345\",\"updatedAt\":null}");
+        expect(HttpMethod.PUT, "/api/internal/admin/osu-credentials")
+                .andExpect(content().json("{\"clientId\":\"12345\",\"clientSecret\":\"s\"}", true))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.DELETE, "/api/internal/admin/osu-credentials").andRespond(withNoContent());
+
+        var page = service.adminOsuCredentials();
+        assertThat(page.configured()).isTrue();
+        assertThat(page.clientId()).isEqualTo("12345");
+        assertThat(service.adminSaveOsuCredentials("12345", "s")).isEqualTo(400);
+        assertThat(service.adminDeleteOsuCredentials()).isEqualTo(204);
     }
 
     @Test

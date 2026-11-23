@@ -14,6 +14,7 @@ import fr.enimaloc.catapult.service.enrichment.bungie.BungieStats;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotPublisher;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotStats;
 import fr.enimaloc.catapult.service.enrichment.faceit.FaceitStats;
+import fr.enimaloc.catapult.service.enrichment.osu.OsuStats;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessStats;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
@@ -317,7 +318,14 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
      */
     public record StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
                               @JsonIgnore GameBinding.SourceType detectedOn, BungieStats bungie, RiotStats riot,
-                              FaceitStats faceit, ChessStats chess) {
+                              FaceitStats faceit, ChessStats chess, OsuStats osu) {
+
+        /** Without the osu! stats. */
+        public StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
+                           GameBinding.SourceType detectedOn, BungieStats bungie, RiotStats riot,
+                           FaceitStats faceit, ChessStats chess) {
+            this(steam, xbox, retroachievements, blizzard, detectedOn, bungie, riot, faceit, chess, null);
+        }
 
         /** Without the Bungie, Riot and FACEIT stats. */
         public StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
@@ -351,7 +359,7 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
             return new StatsObject(SteamStats.of(s.steam(), links), XboxStats.of(s.xbox(), links),
                     RaStats.of(s.retroachievements(), links), blizzardStats(s.blizzard(), links), s.detectedOn(),
                     bungieStats(s.bungie(), links), riotStats(s.riot(), links), faceitStats(s.faceit(), links),
-                    chessStats(s.chess(), links));
+                    chessStats(s.chess(), links), osuStats(s.osu(), links));
         }
 
         List<PlatformObject> platforms() {
@@ -458,6 +466,18 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
      */
     static ChessStats chessStats(ChessStats s, MoreLinks links) {
         return s == null ? null : s.withMore(links.toMe(ApiV2.ME_STATS_PATH + "/chess"));
+    }
+
+    /**
+     * The member's osu! stats with the "more" link to {@code /api/me/stats/osu/<game>}: the aggregate and the detail
+     * route serve this same record.
+     */
+    static OsuStats osuStats(OsuStats s, MoreLinks links) {
+        if (s == null) {
+            return null;
+        }
+        return s.withMore(s.game() == null ? null
+                : links.toMe(ApiV2.ME_STATS_PATH + "/osu/" + s.game().name().toLowerCase(Locale.ROOT)));
     }
 
     /**

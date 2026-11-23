@@ -48,6 +48,7 @@ class TokenKeyRotationRunnerTest {
         jdbc.update("DELETE FROM oauth_token");
         // Not tied to an account (one application row): left over, it would be seen by every other test
         jdbc.update("DELETE FROM bungie_app_credentials");
+        jdbc.update("DELETE FROM osu_app_credentials");
         jdbc.update("DELETE FROM user_account");
     }
 
@@ -182,5 +183,25 @@ class TokenKeyRotationRunnerTest {
         String refresh = jdbc.queryForObject("SELECT refresh_token_enc FROM bungie_account WHERE user_id = ?",
                 String.class, user);
         assertThat(current.decrypt(refresh)).isEqualTo("bungie-refresh");
+    }
+
+    @Test
+    void theOsuSecrets_moveToTheCurrentKey() {
+        assertThat(TokenKeyRotationRunner.SECRETS).contains(
+                new TokenKeyRotationRunner.Secret("osu_app_credentials", "id", "client_secret_enc"),
+                new TokenKeyRotationRunner.Secret("osu_account", "user_id", "refresh_token_enc"));
+        UUID user = user(null);
+        jdbc.update("INSERT INTO osu_app_credentials (id, client_id, client_secret_enc, updated_at)"
+                + " VALUES (1, '12345', ?, now())", old.encrypt("client-secret"));
+        jdbc.update("INSERT INTO osu_account (user_id, osu_user_id, refresh_token_enc, linked_at, updated_at)"
+                + " VALUES (?, 42, ?, now(), now())", user, old.encrypt("osu-refresh"));
+
+        runner.run(null);
+
+        String secret = jdbc.queryForObject("SELECT client_secret_enc FROM osu_app_credentials", String.class);
+        assertThat(current.decrypt(secret)).isEqualTo("client-secret");
+        String refresh = jdbc.queryForObject("SELECT refresh_token_enc FROM osu_account WHERE user_id = ?",
+                String.class, user);
+        assertThat(current.decrypt(refresh)).isEqualTo("osu-refresh");
     }
 }

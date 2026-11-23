@@ -118,7 +118,9 @@ class FictitiousAccountServiceTest {
                 new org.springframework.beans.factory.support.StaticListableBeanFactory()
                         .getBeanProvider(fr.enimaloc.catapult.service.blizzard.BlizzardWowImportService.class),
                 new org.springframework.beans.factory.support.StaticListableBeanFactory()
-                        .getBeanProvider(fr.enimaloc.catapult.service.bungie.BungieLinkService.class));
+                        .getBeanProvider(fr.enimaloc.catapult.service.bungie.BungieLinkService.class),
+                new org.springframework.beans.factory.support.StaticListableBeanFactory()
+                        .getBeanProvider(fr.enimaloc.catapult.service.osu.OsuLinkService.class));
         SimulationProperties properties = new SimulationProperties();
         properties.setStateFile(dir.resolve("simulation.json").toString());
         registry = new SimulationRegistry(properties, accounts, tokens, mock(MinecraftFriendLinkRepository.class),

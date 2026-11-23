@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.event.TwitchLoginEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import fr.enimaloc.catapult.service.bungie.BungieLinkService;
+import fr.enimaloc.catapult.service.osu.OsuLinkService;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,6 +49,7 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
     private final JwtService jwtService;
     private final AuthCodeStore codeStore;
     private final ObjectProvider<BungieLinkService> bungieLinks;
+    private final ObjectProvider<OsuLinkService> osuLinks;
 
     @Value("${app.web-url:}")
     private String webUrl;
@@ -106,6 +108,17 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                             .replaceQueryParam("imported", none ? "wow-empty" : "wow").toUriString());
                     return;
                 }
+            } else if ("osu".equals(registrationId)) {
+                // The osu! link: CatapultOAuth2UserService read the account and left it pending; its refresh token,
+                // only known here, is written encrypted, then Spring's copy is forgotten at once.
+                boolean linked = completeOsuLink(request, response, authentication, catUser);
+                if (webUrl != null && !webUrl.isBlank()) {
+                    UriComponentsBuilder target = UriComponentsBuilder.fromUriString(channelIntegrationsUrl(catUser));
+                    target = linked ? target.replaceQueryParam("linked", "osu")
+                            : target.replaceQueryParam("error", "osu_failed");
+                    response.sendRedirect(target.toUriString());
+                    return;
+                }
             } else if ("bungie".equals(registrationId)) {
                 // The Bungie.net link: CatapultOAuth2UserService checked the account and left it pending; its
                 // refresh token, only known here, is written encrypted, then Spring's copy is forgotten at once.
@@ -140,6 +153,32 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
         }
 
         delegate.onAuthenticationSuccess(request, response, authentication);
+    }
+
+    /** Writes the pending osu! link with its refresh token; false when it could not be (never logging a token). */
+    private boolean completeOsuLink(HttpServletRequest request, HttpServletResponse response,
+                                    Authentication authentication, CatapultOAuth2User catUser) {
+        OAuth2AuthorizedClient client = authorizedClientRepository.loadAuthorizedClient("osu", authentication,
+                request);
+        authorizedClientRepository.removeAuthorizedClient("osu", authentication, request, response);
+        OsuLinkService links = osuLinks == null ? null : osuLinks.getIfAvailable();
+        Object pending = request.getAttribute(OsuLinkService.PENDING_ATTRIBUTE);
+        String refreshToken = client == null || client.getRefreshToken() == null ? null
+                : client.getRefreshToken().getTokenValue();
+        if (links == null || !(pending instanceof OsuLinkService.PendingLink link) || refreshToken == null) {
+            log.warn("osu! link of user {} not written: {}", catUser.getUserAccount().getId(),
+                    refreshToken == null ? "no refresh token" : "no checked login");
+            return false;
+        }
+        try {
+            links.complete(catUser.getUserAccount(), link, refreshToken, client.getAccessToken().getTokenValue(),
+                    client.getAccessToken().getExpiresAt());
+            return true;
+        } catch (RuntimeException e) {
+            log.warn("osu! link of user {} not written: {}", catUser.getUserAccount().getId(),
+                    e.getClass().getSimpleName());
+            return false;
+        }
     }
 
     /** Writes the pending Bungie link with its refresh token; false when it could not be (never logging a token). */

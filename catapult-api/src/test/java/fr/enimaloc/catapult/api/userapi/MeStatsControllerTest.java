@@ -90,6 +90,7 @@ class MeStatsControllerTest {
     @MockitoBean fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService riotStats;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.faceit.FaceitStatsService faceitStats;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.chess.ChessStatsService chessStats;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService osuStats;
 
     private UserAccount user;
     private boolean budgetLeft = true;
@@ -384,6 +385,45 @@ class MeStatsControllerTest {
         }
         mvc.perform(v3(get(STATS + "/blizzard/wow")))
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("import")));
+    }
+
+    @Test
+    void osuDetailIsTheSameProjection_withEveryRulesetAndTheLatestScores() throws Exception {
+        var score = new fr.enimaloc.catapult.service.enrichment.osu.OsuStats.Score("Some Song", "Some Artist",
+                "Insane", 5.42, "https://osu.ppy.sh/b/1001", "S", 256.43, 97.51, 790, List.of("HD"), null);
+        var taiko = new fr.enimaloc.catapult.service.enrichment.osu.OsuStats.RulesetStats(150.0, null, null, 91.2,
+                120L, 3_600L, 20);
+        when(osuStats.forGame(eq(user),
+                eq(fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.OsuGame.OSU), any(), eq(true)))
+                .thenReturn(Optional.of(new fr.enimaloc.catapult.service.enrichment.osu.OsuStats(Status.OK,
+                        fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.OsuGame.OSU, "Inspector",
+                        new fr.enimaloc.catapult.service.enrichment.osu.OsuStats.Profile(Status.OK, "osu", 4321.5,
+                                12_345, 678, "FR", 98.77, 23_456L, 1_234_567L, 101, score,
+                                java.util.Map.of("taiko", taiko), List.of(score, score)), null)));
+
+        mvc.perform(v3(get(STATS + "/osu/osu")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ok"))
+                .andExpect(jsonPath("$.game").value("osu"))
+                .andExpect(jsonPath("$.account").value("Inspector"))
+                .andExpect(jsonPath("$.osu.globalRank").value(12_345))
+                .andExpect(jsonPath("$.osu.rulesets.taiko.pp").value(150.0))
+                .andExpect(jsonPath("$.osu.recentScores[1].rank").value("S"))
+                .andExpect(jsonPath("$.more").value("http://localhost/api/me/stats/osu/osu?version=3"));
+        org.assertj.core.api.Assertions.assertThat(MeStatsController.class.getMethod("osu", UUID.class,
+                String.class).getReturnType())
+                .isEqualTo(fr.enimaloc.catapult.service.enrichment.osu.OsuStats.class);
+    }
+
+    @Test
+    void osuWithoutALink_is404_andAnUnknownGame400() throws Exception {
+        when(osuStats.forGame(any(), any(), any(), anyBoolean())).thenReturn(Optional.empty());
+
+        mvc.perform(v3(get(STATS + "/osu/osu")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("not_found"));
+        mvc.perform(v3(get(STATS + "/osu/taiko")))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

@@ -469,6 +469,12 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public int deleteOsuLink(String username) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/osu", id),
+                status -> status);
+    }
+
+    @Override
     public int refreshSteamProfileCache(String username) {
         return onChannel(username, id -> client.postVoid("/api/internal/users/{userId}/steam-profile/refresh", null, id),
                 status -> status);
@@ -1688,6 +1694,24 @@ public class RealApiService implements ApiService {
     @Override
     public int adminDeleteBungieCredentials() {
         return client.call(HttpMethod.DELETE, "/api/internal/admin/bungie-credentials", null, Void.class).status();
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData adminOsuCredentials() {
+        return client.get("/api/internal/admin/osu-credentials",
+                fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData.class);
+    }
+
+    @Override
+    public int adminSaveOsuCredentials(String clientId, String clientSecret) {
+        return client.call(HttpMethod.PUT, "/api/internal/admin/osu-credentials",
+                new fr.enimaloc.catapult.common.dto.admin.OsuCredentialsRequest(clientId, clientSecret),
+                Void.class).status();
+    }
+
+    @Override
+    public int adminDeleteOsuCredentials() {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/osu-credentials", null, Void.class).status();
     }
 
     @Override

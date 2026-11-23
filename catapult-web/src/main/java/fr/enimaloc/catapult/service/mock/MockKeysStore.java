@@ -16,6 +16,8 @@ import java.util.regex.Pattern;
  * unknown key id is a 404, and only the masked form ever leaves the store.
  */
 class MockKeysStore {
+    /** The shape an OAuth client secret takes (osu!, Bungie): checked like the API does. */
+    private static final Pattern SECRET_SHAPE = Pattern.compile("[A-Za-z0-9._~+/=-]{16,128}");
     private static final Map<ApiKeyProvider, Pattern> FORMATS = Map.of(
             ApiKeyProvider.STEAM, Pattern.compile("[0-9A-Fa-f]{32}"),
             ApiKeyProvider.DTDD, Pattern.compile("ddd_[A-Za-z0-9]{16,128}"),
@@ -87,6 +89,32 @@ class MockKeysStore {
         return 204;
     }
 
+    /** The mock's osu! OAuth application: set from the start, so that its card shows filled. */
+    private String osuClientId = "12345";
+
+    synchronized fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData osu() {
+        return osuClientId == null ? fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData.none()
+                : new fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData(true, osuClientId,
+                        java.time.Instant.parse("2026-11-20T10:00:00Z"));
+    }
+
+    /** Like catapult-api: a malformed value, or a blank secret with nothing set yet or another client, is a 400. */
+    synchronized int saveOsu(String clientId, String clientSecret) {
+        String id = clientId == null ? "" : clientId.trim();
+        String secret = clientSecret == null ? "" : clientSecret.trim();
+        if (!id.matches("[0-9]{1,20}") || (!secret.isEmpty() && !SECRET_SHAPE.matcher(secret).matches())) {
+            return 400;
+        }
+        if ((osuClientId == null || !osuClientId.equals(id)) && secret.isEmpty()) return 400;
+        osuClientId = id;
+        return 204;
+    }
+
+    synchronized int deleteOsu() {
+        osuClientId = null;
+        return 204;
+    }
+
     /** The mock's Bungie.net application: set from the start, so that its card shows filled. */
     private String bungieClientId = "12345";
     private String bungieApiKey = "0123456789abcdef0123456789abcdef";
@@ -102,7 +130,7 @@ class MockKeysStore {
         String id = clientId == null ? "" : clientId.trim();
         String secret = clientSecret == null ? "" : clientSecret.trim();
         String key = apiKey == null ? "" : apiKey.trim();
-        if (!id.matches("[0-9]{1,20}") || (!secret.isEmpty() && !secret.matches("[A-Za-z0-9._~+/=-]{16,128}"))
+        if (!id.matches("[0-9]{1,20}") || (!secret.isEmpty() && !SECRET_SHAPE.matcher(secret).matches())
                 || (!key.isEmpty() && !key.matches("[0-9A-Fa-f]{32}"))) {
             return 400;
         }

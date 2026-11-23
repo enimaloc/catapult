@@ -51,7 +51,9 @@ public enum EnrichmentSource {
     FACEIT_LAST_MATCH("faceit-last-match"),
     CHESS_CHESSCOM_STATS("chess-chesscom-stats"),
     CHESS_CHESSCOM_GAMES("chess-chesscom-games"),
-    CHESS_LICHESS_USER("chess-lichess-user");
+    CHESS_LICHESS_USER("chess-lichess-user"),
+    OSU_PROFILE("osu-profile"),
+    OSU_RECENT("osu-recent");
 
     private final String key;
 
@@ -67,8 +69,8 @@ public enum EnrichmentSource {
     /**
      * Whether the source holds one member's own stats (keyed {@code u:<userId>...}): the Steam, Xbox and
      * RetroAchievements sources, the Blizzard character, achievement and profile ones, the Bungie profile and
-     * triumphs, the Riot summoner, league and live game ones, the FACEIT ones and the Chess.com and Lichess ones,
-     * except the Steam schema and rarity, which are the same for everyone.
+     * triumphs, the Riot summoner, league and live game ones, the FACEIT ones, the Chess.com and Lichess ones and
+     * the osu! profile and recent scores, except the Steam schema and rarity, which are the same for everyone.
      */
     public boolean personal() {
         return switch (this) {
@@ -78,6 +80,7 @@ public enum EnrichmentSource {
             case RIOT_LOL_SUMMONER, RIOT_LOL_LEAGUE, RIOT_LOL_LIVE, RIOT_TFT_LEAGUE -> true;
             case FACEIT_PLAYER, FACEIT_STATS, FACEIT_LAST_MATCH -> true;
             case CHESS_CHESSCOM_STATS, CHESS_CHESSCOM_GAMES, CHESS_LICHESS_USER -> true;
+            case OSU_PROFILE, OSU_RECENT -> true;
             default -> false;
         };
     }

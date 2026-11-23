@@ -4,6 +4,7 @@
 <!--/*@thymesVar id="retroachievements" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
 <!--/*@thymesVar id="itad" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
 <!--/*@thymesVar id="opencritic" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*@thymesVar id="osu" type="fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData"*/-->
 <!--/*@thymesVar id="bungie" type="fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData"*/-->
 <!--/*@thymesVar id="riot" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
 <!--/*@thymesVar id="faceit" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
@@ -120,6 +121,31 @@
                          th:attr="data-confirm=#{admin.keys.bungie.delete-confirm}" th:text="#{admin.keys.bungie.delete}">Remove</mdui-button>
         </div>
         <p class="admin-cell-muted" th:text="#{admin.keys.bungie.help}">Help.</p>
+    </mdui-card>
+
+    <!--/*
+      The osu! OAuth application: its client id (public) and its secret. The secret is never rendered; a blank secret
+      keeps the one set (same client id only). Without it the osu! source and login are off. Driven by admin-keys.js
+      (.admin-osu-save, .admin-osu-delete).
+    */-->
+    <th:block th:if="${osu == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <mdui-card th:if="${osu != null}" class="admin-keys-card admin-osu" variant="outlined"
+               th:attr="data-label-invalid=#{admin.keys.osu.invalid},data-label-saved=#{admin.keys.osu.saved},
+                        data-label-removed=#{admin.keys.osu.removed}">
+        <div class="admin-keys-head">
+            <h3 th:text="#{admin.keys.osu.title}">osu! application</h3>
+        </div>
+        <p class="admin-cell-muted" th:text="${osu.configured()} ? #{admin.keys.osu.set(${osu.clientId()})} : #{admin.keys.osu.none}">None.</p>
+        <div class="admin-keys-add">
+            <mdui-text-field name="clientId" variant="outlined" required autocomplete="off"
+                             th:attr="label=#{admin.keys.osu.client-id},value=${osu.clientId()}"></mdui-text-field>
+            <mdui-text-field name="clientSecret" type="password" variant="outlined" autocomplete="off"
+                             th:attr="label=#{admin.keys.osu.client-secret}"></mdui-text-field>
+            <mdui-button variant="filled" icon="save" class="admin-osu-save" th:text="#{admin.keys.osu.save}">Save</mdui-button>
+            <mdui-button th:if="${osu.configured()}" variant="text" icon="delete" class="admin-osu-delete"
+                         th:attr="data-confirm=#{admin.keys.osu.delete-confirm}" th:text="#{admin.keys.osu.delete}">Remove</mdui-button>
+        </div>
+        <p class="admin-cell-muted" th:text="#{admin.keys.osu.help}">Help.</p>
     </mdui-card>
 
     <!--/*

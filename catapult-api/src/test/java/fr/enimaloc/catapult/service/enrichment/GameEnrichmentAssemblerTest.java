@@ -132,6 +132,8 @@ class GameEnrichmentAssemblerTest {
     private final fr.enimaloc.catapult.service.enrichment.riot.RiotGameDataService riotData =
             mock(fr.enimaloc.catapult.service.enrichment.riot.RiotGameDataService.class);
     private final FaceitStatsService faceitStats = mock(FaceitStatsService.class);
+    private final fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService osuStats =
+            mock(fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService.class);
     private final EnrichmentProperties properties = new EnrichmentProperties();
 
     private GameEnrichmentAssembler assembler;
@@ -143,7 +145,7 @@ class GameEnrichmentAssemblerTest {
                 twitch, speedrunGames, speedrunIdentity, speedrunPersonal, igdbService, igdbGameDetailsService,
                 trailers, steamStats, xboxStats, raStats, blizzardStats, blizzardData, bungieStats, bungieData,
                 riotStats, riotData, faceitStats,
-                properties, chessStats);
+                properties, chessStats, osuStats);
         when(hltb.timeToBeat(any(), any())).thenReturn(Optional.of(TTB));
         when(protonDb.summary(anyString(), any())).thenReturn(Optional.of(PROTON));
         when(steamGridDb.bySteamAppId(anyString(), any())).thenReturn(Optional.of(SGDB));
@@ -392,6 +394,7 @@ class GameEnrichmentAssemblerTest {
                 .withBean(fr.enimaloc.catapult.service.enrichment.riot.RiotGameDataService.class, () -> riotData)
                 .withBean(FaceitStatsService.class, () -> faceitStats)
                 .withBean(fr.enimaloc.catapult.service.enrichment.chess.ChessStatsService.class, () -> chessStats)
+                .withBean(fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService.class, () -> osuStats)
                 .withBean(EnrichmentProperties.class)
                 .withUserConfiguration(GameEnrichmentAssembler.class)
                 .run(ctx -> assertThat(ctx).hasSingleBean(GameEnrichmentAssembler.class));
@@ -992,5 +995,35 @@ class GameEnrichmentAssemblerTest {
         assertThat(result.stats().faceit()).isNull();
         assertThat(result.stats().steam()).isEqualTo(STEAM_OK);
         assertThat(took).isLessThan(Duration.ofMillis(1500));
+    }
+
+    // ---------------------------------------------------------------- osu!
+
+    private static final DetectedGame OSU = new DetectedGame("osu!", GameBinding.SourceType.MANUAL, "osu!");
+    private static final fr.enimaloc.catapult.service.enrichment.osu.OsuStats OSU_STATS =
+            new fr.enimaloc.catapult.service.enrichment.osu.OsuStats(Status.OK,
+                    fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.OsuGame.OSU, "Inspector",
+                    fr.enimaloc.catapult.service.enrichment.osu.OsuStats.Profile.of(Status.OK), null);
+
+    @Test
+    void publicAggregateHasNoOsuStats_andOsuHasNoPublisherObject() {
+        GameEnrichment result = assembler.enrich(OSU, Optional.of("3012"), Optional.empty(), "osu!", "FR", null,
+                LINKS, Optional.empty(), Locale.ENGLISH);
+
+        assertThat(result.stats()).isNull();
+        assertThat(result.publisher()).isNull();
+        verifyNoInteractions(osuStats);
+    }
+
+    @Test
+    void memberOsuStats_inTheStatsObject() {
+        UserAccount user = member();
+        when(osuStats.forDetected(eq(user), eq("3012"), any())).thenReturn(Optional.of(OSU_STATS));
+
+        GameEnrichment result = assembler.enrich(OSU, Optional.of("3012"), Optional.empty(), "osu!", "FR", null,
+                LINKS, Optional.of(user), Locale.FRENCH);
+
+        assertThat(result.stats().osu()).isEqualTo(OSU_STATS);
+        assertThat(result.stats().bungie()).isNull();
     }
 }
