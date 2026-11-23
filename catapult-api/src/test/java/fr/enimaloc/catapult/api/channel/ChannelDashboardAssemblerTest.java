@@ -112,6 +112,8 @@ class ChannelDashboardAssemblerTest {
             mock(fr.enimaloc.catapult.service.blizzard.BlizzardAccountService.class);
     private final fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinks =
             mock(fr.enimaloc.catapult.service.bungie.BungieLinkService.class);
+    private final fr.enimaloc.catapult.service.riot.RiotAccountService riotAccounts =
+            mock(fr.enimaloc.catapult.service.riot.RiotAccountService.class);
     private final fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService raAccounts =
             mock(fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService.class);
     private final MinecraftLinkStateService minecraftStates =
@@ -146,7 +148,7 @@ class ChannelDashboardAssemblerTest {
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumService.class)), categoryCache,
                 streamTitle, dropsGate, dropsCatalog, speedrunAccounts, raAccounts, java.util.Optional.of(blizzardAccounts),
-                bungieLinks);
+                bungieLinks, riotAccounts);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }
@@ -599,6 +601,19 @@ class ChannelDashboardAssemblerTest {
             assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.BungieAccountData.class
                     .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
                     .containsExactly("linked", "account", "platform", "invalid", "available", "linkedAt");
+        }
+
+        @Test
+        void dashboardCarriesTheRiotSettingsForTheOwnerOnly() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.RiotData("Catapult#EUW", "euw1", true);
+            when(riotAccounts.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).riot()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).riot()).isNull();
+            verify(riotAccounts, never()).data(moderator);
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.RiotData.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("riotId", "platform", "available");
         }
 
         @Test

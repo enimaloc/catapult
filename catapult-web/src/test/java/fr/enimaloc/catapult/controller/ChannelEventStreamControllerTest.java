@@ -332,4 +332,18 @@ class ChannelEventStreamControllerTest {
                         .accept(MediaType.TEXT_EVENT_STREAM))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void theRiotSettingsGoToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent("enimaloc", "Catapult#EUW", "euw1",
+                true);
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:RiotAccountChangedEvent", "Catapult#EUW");
+        assertThat(moderator.getResponse().getContentAsString()).doesNotContain("Catapult#EUW");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
 }

@@ -24,6 +24,10 @@ import fr.enimaloc.catapult.service.enrichment.prices.PricesService;
 import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbService;
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames;
 import fr.enimaloc.catapult.service.enrichment.rastats.RaUnavailableException;
+import fr.enimaloc.catapult.service.enrichment.riot.RiotGameDataService;
+import fr.enimaloc.catapult.service.enrichment.riot.RiotPublisher;
+import fr.enimaloc.catapult.service.enrichment.riot.RiotStats;
+import fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService;
 import fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsStatsService;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunEnrichment;
 import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunGame;
@@ -86,7 +90,7 @@ import java.util.function.Supplier;
  *
  * <p>The publishers' public game data (Blizzard: WoW Token price, latest Hearthstone set, Diablo III season) is
  * asked with or without a member, in the member's Blizzard region when there is one, else the default region. It
- * never carries anything about the member.
+ * never carries anything about the member. Riot's (the current League of Legends patch) is found by the IGDB id.
  */
 @Slf4j
 @Component
@@ -117,6 +121,8 @@ public class GameEnrichmentAssembler {
     private final BlizzardGameDataService blizzardGameDataService;
     private final BungieStatsService bungieStatsService;
     private final BungieGameDataService bungieGameDataService;
+    private final RiotStatsService riotStatsService;
+    private final RiotGameDataService riotGameDataService;
     private final EnrichmentProperties properties;
 
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -156,6 +162,7 @@ public class GameEnrichmentAssembler {
                 locale));
         var bungiePublisher = supply("bungie publisher", () -> PublisherGames.bungie(igdb)
                 .flatMap(game -> bungieGameDataService.forGame(game, locale, FetchBudget.UNLIMITED)).orElse(null));
+        var riotPublisher = supply("riot publisher", () -> riotPublisher(igdb));
 
         return new GameEnrichment(
                 await(hltb, deadline, "hltb"),
@@ -171,7 +178,14 @@ public class GameEnrichmentAssembler {
                 speedrun.await(deadline),
                 stats == null ? null : stats.await(deadline),
                 PublisherEnrichment.of(await(blizzardPublisher, deadline, "blizzard publisher"),
-                        await(bungiePublisher, deadline, "bungie publisher")));
+                        await(bungiePublisher, deadline, "bungie publisher"),
+                        await(riotPublisher, deadline, "riot publisher")));
+    }
+
+    /** The public data of the Riot game {@code igdb} is (the current patch); null when it is none or has none. */
+    private RiotPublisher riotPublisher(String igdb) {
+        return riotStatsService.gameOf(igdb).filter(game -> riotGameDataService.available())
+                .flatMap(game -> riotGameDataService.forGame(game, FetchBudget.UNLIMITED)).orElse(null);
     }
 
     /**
@@ -226,7 +240,9 @@ public class GameEnrichmentAssembler {
                 .forDetected(user, detected, igdb, locale, FetchBudget.UNLIMITED).orElse(null));
         CompletableFuture<BungieStats> bungie = supply("bungie stats", () -> bungieStatsService
                 .forDetected(user, igdb, locale, FetchBudget.UNLIMITED).orElse(null));
-        return new Stats(steam, xbox, retro, blizzard, detected.getSourceType(), bungie);
+        CompletableFuture<RiotStats> riot = supply("riot stats", () -> riotStatsService
+                .forDetected(user, igdb, locale, FetchBudget.UNLIMITED).orElse(null));
+        return new Stats(steam, xbox, retro, blizzard, detected.getSourceType(), bungie, riot);
     }
 
     private PlatformStats xboxStats(UserAccount user, DetectedGame detected, String igdb, String searched,
@@ -259,7 +275,7 @@ public class GameEnrichmentAssembler {
     private record Stats(CompletableFuture<PlatformStats> steam, CompletableFuture<PlatformStats> xbox,
                          CompletableFuture<PlatformStats> retroachievements,
                          CompletableFuture<BlizzardStats> blizzard, GameBinding.SourceType detectedOn,
-                         CompletableFuture<BungieStats> bungie) {
+                         CompletableFuture<BungieStats> bungie, CompletableFuture<RiotStats> riot) {
 
         /** What arrived before {@code deadline}; null when no platform applies. */
         PersonalStatsEnrichment await(long deadline) {
@@ -268,7 +284,8 @@ public class GameEnrichmentAssembler {
                     GameEnrichmentAssembler.await(retroachievements, deadline, "retroachievements stats"),
                     GameEnrichmentAssembler.await(blizzard, deadline, "blizzard stats"),
                     detectedOn,
-                    GameEnrichmentAssembler.await(bungie, deadline, "bungie stats"));
+                    GameEnrichmentAssembler.await(bungie, deadline, "bungie stats"),
+                    GameEnrichmentAssembler.await(riot, deadline, "riot stats"));
         }
     }
 

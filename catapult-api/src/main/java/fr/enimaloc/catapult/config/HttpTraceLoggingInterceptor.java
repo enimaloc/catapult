@@ -38,7 +38,7 @@ import java.util.regex.Pattern;
  * response (Steam app list, IGDB game JSON) can't swamp the log line. The
  * suffix {@code …(+N bytes)} makes the cut visible.</p>
  *
- * <p>{@code Authorization} / {@code X-API-KEY} values are never echoed — only
+ * <p>{@code Authorization} / {@code X-API-KEY} / {@code X-Riot-Token} values are never echoed — only
  * their presence is reported. Neither are the values of the {@code key},
  * {@code api_key}, {@code apikey}, {@code token}, {@code y}, {@code client_secret}, {@code access_token} and
  * {@code refresh_token} query parameters (any case),
@@ -63,6 +63,10 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
     private static final Pattern SECRET_FORM_FIELD =
             Pattern.compile("((?:^|&)(?:client_secret|access_token|refresh_token|password)=)[^&]*",
                     Pattern.CASE_INSENSITIVE);
+
+    /** A Riot API key ({@code RGAPI-<uuid>}) quoted in a body: never logged. */
+    private static final Pattern RIOT_KEY =
+            Pattern.compile("(?i)RGAPI-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
 
     /** An OAuth token answer, from any provider: its tokens are credentials (they never reach the log). */
     private static final Pattern ACCESS_TOKEN_FIELD =
@@ -247,6 +251,7 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
             return respBody;
         }
         String masked = ACCESS_TOKEN_FIELD.matcher(new String(respBody, StandardCharsets.UTF_8)).replaceAll("$1***$2");
+        masked = RIOT_KEY.matcher(masked).replaceAll("***");
         return masked.getBytes(StandardCharsets.UTF_8);
     }
 
@@ -254,7 +259,8 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
         var headers = request.getHeaders();
         boolean hasAuth = headers.getFirst("Authorization") != null;
         boolean hasApiKey = headers.getFirst("X-API-KEY") != null
-                || headers.getFirst("Client-Id") != null;
+                || headers.getFirst("Client-Id") != null
+                || headers.getFirst("X-Riot-Token") != null;
         if (hasAuth && hasApiKey) return "Bearer+ApiKey";
         if (hasAuth) return "Bearer";
         if (hasApiKey) return "ApiKey";

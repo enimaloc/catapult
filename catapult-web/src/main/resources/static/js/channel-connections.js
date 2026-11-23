@@ -1,5 +1,5 @@
 /**
- * Handlers for the Steam/Minecraft/Battle.net/Ankama/Epic/Speedrun.com/RetroAchievements/Blizzard stats/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
+ * Handlers for the Steam/Minecraft/Battle.net/Ankama/Epic/Speedrun.com/RetroAchievements/Blizzard stats/Riot/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
  * pre-rendered and only toggled via the `hidden` class (spa:if/spa:switch, see
  * channel.html) instead of being created/destroyed per SSE event, so handlers only
  * need attaching once, at render — no refresh() either: the SSE echo updates the cards.
@@ -260,6 +260,17 @@ window.CatapultConnections = (function () {
         });
         on("retroachievements-key-delete-btn", "click", () =>
             postJson(`${baseUrl}/settings/retroachievements/api-key/delete`, {}));
+
+        // Riot: the Riot ID and the server are saved together, Riot checking the Riot ID first; the card follows
+        // from RiotAccountChangedEvent.
+        on("riot-save-btn", "click", () => {
+            const input = document.getElementById("riot-id-input");
+            const platform = document.getElementById("riot-platform-select")?.value || "euw1";
+            return saveSpeedrun(`${baseUrl}/settings/riot/account`, { riotId: input.value.trim(), platform }, input,
+                ["labelRiotRefused", "Riot does not know this Riot ID on that server"],
+                ["labelRiotUnavailable", "Riot cannot be reached right now: try again later."]);
+        });
+        on("riot-delete-btn", "click", () => postJson(`${baseUrl}/settings/riot/account/delete`, {}));
 
         // Blizzard stats: the region and the main are saved as picked; importing leaves for Blizzard's login (which
         // sends the member back to this tab with ?imported=wow, or the reason it failed). The card follows from the

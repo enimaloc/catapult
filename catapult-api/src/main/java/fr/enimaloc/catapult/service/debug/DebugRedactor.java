@@ -148,6 +148,7 @@ public class DebugRedactor {
                 ? Matcher.quoteReplacement(r.group(1) + "=" + MASK)
                 : Matcher.quoteReplacement(r.group()));
         masked = RA_KEY_IN_TEXT.matcher(masked).replaceAll(r -> Matcher.quoteReplacement(r.group(1) + MASK));
+        masked = RIOT_KEY.matcher(masked).replaceAll(Matcher.quoteReplacement(MASK));
         return maskJsonByRegex(masked);
     }
 
@@ -156,6 +157,8 @@ public class DebugRedactor {
             "(?<![\\w.-])([A-Za-z_][\\w.-]*)=[^&\\s\"'#<>,;)\\]}]*");
     /** The RetroAchievements key in a query string quoted in text; a bare {@code y=} (a coordinate) is left alone. */
     private static final Pattern RA_KEY_IN_TEXT = Pattern.compile("(?i)([?&]y=)(?!\\[masqué])[^&\\s\"'#<>,;)\\]}]+");
+    /** A Riot API key ({@code RGAPI-<uuid>}) wherever it is quoted, with or without a name before it. */
+    static final Pattern RIOT_KEY = Pattern.compile("(?i)RGAPI-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
     /** {@code Name:} as a header is written; what follows, up to the end of the line or a quote, is its value. */
     private static final Pattern HEADER_IN_TEXT = Pattern.compile("(?<![\\w.-])([A-Za-z][\\w-]*)[ \\t]*:[ \\t]*");
     /** An HTTP credential written with its scheme: {@code Bearer <token>}, {@code Basic <b64>}, {@code XBL3.0 x=…}. */

@@ -338,6 +338,24 @@ class EnrichmentCacheTest {
     }
 
     @Test
+    void riotSourcesHaveTheirDefaultsAndPersonalFlags() {
+        assertThat(properties.source(EnrichmentSource.RIOT_LOL_SUMMONER).ttl()).isEqualTo(Duration.ofMinutes(10));
+        assertThat(properties.source(EnrichmentSource.RIOT_LOL_LEAGUE).ttl()).isEqualTo(Duration.ofMinutes(10));
+        assertThat(properties.source(EnrichmentSource.RIOT_TFT_LEAGUE).ttl()).isEqualTo(Duration.ofMinutes(10));
+        assertThat(properties.source(EnrichmentSource.RIOT_LOL_LIVE).ttl()).isEqualTo(Duration.ofMinutes(1));
+        assertThat(properties.source(EnrichmentSource.RIOT_LOL_PATCH).ttl()).isEqualTo(Duration.ofHours(1));
+        assertThat(properties.source(EnrichmentSource.RIOT_LOL_CHAMPIONS).ttl()).isEqualTo(Duration.ofDays(1));
+        assertThat(EnrichmentSource.RIOT_LOL_LIVE.key()).isEqualTo("riot-lol-live");
+        assertThat(EnrichmentSource.RIOT_LOL_SUMMONER.personal()).isTrue();
+        assertThat(EnrichmentSource.RIOT_LOL_LEAGUE.personal()).isTrue();
+        assertThat(EnrichmentSource.RIOT_LOL_LIVE.personal()).isTrue();
+        assertThat(EnrichmentSource.RIOT_TFT_LEAGUE.personal()).isTrue();
+        assertThat(EnrichmentSource.RIOT_LOL_PATCH.personal()).isFalse();
+        assertThat(EnrichmentSource.RIOT_LOL_CHAMPIONS.personal()).isFalse();
+        assertThat(properties.riotEnabled()).isTrue();
+    }
+
+    @Test
     void notFoundStatusSerializes() {
         assertThat(tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(
                 fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Status.NOT_FOUND))

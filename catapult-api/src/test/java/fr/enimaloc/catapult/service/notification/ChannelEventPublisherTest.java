@@ -171,6 +171,16 @@ class ChannelEventPublisherTest {
     }
 
     @Test
+    void riotAccountChanged_publishesTheCardsData() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.RiotData("Catapult#EUW", "euw1", true);
+
+        publisher.riotAccountChanged(ownerId, account);
+
+        assertThat(published(ChannelEvents.RIOT_ACCOUNT_CHANGED)).isEqualTo(
+                new ChannelEvents.RiotAccountChanged(ownerId.toString(), "streamername", account));
+    }
+
+    @Test
     void retroAchievementsAccountChanged_publishesTheCardsData() {
         var account = new fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData("Scott",
                 "https://retroachievements.org/user/Scott", true, false, true);

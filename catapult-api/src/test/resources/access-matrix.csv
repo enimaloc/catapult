@@ -212,6 +212,8 @@ PUT,/api/internal/users/{userId}/settings/blizzard/region,,"{""region"":""eu""}"
 PUT,/api/internal/users/{userId}/settings/blizzard/wow-main,,"{""region"":""eu"",""characterId"":1}",401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/settings/blizzard/wow-characters,,,401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/settings/bungie,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/riot/account,,"{""riotId"":""matrix#EUW"",""platform"":""euw1""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/riot/account,,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/settings/twitchat,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat,,"{""enabled"":false}",401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat/branch,,,401,401,403,403,PASS,403,401
@@ -275,6 +277,10 @@ POST,/api/internal/admin/retroachievements-keys/refresh,,,401,PASS,403,403,403,P
 GET,/api/internal/admin/bungie-credentials,,,401,PASS,403,403,403,PASS,401
 PUT,/api/internal/admin/bungie-credentials,,"{""clientId"":""matrix""}",401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/bungie-credentials,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/riot-keys,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/riot-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/riot-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/riot-keys/refresh,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/opencritic-keys,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/opencritic-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/opencritic-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
@@ -532,4 +538,5 @@ GET,/api/me/stats/xbox/{titleId},titleId=1144039928;?version=3,,401,401,401,401,
 GET,/api/me/stats/retroachievements/{gameId},gameId=228;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/blizzard/{game},game=wow;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/bungie/{game},game=destiny2;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/riot/{game},game=lol;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/retroachievements,?version=3,,401,401,401,401,401,401,PASS

@@ -111,6 +111,7 @@ class AccountResolutionPerRequestTest {
     @MockitoBean EmergencyStopService emergencyStopService;
     @MockitoBean fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService speedrunAccountService;
     @MockitoBean fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService retroAchievementsAccountService;
+    @MockitoBean fr.enimaloc.catapult.service.riot.RiotAccountService riotAccountService;
 
     private static RequestPostProcessor as(UserAccount account) {
         return jwt().jwt(j -> j.subject(account.getId().toString()).claim("twitchId", account.getTwitchId()))

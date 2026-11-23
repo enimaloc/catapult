@@ -47,6 +47,8 @@ import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
 import fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService;
+import fr.enimaloc.catapult.service.riot.RiotAccountService;
+import fr.enimaloc.catapult.common.dto.channel.RiotAccountRequest;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
 import fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService;
 import fr.enimaloc.catapult.service.steam.SteamPersonalTokenService;
@@ -102,6 +104,7 @@ public class ApiChannelActionsController {
     /** Absent unless {@code battlenet.enabled}: the Blizzard routes are then a 404. */
     private final Optional<BlizzardAccountService> blizzardAccountService;
     private final fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinkService;
+    private final RiotAccountService riotAccountService;
 
 
     // ── Binding actions ───────────────────────────────────────────────────────
@@ -477,6 +480,29 @@ public class ApiChannelActionsController {
     private BlizzardAccountService blizzard() {
         return blizzardAccountService.orElseThrow(
                 () -> new ApiProblem(ErrorCode.NOT_FOUND, "Blizzard settings are not available"));
+    }
+
+    /**
+     * 400 for a malformed Riot ID, an unknown platform or a Riot ID Riot does not know; 503 when Riot cannot be asked
+     * (down, the source off, or no key of the pool for the platform).
+     */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/riot/account")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveRiotAccount(
+            @PathVariable UUID userId,
+            @RequestBody RiotAccountRequest body) {
+
+        riotAccountService.save(userResolver.user(userId), body.riotId(), body.platform());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/riot/account")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRiotAccount(
+            @PathVariable UUID userId) {
+
+        riotAccountService.delete(userResolver.user(userId));
     }
 
     /** 400 when RetroAchievements does not know the name, 503 when it cannot be asked (or no key can ask it). */

@@ -11,6 +11,8 @@ import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardPublisher;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStats;
 import fr.enimaloc.catapult.service.enrichment.bungie.BungiePublisher;
 import fr.enimaloc.catapult.service.enrichment.bungie.BungieStats;
+import fr.enimaloc.catapult.service.enrichment.riot.RiotPublisher;
+import fr.enimaloc.catapult.service.enrichment.riot.RiotStats;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
@@ -312,12 +314,18 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
      * data.
      */
     public record StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
-                              @JsonIgnore GameBinding.SourceType detectedOn, BungieStats bungie) {
+                              @JsonIgnore GameBinding.SourceType detectedOn, BungieStats bungie, RiotStats riot) {
 
-        /** Without the Bungie stats. */
+        /** Without the Bungie and Riot stats. */
         public StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
                            GameBinding.SourceType detectedOn) {
-            this(steam, xbox, retroachievements, blizzard, detectedOn, null);
+            this(steam, xbox, retroachievements, blizzard, detectedOn, null, null);
+        }
+
+        /** Without the Riot stats. */
+        public StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
+                           GameBinding.SourceType detectedOn, BungieStats bungie) {
+            this(steam, xbox, retroachievements, blizzard, detectedOn, bungie, null);
         }
 
         static StatsObject of(PersonalStatsEnrichment s, MoreLinks links) {
@@ -326,7 +334,7 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
             }
             return new StatsObject(SteamStats.of(s.steam(), links), XboxStats.of(s.xbox(), links),
                     RaStats.of(s.retroachievements(), links), blizzardStats(s.blizzard(), links), s.detectedOn(),
-                    bungieStats(s.bungie(), links));
+                    bungieStats(s.bungie(), links), riotStats(s.riot(), links));
         }
 
         List<PlatformObject> platforms() {
@@ -419,10 +427,22 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
      * The publishers' public data on the game (Blizzard: WoW Token price, latest Hearthstone set, Diablo III
      * season), null when no publisher applies. Public game data: never anything about the member.
      */
-    public record PublisherObject(BlizzardPublisher blizzard, BungiePublisher bungie) {
+    public record PublisherObject(BlizzardPublisher blizzard, BungiePublisher bungie, RiotPublisher riot) {
         static PublisherObject of(PublisherEnrichment p) {
-            return p == null ? null : new PublisherObject(p.blizzard(), p.bungie());
+            return p == null ? null : new PublisherObject(p.blizzard(), p.bungie(), p.riot());
         }
+    }
+
+    /**
+     * The member's Riot stats with the "more" link to {@code /api/me/stats/riot/<game>} (none for Valorant,
+     * {@code unsupported}): the aggregate and the detail route serve this same record.
+     */
+    static RiotStats riotStats(RiotStats s, MoreLinks links) {
+        if (s == null) {
+            return null;
+        }
+        return s.withMore(s.game() == null || s.status() == Status.UNSUPPORTED ? null
+                : links.toMe(ApiV2.ME_STATS_PATH + "/riot/" + s.game().name().toLowerCase(Locale.ROOT)));
     }
 
     /**

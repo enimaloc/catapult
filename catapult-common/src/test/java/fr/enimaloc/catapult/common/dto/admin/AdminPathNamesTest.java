@@ -25,6 +25,8 @@ class AdminPathNamesTest {
         assertThat(ApiKeyProvider.RETROACHIEVEMENTS.pathName()).isEqualTo("retroachievements");
         assertThat(ApiKeyProvider.OPENCRITIC.apiPath()).isEqualTo("opencritic-keys");
         assertThat(ApiKeyProvider.OPENCRITIC.pathName()).isEqualTo("opencritic");
+        assertThat(ApiKeyProvider.RIOT.apiPath()).isEqualTo("riot-keys");
+        assertThat(ApiKeyProvider.RIOT.pathName()).isEqualTo("riot");
     }
 
     @ParameterizedTest

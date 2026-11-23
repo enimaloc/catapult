@@ -217,4 +217,17 @@ class HttpTraceLoggingInterceptorTest {
 
         assertThat(messages()).doesNotContain("0123456789abcdef0123456789abcdef").doesNotContain("MEMBERTOKEN");
     }
+
+    @Test
+    void theRiotKeyHeaderIsOnlyReportedAsPresent_andAQuotedKeyIsMasked() throws IOException {
+        MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET,
+                URI.create("https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/p1"));
+        request.getHeaders().add("X-Riot-Token", "RGAPI-12345678-abcd-4ef0-9abc-0123456789ab");
+
+        interceptor.intercept(request, new byte[0],
+                respondWith("{\"note\":\"echo RGAPI-12345678-ABCD-4ef0-9abc-0123456789ab\"}"));
+
+        assertThat(messages()).contains("auth=ApiKey").doesNotContain("12345678-abcd").doesNotContain("12345678-ABCD")
+                .contains("echo ***");
+    }
 }

@@ -128,6 +128,14 @@ public interface ApiService {
      * RetroAchievements does not know it, 503 when it cannot be asked.
      */
     int saveRetroAchievementsUsername(String username, String raName);
+
+    /**
+     * Declares {@code riotId} ({@code gameName#tagLine}) on the League of Legends {@code platform} as the channel
+     * owner's; catapult-api's status: 400 when malformed or unknown to Riot, 503 when Riot cannot be asked.
+     */
+    int saveRiotAccount(String username, String riotId, String platform);
+
+    int deleteRiotAccount(String username);
     int deleteRetroAchievementsUsername(String username);
     /** Saves the owner's personal RetroAchievements key (never logged); 400 when refused, 503 when unreachable. */
     int saveRetroAchievementsApiKey(String username, String apiKey);

@@ -301,6 +301,10 @@ describe("channel-connections", () => {
               <input id="retroachievements-key-input" value=" abc123 ">
               <button id="retroachievements-key-save-btn"></button>
               <button id="retroachievements-key-delete-btn"></button>
+              <input id="riot-id-input" value="  Catapult#EUW ">
+              <select id="riot-platform-select"><option value="euw1">EUW1</option><option value="na1">NA1</option></select>
+              <button id="riot-save-btn"></button>
+              <button id="riot-delete-btn"></button>
               <select id="blizzard-region-select"><option value="eu">EU</option><option value="us">US</option></select>
               <select id="blizzard-main-select"><option value="eu:1001">Thrall</option><option value="us:77">Jaina</option></select>
               <button id="blizzard-forget-btn"></button>
@@ -442,6 +446,41 @@ describe("channel-connections", () => {
 
             expect(snackbars()).toEqual(["Nom inconnu", "Action failed (502)", "Catapult could not be reached"]);
             delete document.body.dataset.labelSpeedrunRefusedUsername;
+        });
+    });
+
+    describe("the Riot ID", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
+        it("saves the trimmed Riot ID with the picked server, and removes it with a post", async () => {
+            document.getElementById("riot-platform-select").value = "na1";
+            await click("#riot-save-btn");
+            await click("#riot-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/riot/account", { riotId: "Catapult#EUW", platform: "na1" }],
+                ["/channel/enimaloc/settings/riot/account/delete", {}],
+            ]);
+            expect(snackbars()).toEqual([]);
+        });
+
+        it("sends nothing for an empty Riot ID", async () => {
+            document.getElementById("riot-id-input").value = "  ";
+            await click("#riot-save-btn");
+
+            expect(posts()).toEqual([]);
+        });
+
+        it("tells a Riot ID Riot does not know, and that Riot cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(400));
+            await click("#riot-save-btn");
+            posted.mockResolvedValueOnce(response(503));
+            await click("#riot-save-btn");
+
+            expect(snackbars()).toEqual([
+                "Riot does not know this Riot ID on that server",
+                "Riot cannot be reached right now: try again later.",
+            ]);
         });
     });
 

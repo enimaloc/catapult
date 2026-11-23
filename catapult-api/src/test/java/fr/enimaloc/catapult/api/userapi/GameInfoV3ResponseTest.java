@@ -636,4 +636,66 @@ class GameInfoV3ResponseTest {
         assertThat(bungie.path("status").asString()).isEqualTo("private");
         assertThat(bungie.path("destiny2").path("guardianRank").isNull()).isTrue();
     }
+
+    // ---------------------------------------------------------------- Riot
+
+    private static final fr.enimaloc.catapult.service.enrichment.riot.RiotStats LOL =
+            new fr.enimaloc.catapult.service.enrichment.riot.RiotStats(Status.OK,
+                    fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame.LOL, "Catapult#EUW",
+                    "euw1", new fr.enimaloc.catapult.service.enrichment.riot.RiotStats.LolStats(Status.OK, 312, null,
+                    new fr.enimaloc.catapult.service.enrichment.riot.RiotStats.Ranked(
+                            new fr.enimaloc.catapult.service.enrichment.riot.RiotStats.Rank("GOLD", "II", 57, 61, 54),
+                            null), false, null, null), null, null);
+
+    private static GameInfoV3Response withRiot(fr.enimaloc.catapult.service.enrichment.riot.RiotStats riot,
+                                               fr.enimaloc.catapult.service.enrichment.riot.RiotPublisher publisher) {
+        PersonalStatsEnrichment stats = PersonalStatsEnrichment.of(null, null, null, null,
+                GameBinding.SourceType.STEAM, riot);
+        GameEnrichment enrichment = new GameEnrichment(null, null, null, null, null, null, null, null, null, null,
+                null, stats, PublisherEnrichment.of(null, publisher));
+        return GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.of("115"));
+    }
+
+    @Test
+    void riotStatsCarryTheirMoreLink_andTheDetailOnlyFieldsStayOut() {
+        JsonNode riot = MAPPER.readTree(MAPPER.writeValueAsString(withRiot(LOL, null))).path("stats").path("riot");
+
+        assertThat(riot.path("status").asString()).isEqualTo("ok");
+        assertThat(riot.path("game").asString()).isEqualTo("lol");
+        assertThat(riot.path("account").asString()).isEqualTo("Catapult#EUW");
+        assertThat(riot.path("lol").path("level").asInt()).isEqualTo(312);
+        assertThat(riot.path("lol").path("ranked").path("solo").path("tier").asString()).isEqualTo("GOLD");
+        assertThat(riot.path("lol").has("queues")).isFalse();
+        assertThat(riot.path("more").asString()).isEqualTo(BASE + "/api/me/stats/riot/lol?version=3");
+    }
+
+    @Test
+    void valorantIsUnsupported_withoutAMoreLink() {
+        var valorant = new fr.enimaloc.catapult.service.enrichment.riot.RiotStats(Status.UNSUPPORTED,
+                fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame.VALORANT, "Catapult#EUW",
+                "euw1", null, null, null);
+
+        JsonNode riot = MAPPER.readTree(MAPPER.writeValueAsString(withRiot(valorant, null))).path("stats")
+                .path("riot");
+
+        assertThat(riot.path("status").asString()).isEqualTo("unsupported");
+        assertThat(riot.path("game").asString()).isEqualTo("valorant");
+        assertThat(riot.path("more").isNull()).isTrue();
+    }
+
+    @Test
+    void riotPublisher_isThePatch_withNothingPersonal() {
+        var patch = new fr.enimaloc.catapult.service.enrichment.riot.RiotPublisher(
+                fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame.LOL,
+                new fr.enimaloc.catapult.service.enrichment.riot.RiotPublisher.Lol("16.23.1"));
+
+        GameInfoV3Response response = withRiot(LOL, patch);
+        JsonNode publisher = MAPPER.readTree(MAPPER.writeValueAsString(response)).path("publisher");
+
+        assertThat(publisher.path("riot").path("lol").path("patch").asString()).isEqualTo("16.23.1");
+        assertThat(publisher.path("blizzard").isNull()).isTrue();
+        assertThat(publisher.toString()).doesNotContain("Catapult#EUW").doesNotContain("euw1")
+                .doesNotContain("GOLD");
+        assertThat(withRiot(null, patch).stats()).isNull();
+    }
 }

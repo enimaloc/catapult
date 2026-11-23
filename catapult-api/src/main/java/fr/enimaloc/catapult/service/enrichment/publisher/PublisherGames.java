@@ -68,4 +68,31 @@ public final class PublisherGames {
         return game != null && game.getSourceType() == SourceType.BATTLENET && game.getSourceId() != null
                 && game.getSourceId().contains(":");
     }
+
+    /** The Riot games the enrichment knows. */
+    public enum RiotGame {
+        @JsonProperty("lol") LOL,
+        @JsonProperty("tft") TFT,
+        @JsonProperty("valorant") VALORANT
+    }
+
+    /**
+     * The Riot game of a detected one, by its IGDB id (no Riot client is detected): {@code ids} gives the ids of
+     * League of Legends, Teamfight Tactics and Valorant (an empty one maps no game).
+     */
+    public static Optional<RiotGame> riot(String igdbId, String lolId, String tftId, String valorantId) {
+        if (igdbId == null || igdbId.isBlank()) {
+            return Optional.empty();
+        }
+        if (igdbId.equals(lolId)) {
+            return Optional.of(RiotGame.LOL);
+        }
+        if (igdbId.equals(tftId)) {
+            return Optional.of(RiotGame.TFT);
+        }
+        if (igdbId.equals(valorantId)) {
+            return Optional.of(RiotGame.VALORANT);
+        }
+        return Optional.empty();
+    }
 }

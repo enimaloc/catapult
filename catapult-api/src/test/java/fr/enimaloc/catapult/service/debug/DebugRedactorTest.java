@@ -296,4 +296,21 @@ class DebugRedactorTest {
         assertThat(redactor.text("refused X-API-Key: 0123456789abcdef0123456789abcdef and client_secret=CSECRET", false))
                 .doesNotContain("0123456789abcdef0123456789abcdef").doesNotContain("CSECRET");
     }
+
+    @Test
+    void theRiotKey_isMaskedAsAHeader_andWhereverItIsQuoted() {
+        String key = "RGAPI-12345678-abcd-4ef0-9abc-0123456789ab";
+        assertThat(redactor.isSecretHeader("X-Riot-Token")).isTrue();
+        assertThat(redactor.headers(header("X-Riot-Token", key), false)).isEqualTo("X-Riot-Token: [masqué]");
+        assertThat(redactor.text("X-Riot-Token: " + key, false)).doesNotContain("12345678");
+        assertThat(redactor.text("Riot refused " + key + " at 10:00", false))
+                .isEqualTo("Riot refused [masqué] at 10:00");
+        assertThat(redactor.text("refused " + key.toUpperCase(java.util.Locale.ROOT), false))
+                .doesNotContain("12345678");
+        assertThat(redactor.body(b("{\"key\":\"" + key + "\"}"), MediaType.APPLICATION_JSON, false))
+                .doesNotContain("12345678");
+        // a word that only starts the same way is left alone
+        assertThat(redactor.text("RGAPI-docs page", false)).isEqualTo("RGAPI-docs page");
+        assertThat(redactor.text("refused " + key, true)).contains(key);
+    }
 }

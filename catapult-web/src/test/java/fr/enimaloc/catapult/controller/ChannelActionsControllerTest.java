@@ -848,4 +848,27 @@ class ChannelActionsControllerTest {
 
         verify(apiService, org.mockito.Mockito.times(1)).cancelAccountDeletion("me");
     }
+
+    @Test
+    void riotSettings_areSavedAndForgottenThroughTheApi_andRefusalsKeepTheirStatus() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/riot/account").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"riotId\":\"Catapult#EUW\",\"platform\":\"euw1\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/riot/account/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+        verify(apiService).saveRiotAccount("enimaloc", "Catapult#EUW", "euw1");
+        verify(apiService).deleteRiotAccount("enimaloc");
+
+        when(apiService.saveRiotAccount("enimaloc", "Ghost#0000", "euw1")).thenReturn(400);
+        when(apiService.saveRiotAccount("enimaloc", "Down#EUW", "euw1")).thenReturn(503);
+        mvc.perform(post("/channel/enimaloc/settings/riot/account").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"riotId\":\"Ghost#0000\",\"platform\":\"euw1\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/channel/enimaloc/settings/riot/account").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"riotId\":\"Down#EUW\",\"platform\":\"euw1\"}"))
+                .andExpect(status().isServiceUnavailable());
+    }
 }

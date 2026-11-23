@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.channel.AnkamaData;
 import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
+import fr.enimaloc.catapult.common.dto.channel.RiotData;
 import fr.enimaloc.catapult.common.dto.channel.EpicData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
@@ -87,6 +88,9 @@ public final class IntegrationCards {
         }
         if (ch.bungie() != null) {
             cards.add(bungie(ch.bungie()));
+        }
+        if (ch.riot() != null) {
+            cards.add(riot(ch.riot()));
         }
         if (ch.obs() != null) {
             cards.add(obs(ch.obs()));
@@ -559,6 +563,44 @@ public final class IntegrationCards {
                                 now.linked(), BUNGIE_EVENT + ".linked")), Button.Kind.TEXT,
                                 key(BUNGIE_PREFIX + "disconnect")))),
                 new Text(Attrs.cls("bungie-help"), true, key(BUNGIE_PREFIX + "help")));
+    }
+
+    // Riot: the Riot ID the member declares (gameName#tagLine) and the League of Legends platform it plays on, saved
+    // together; Riot checks the Riot ID before anything is kept. The declared one shows as a chip that
+    // RiotAccountChangedEvent replaces in place. Without a key in the shared pool the card says the stats are off on
+    // this instance (a save would be refused). Wide: a form. No secret is ever held for a member.
+
+    private static final String RIOT_EVENT = "RiotAccountChangedEvent";
+    private static final String RIOT_PREFIX = PREFIX + "riot.";
+    public static final List<String> RIOT_PLATFORMS = List.of("euw1", "eun1", "tr1", "ru", "me1", "na1", "br1", "la1",
+            "la2", "kr", "jp1", "oc1", "ph2", "sg2", "th2", "tw2", "vn2");
+
+    static IntegrationDto riot(RiotData riot) {
+        boolean hasId = riot.riotId() != null && !riot.riotId().isBlank();
+        SpaState hasIdState = SpaState.flag("riotHasId", hasId, RIOT_EVENT + ".riotId");
+        List<Select.Option> platforms = RIOT_PLATFORMS.stream()
+                .map(p -> new Select.Option(p, literal(p.toUpperCase(java.util.Locale.ROOT)))).toList();
+        return wideCard("riot",
+                new Container(Attrs.cls("riot-account").withState(hasIdState), Container.Kind.DIV, List.of(
+                        new Text(Attrs.NONE, false, key(RIOT_PREFIX + "account")),
+                        new Chip(Attrs.cls("riot-account-name").withState(
+                                SpaState.sync("textContent", RIOT_EVENT + ".riotId")),
+                                Message.literal(hasId ? riot.riotId() : "")))),
+                new Text(Attrs.cls("riot-none").withState(SpaState.flag("riotNoId", !hasId,
+                        RIOT_EVENT + ".!riotId")), false, key(RIOT_PREFIX + "none")),
+                new Text(Attrs.cls("riot-unavailable").withState(SpaState.flag("riotUnavailable",
+                        !riot.available(), RIOT_EVENT + ".!available")), true, key(RIOT_PREFIX + "unavailable")),
+                new Input(Attrs.id("riot-id-input").withState(SpaState.sync("value", RIOT_EVENT + ".riotId")),
+                        "text", key(RIOT_PREFIX + "id.placeholder"), null, riot.riotId(), null, null, "off"),
+                new Select(Attrs.id("riot-platform-select").withState(
+                        SpaState.sync("value", RIOT_EVENT + ".platform")),
+                        key(RIOT_PREFIX + "platform"), riot.platform() == null ? "euw1" : riot.platform(),
+                        platforms, null),
+                new Container(Attrs.id("riot-actions").withClass("card-actions"), Container.Kind.SEGMENTED_GROUP,
+                        List.of(segmented(Attrs.id("riot-save-btn"), key(RIOT_PREFIX + "save")),
+                                segmented(Attrs.id("riot-delete-btn").withState(hasIdState),
+                                        key(RIOT_PREFIX + "delete")))),
+                new Text(Attrs.cls("riot-help"), true, key(RIOT_PREFIX + "help")));
     }
 
     // Epic: one sub-view and button per status, driven by the status field of EpicLinkEvent, which carries NONE too.

@@ -1566,4 +1566,23 @@ class MockApiServiceTest {
         assertThat(service.adminDeleteBattleNetGameVariant(created.body().id()).status()).isEqualTo(204);
         assertThat(service.adminBattleNetGameVariants()).hasSize(1);
     }
+
+    @Test
+    void riotAccount_followsTheSettingsAndTellsThePage() {
+        assertThat(data.riotData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.RiotData(null, null, true));
+
+        assertThat(service.saveRiotAccount(username, "Catapult#EUW", "na1")).isEqualTo(204);
+        assertThat(data.riotData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.RiotData("Catapult#EUW",
+                "na1", true));
+        assertThat(service.saveRiotAccount(username, "Ghost#0000", "euw1")).isEqualTo(400);
+        assertThat(service.saveRiotAccount(username, "Catapult", "euw1")).isEqualTo(400);
+        assertThat(service.saveRiotAccount(username, "Catapult#EUW", "mars")).isEqualTo(400);
+        assertThat(service.saveRiotAccount(username, "Catapult#EUWEST", "euw1")).isEqualTo(400);
+        assertThat(service.saveRiotAccount(username, null, "euw1")).isEqualTo(400);
+
+        assertThat(service.deleteRiotAccount(username)).isEqualTo(204);
+        assertThat(data.riotData().riotId()).isNull();
+        assertThat(events).hasSize(2).allSatisfy(event ->
+                assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent.class));
+    }
 }

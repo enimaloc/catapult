@@ -2872,4 +2872,33 @@ class RealApiServiceTest {
         assertThat(refused.body()).isNull();
         assertThat(refused.error()).isEqualTo("A call is already running on this bot");
     }
+
+    @Test
+    void riotKeys_areReadAndManagedThroughTheirRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.RIOT;
+        respond(HttpMethod.GET, "/api/internal/admin/riot-keys", "{\"keys\":[],\"riotEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/riot-keys")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/riot-keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/riot-keys/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
+    }
+
+    @Test
+    void riotAccount_isSavedAndRemovedOnTheChannel_andRefusalsKeepTheirStatus() {
+        expectPut(channel("enimaloc") + "/settings/riot/account",
+                "{\"riotId\":\"Catapult#EUW\",\"platform\":\"euw1\"}");
+        expectDelete(channel("enimaloc") + "/settings/riot/account");
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/riot/account")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThat(service.saveRiotAccount("enimaloc", "Catapult#EUW", "euw1")).isEqualTo(204);
+        assertThat(service.deleteRiotAccount("enimaloc")).isEqualTo(204);
+        assertThat(service.saveRiotAccount("enimaloc", "Down#EUW", "euw1")).isEqualTo(503);
+    }
 }
