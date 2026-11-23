@@ -106,6 +106,7 @@ import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
 import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
+import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
 import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
 import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
@@ -675,6 +676,15 @@ public class MockApiService implements ApiService {
     public int deleteBlizzardWowCharacters(String username) {
         log.trace("deleteBlizzardWowCharacters({})", username);
         return blizzardChanged(username, MockData::deleteBlizzardWowCharacters);
+    }
+
+    @Override
+    public int deleteBungieLink(String username) {
+        log.trace("deleteBungieLink({})", username);
+        MockData data = currentData();
+        data.unlinkBungie();
+        eventPublisher.publishEvent(BungieAccountChangedEvent.of(username, data.bungieData()));
+        return NO_CONTENT;
     }
 
     private int blizzardChanged(String username, java.util.function.Consumer<MockData> change) {

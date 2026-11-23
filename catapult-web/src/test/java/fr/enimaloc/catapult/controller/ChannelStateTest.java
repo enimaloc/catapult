@@ -125,6 +125,19 @@ class ChannelStateTest {
     }
 
     @Test
+    void bungieLink_asItsEvent() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.BungieAccountData(true, "G#0042", "steam", false, true,
+                        java.time.Instant.parse("2026-11-20T23:30:00Z")));
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent("enimaloc", true, true,
+                        "G#0042", false, false, true, false));
+    }
+
+    @Test
     void noBlizzardSettings_noEvent() {
         ChannelPageData ch = page(null, new PagedBindings(0, 0, 0, List.of()), null, null, null, null);
 

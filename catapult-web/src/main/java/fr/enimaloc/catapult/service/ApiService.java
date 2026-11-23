@@ -138,6 +138,8 @@ public interface ApiService {
     int saveBlizzardWowMain(String username, String region, long characterId);
     /** Forgets the owner's imported World of Warcraft characters and their main. */
     int deleteBlizzardWowCharacters(String username);
+    /** Unlinks the owner's Bungie.net account and forgets their Destiny 2 stats. */
+    int deleteBungieLink(String username);
     int refreshSteamProfileCache(String username);
     LinkStateResponse minecraftStatus(String username);
     int minecraftEnroll(String username, String name);

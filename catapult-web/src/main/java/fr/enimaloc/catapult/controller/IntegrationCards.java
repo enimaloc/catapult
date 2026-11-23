@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.AnkamaData;
 import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
+import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
 import fr.enimaloc.catapult.common.dto.channel.EpicData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
@@ -27,6 +28,7 @@ import fr.enimaloc.catapult.dto.integration.IntegrationNode.Text;
 import fr.enimaloc.catapult.dto.integration.Message;
 import fr.enimaloc.catapult.dto.integration.SpaState;
 import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
+import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -82,6 +84,9 @@ public final class IntegrationCards {
         }
         if (ch.blizzardStats() != null) {
             cards.add(blizzardStats(ch.blizzardStats()));
+        }
+        if (ch.bungie() != null) {
+            cards.add(bungie(ch.bungie()));
         }
         if (ch.obs() != null) {
             cards.add(obs(ch.obs()));
@@ -520,6 +525,40 @@ public final class IntegrationCards {
                                 new Button(Attrs.id("blizzard-forget-btn").withState(importedState),
                                         Button.Kind.TEXT, key(BLIZZARD_PREFIX + "forget")))),
                         new Text(Attrs.cls("blizzard-stats-help"), true, key(BLIZZARD_PREFIX + "help")))));
+    }
+
+    // Bungie: the owner's Bungie.net link (Destiny 2 stats). Linking leaves for Bungie's login (catapult-api's
+    // /oauth2/authorization/bungie), which sends the member back to this tab; it is only offered while the instance
+    // has a Bungie application set (otherwise the login does not exist). A link Bungie refused since asks to link
+    // again. BungieAccountChangedEvent flips everything. Never a token, never an internal id.
+
+    private static final String BUNGIE_EVENT = "BungieAccountChangedEvent";
+    private static final String BUNGIE_PREFIX = PREFIX + "bungie.";
+
+    static IntegrationDto bungie(BungieAccountData bungie) {
+        BungieAccountChangedEvent now = BungieAccountChangedEvent.of(null, bungie);
+        return card("bungie",
+                new Chip(Attrs.cls("bungie-connected-chip").withState(SpaState.flag("bungieUsable", now.usable(),
+                        BUNGIE_EVENT + ".usable")), CONNECTED),
+                new Chip(Attrs.cls("bungie-not-connected-chip").withState(SpaState.flag("bungieNotUsable",
+                        !now.usable(), BUNGIE_EVENT + ".!usable")), NOT_CONNECTED),
+                new Chip(Attrs.cls("bungie-account").withState(SpaState.flag("bungieNamed", now.usable(),
+                        BUNGIE_EVENT + ".usable").andSync("textContent", BUNGIE_EVENT + ".account")),
+                        literal(now.account())),
+                new Text(Attrs.cls("bungie-invalid").withState(SpaState.flag("bungieInvalid", now.invalid(),
+                        BUNGIE_EVENT + ".invalid")), true, key(BUNGIE_PREFIX + "invalid")),
+                new Text(Attrs.cls("bungie-no-profile").withState(SpaState.flag("bungieNoProfile", now.noProfile(),
+                        BUNGIE_EVENT + ".noProfile")), true, key(BUNGIE_PREFIX + "no_profile")),
+                new Text(Attrs.cls("bungie-unavailable").withState(SpaState.flag("bungieUnavailable",
+                        !now.available(), BUNGIE_EVENT + ".!available")), true, key(BUNGIE_PREFIX + "unavailable")),
+                new Container(Attrs.id("bungie-link-actions").withClass("card-actions"), Container.Kind.DIV, List.of(
+                        new Button(Attrs.id("bungie-connect-btn").withState(SpaState.flag("bungieCanLink",
+                                now.canLink(), BUNGIE_EVENT + ".canLink")), Button.Kind.FILLED,
+                                key(BUNGIE_PREFIX + "connect")),
+                        new Button(Attrs.id("bungie-disconnect-btn").withState(SpaState.flag("bungieLinked",
+                                now.linked(), BUNGIE_EVENT + ".linked")), Button.Kind.TEXT,
+                                key(BUNGIE_PREFIX + "disconnect")))),
+                new Text(Attrs.cls("bungie-help"), true, key(BUNGIE_PREFIX + "help")));
     }
 
     // Epic: one sub-view and button per status, driven by the status field of EpicLinkEvent, which carries NONE too.

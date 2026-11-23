@@ -78,6 +78,8 @@ class CatapultOAuth2UserServiceTest {
     @Mock private PlatformTransactionManager transactionManager;
     @Mock private BlizzardWowImportService wowImport;
     @Mock private ObjectProvider<BlizzardWowImportService> wowImportProvider;
+    @Mock private ObjectProvider<fr.enimaloc.catapult.service.bungie.BungieLinkService> bungieLinkProvider;
+    @Mock private fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinks;
 
     @Mock private RestClient.RequestHeadersUriSpec getSpec;
     @Mock private RestClient.RequestHeadersSpec headersSpec;
@@ -91,7 +93,8 @@ class CatapultOAuth2UserServiceTest {
             userAccountRepository, oAuthTokenRepository, userSettingsRepository,
             getterConfigRepository, tokenEncryptionService, eventPublisher, restClient, whitelistService,
             adminMigrationService, inviteService, battleNetGate, battleNetFriendsProvider,
-            epicGate, epicFriendsProvider, new TransactionTemplate(transactionManager), wowImportProvider
+            epicGate, epicFriendsProvider, new TransactionTemplate(transactionManager), wowImportProvider,
+            bungieLinkProvider
         );
         ReflectionTestUtils.setField(service, "ownerId", "");
         ReflectionTestUtils.setField(service, "defaultNoGameName", "");
@@ -582,5 +585,64 @@ class CatapultOAuth2UserServiceTest {
         assertThat(errorCodeOf(epicRequest())).isEqualTo("epic_full");
         assertThat(errorCodeOf(epicRequest())).isEqualTo("epic_full");
         assertThat(errorCodeOf(epicRequest())).isEqualTo("epic_already_linked");
+    }
+
+    // --- Bungie ---
+
+    private OAuth2UserRequest bungieRequest(java.util.Map<String, Object> parameters) {
+        ClientRegistration reg = ClientRegistration.withRegistrationId("bungie")
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .clientId("12345")
+            .redirectUri("http://localhost/callback")
+            .authorizationUri("https://www.bungie.net/en/OAuth/Authorize")
+            .tokenUri("https://www.bungie.net/platform/app/oauth/token/")
+            .build();
+        OAuth2AccessToken token = new OAuth2AccessToken(
+            OAuth2AccessToken.TokenType.BEARER, "bungie-token", Instant.now(), Instant.now().plusSeconds(3600));
+        return new OAuth2UserRequest(reg, token, parameters);
+    }
+
+    @Test
+    void bungieLink_isCheckedAndLeftPending_nothingWritten() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        signedInStreamer(account);
+        when(bungieLinkProvider.getIfAvailable()).thenReturn(bungieLinks);
+        var pending = new fr.enimaloc.catapult.service.bungie.BungieLinkService.PendingLink("42", "G#0042", 3, "461",
+            Instant.now());
+        java.util.Map<String, Object> parameters = java.util.Map.of("membership_id", "42");
+        when(bungieLinks.check("bungie-token", parameters)).thenReturn(pending);
+        var web = new org.springframework.mock.web.MockHttpServletRequest();
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(web));
+        try {
+            service.loadUser(bungieRequest(parameters));
+        } finally {
+            org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+        }
+
+        assertThat(web.getAttribute(fr.enimaloc.catapult.service.bungie.BungieLinkService.PENDING_ATTRIBUTE))
+            .isSameAs(pending);
+        verify(bungieLinks, never()).complete(any(), any(), any());
+        verifyNoInteractions(oAuthTokenRepository, transactionManager);
+    }
+
+    @Test
+    void bungieLink_refusalsHaveTheirCodes() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        java.util.Map<String, Object> parameters = java.util.Map.of("membership_id", "42");
+
+        assertThat(errorCodeOf(bungieRequest(parameters))).isEqualTo("unauthorized");
+
+        signedInStreamer(account);
+        when(bungieLinkProvider.getIfAvailable()).thenReturn(null);
+        assertThat(errorCodeOf(bungieRequest(parameters))).isEqualTo("bungie_unavailable");
+
+        when(bungieLinkProvider.getIfAvailable()).thenReturn(bungieLinks);
+        when(bungieLinks.check("bungie-token", parameters)).thenThrow(
+            new fr.enimaloc.catapult.service.bungie.BungieLinkService.RefusedException(
+                fr.enimaloc.catapult.service.bungie.BungieLinkService.Refusal.MISMATCH));
+        assertThat(errorCodeOf(bungieRequest(parameters))).isEqualTo("bungie_mismatch");
     }
 }

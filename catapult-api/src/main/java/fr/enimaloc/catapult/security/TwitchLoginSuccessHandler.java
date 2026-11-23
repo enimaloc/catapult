@@ -3,12 +3,14 @@ package fr.enimaloc.catapult.security;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.event.TwitchLoginEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
+import fr.enimaloc.catapult.service.bungie.BungieLinkService;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
@@ -45,6 +47,7 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
     private final ApplicationEventPublisher eventPublisher;
     private final JwtService jwtService;
     private final AuthCodeStore codeStore;
+    private final ObjectProvider<BungieLinkService> bungieLinks;
 
     @Value("${app.web-url:}")
     private String webUrl;
@@ -103,6 +106,17 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                             .replaceQueryParam("imported", none ? "wow-empty" : "wow").toUriString());
                     return;
                 }
+            } else if ("bungie".equals(registrationId)) {
+                // The Bungie.net link: CatapultOAuth2UserService checked the account and left it pending; its
+                // refresh token, only known here, is written encrypted, then Spring's copy is forgotten at once.
+                boolean linked = completeBungieLink(request, response, authentication, catUser);
+                if (webUrl != null && !webUrl.isBlank()) {
+                    UriComponentsBuilder target = UriComponentsBuilder.fromUriString(channelIntegrationsUrl(catUser));
+                    target = linked ? target.replaceQueryParam("linked", "bungie")
+                            : target.replaceQueryParam("error", "bungie_failed");
+                    response.sendRedirect(target.toUriString());
+                    return;
+                }
             } else if ("epic".equals(registrationId)) {
                 // Like Battle.net: the bot befriends the account, so the EOS access token is forgotten at once.
                 authorizedClientRepository.removeAuthorizedClient("epic", authentication, request, response);
@@ -126,6 +140,31 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
         }
 
         delegate.onAuthenticationSuccess(request, response, authentication);
+    }
+
+    /** Writes the pending Bungie link with its refresh token; false when it could not be (never logging a token). */
+    private boolean completeBungieLink(HttpServletRequest request, HttpServletResponse response,
+                                       Authentication authentication, CatapultOAuth2User catUser) {
+        OAuth2AuthorizedClient client = authorizedClientRepository.loadAuthorizedClient("bungie", authentication,
+                request);
+        authorizedClientRepository.removeAuthorizedClient("bungie", authentication, request, response);
+        BungieLinkService links = bungieLinks == null ? null : bungieLinks.getIfAvailable();
+        Object pending = request.getAttribute(BungieLinkService.PENDING_ATTRIBUTE);
+        String refreshToken = client == null || client.getRefreshToken() == null ? null
+                : client.getRefreshToken().getTokenValue();
+        if (links == null || !(pending instanceof BungieLinkService.PendingLink link) || refreshToken == null) {
+            log.warn("Bungie link of user {} not written: {}", catUser.getUserAccount().getId(),
+                    refreshToken == null ? "no refresh token" : "no checked login");
+            return false;
+        }
+        try {
+            links.complete(catUser.getUserAccount(), link, refreshToken);
+            return true;
+        } catch (RuntimeException e) {
+            log.warn("Bungie link of user {} not written: {}", catUser.getUserAccount().getId(),
+                    e.getClass().getSimpleName());
+            return false;
+        }
     }
 
     private String channelIntegrationsUrl(CatapultOAuth2User catUser) {

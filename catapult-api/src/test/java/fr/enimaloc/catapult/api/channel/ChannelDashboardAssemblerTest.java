@@ -110,6 +110,8 @@ class ChannelDashboardAssemblerTest {
             mock(fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService.class);
     private final fr.enimaloc.catapult.service.blizzard.BlizzardAccountService blizzardAccounts =
             mock(fr.enimaloc.catapult.service.blizzard.BlizzardAccountService.class);
+    private final fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinks =
+            mock(fr.enimaloc.catapult.service.bungie.BungieLinkService.class);
     private final fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService raAccounts =
             mock(fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService.class);
     private final MinecraftLinkStateService minecraftStates =
@@ -143,7 +145,8 @@ class ChannelDashboardAssemblerTest {
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumService.class)), categoryCache,
-                streamTitle, dropsGate, dropsCatalog, speedrunAccounts, raAccounts, java.util.Optional.of(blizzardAccounts));
+                streamTitle, dropsGate, dropsCatalog, speedrunAccounts, raAccounts, java.util.Optional.of(blizzardAccounts),
+                bungieLinks);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }
@@ -582,6 +585,20 @@ class ChannelDashboardAssemblerTest {
             assertThat(assembler().page(owner, owner, "streamer", 0, null, null).blizzardStats()).isEqualTo(account);
             assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).blizzardStats()).isNull();
             verify(blizzardAccounts, never()).data(moderator);
+        }
+
+        @Test
+        void dashboardCarriesTheBungieLinkForTheOwnerOnly_withoutAnyToken() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.BungieAccountData(true, "G#0042", "steam", false,
+                    true, java.time.Instant.parse("2026-11-20T10:00:00Z"));
+            when(bungieLinks.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).bungie()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).bungie()).isNull();
+            verify(bungieLinks, never()).data(moderator);
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.BungieAccountData.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("linked", "account", "platform", "invalid", "available", "linkedAt");
         }
 
         @Test

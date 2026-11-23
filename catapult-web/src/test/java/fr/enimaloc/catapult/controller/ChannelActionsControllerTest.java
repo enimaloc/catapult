@@ -330,6 +330,16 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void bungieLink_isUnlinkedThroughTheApi() throws Exception {
+        org.mockito.Mockito.when(apiService.deleteBungieLink("enimaloc")).thenReturn(204);
+
+        mvc.perform(post("/channel/enimaloc/settings/bungie/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).deleteBungieLink("enimaloc");
+    }
+
+    @Test
     void blizzardSettings_refusalsKeepTheirStatus() throws Exception {
         when(apiService.saveBlizzardRegion("enimaloc", "xx")).thenReturn(400);
         when(apiService.saveBlizzardWowMain("enimaloc", "eu", 9L)).thenReturn(404);

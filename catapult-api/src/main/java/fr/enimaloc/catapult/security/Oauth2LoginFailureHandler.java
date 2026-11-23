@@ -43,7 +43,8 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
             "system_account_login_forbidden", "unauthorized", "battlenet_unavailable", "battlenet_full",
             "epic_unavailable", "epic_full", "epic_already_linked",
             "battlenet_stats_unavailable", "battlenet_stats_failed", "battlenet_stats_mismatch",
-            "battlenet_stats_cancelled");
+            "battlenet_stats_cancelled",
+            "bungie_unavailable", "bungie_failed", "bungie_mismatch", "bungie_cancelled");
     /**
      * Refusals of a link the member started from their channel's integrations tab: they go back there, the code as
      * {@code error}, for the card to tell why (TwitchLoginSuccessHandler sends a successful link to the same tab).
@@ -51,12 +52,18 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
     private static final Set<String> CHANNEL_LINK_ERROR_CODES = Set.of(
             "epic_unavailable", "epic_full", "epic_already_linked",
             "battlenet_stats_unavailable", "battlenet_stats_failed", "battlenet_stats_mismatch",
-            "battlenet_stats_cancelled");
+            "battlenet_stats_cancelled",
+            "bungie_unavailable", "bungie_failed", "bungie_mismatch", "bungie_cancelled");
     /** The World of Warcraft import: a failure that is not one of its refusals is a failed import on the card. */
     private static final String WOW_IMPORT = "battlenet-stats";
     private static final Set<String> WOW_IMPORT_ERROR_CODES = Set.of(
             "battlenet_stats_unavailable", "battlenet_stats_failed", "battlenet_stats_mismatch",
             "battlenet_stats_cancelled");
+
+    /** The Bungie.net link: a failure that is not one of its refusals is a failed link on the card. */
+    private static final String BUNGIE = "bungie";
+    private static final Set<String> BUNGIE_ERROR_CODES = Set.of(
+            "bungie_unavailable", "bungie_failed", "bungie_mismatch", "bungie_cancelled");
 
     @Value("${app.web-url:http://localhost:8080}")
     private String webUrl;
@@ -75,6 +82,14 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
         if (WOW_IMPORT.equals(registrationId) && !"unauthorized".equals(errorCode)
                 && !WOW_IMPORT_ERROR_CODES.contains(errorCode)) {
             errorCode = "battlenet_stats_failed";
+        }
+        if (BUNGIE.equals(registrationId) && "access_denied".equals(errorCode)) {
+            // The member declined on Bungie's authorization page: not a failure
+            errorCode = "bungie_cancelled";
+        }
+        if (BUNGIE.equals(registrationId) && !"unauthorized".equals(errorCode)
+                && !BUNGIE_ERROR_CODES.contains(errorCode)) {
+            errorCode = "bungie_failed";
         }
         if ("twitch".equals(registrationId) && !BUSINESS_ERROR_CODES.contains(errorCode) && !alreadyRetried(request)) {
             markRetried(request, response);

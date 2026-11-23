@@ -15,6 +15,7 @@ import fr.enimaloc.catapult.service.account.AdminMigrationService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetFriendService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
 import fr.enimaloc.catapult.service.blizzard.BlizzardImportRefusedException;
+import fr.enimaloc.catapult.service.bungie.BungieLinkService;
 import fr.enimaloc.catapult.service.blizzard.BlizzardWowImportService;
 import fr.enimaloc.catapult.service.epic.EpicEnrollmentException;
 import fr.enimaloc.catapult.service.epic.EpicFriendService;
@@ -70,6 +71,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     private final TransactionTemplate transactions;
     // Only present when battlenet.enabled.
     private final ObjectProvider<BlizzardWowImportService> wowImports;
+    private final ObjectProvider<BungieLinkService> bungieLinks;
 
     @Value("${app.owner-id:}")
     private String ownerId;
@@ -107,6 +109,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
                 case "battlenet" -> handleBattleNetLink(userRequest);
                 case "battlenet-stats" -> handleBattleNetStatsConsent(userRequest);
                 case "epic" -> handleEpicLink(userRequest);
+                case "bungie" -> handleBungieLink(userRequest);
                 default -> delegate.loadUser(userRequest);
             };
         } catch (OAuth2AuthenticationException e) {
@@ -205,6 +208,35 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         } catch (RuntimeException e) {
             log.warn("World of Warcraft import failed for user {}: {}", user.getId(), e.getClass().getSimpleName());
             throw new OAuth2AuthenticationException(new OAuth2Error("battlenet_stats_failed"));
+        }
+        return existingUser;
+    }
+
+    /**
+     * The Bungie.net link of a member already logged in with Twitch: the token's account is checked (the account
+     * Bungie says the token reads must be the one its answer named) and left as a pending link in the request; it is
+     * written by TwitchLoginSuccessHandler, the only one that gets the refresh token. Nothing is written here and no
+     * token reaches a log: failures are logged by their type only. Not transactional, see {@link #loadUser}.
+     */
+    private OAuth2User handleBungieLink(OAuth2UserRequest userRequest) {
+        Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
+        if (currentAuth == null || !(currentAuth.getPrincipal() instanceof CatapultOAuth2User existingUser)) {
+            log.error("BUNGIE link without an authenticated Twitch session");
+            throw new OAuth2AuthenticationException(new OAuth2Error("unauthorized"));
+        }
+        BungieLinkService links = bungieLinks.getIfAvailable();
+        if (links == null) {
+            throw new OAuth2AuthenticationException(new OAuth2Error("bungie_unavailable"));
+        }
+        try {
+            BungieLinkService.PendingLink pending = links.check(userRequest.getAccessToken().getTokenValue(),
+                userRequest.getAdditionalParameters());
+            if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes web) {
+                web.getRequest().setAttribute(BungieLinkService.PENDING_ATTRIBUTE, pending);
+            }
+        } catch (BungieLinkService.RefusedException e) {
+            log.warn("Bungie link refused for user {}: {}", existingUser.getUserAccount().getId(), e.reason());
+            throw new OAuth2AuthenticationException(new OAuth2Error(e.reason().code()));
         }
         return existingUser;
     }

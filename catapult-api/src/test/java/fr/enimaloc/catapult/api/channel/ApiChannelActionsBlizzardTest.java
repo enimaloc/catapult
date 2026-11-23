@@ -79,4 +79,13 @@ class ApiChannelActionsBlizzardTest extends ApiChannelActionsTestSupport {
 
         verify(blizzardAccountService).deleteWowCharacters(owner);
     }
+
+    @Test
+    void bungieUnlink_byTheOwnerOnly() throws Exception {
+        mvc.perform(as(moderator, HttpMethod.DELETE, "/settings/bungie", null)).andExpect(status().isForbidden());
+        verifyNoInteractions(bungieLinkService);
+
+        mvc.perform(as(owner, HttpMethod.DELETE, "/settings/bungie", null)).andExpect(status().isNoContent());
+        verify(bungieLinkService).unlink(any());
+    }
 }

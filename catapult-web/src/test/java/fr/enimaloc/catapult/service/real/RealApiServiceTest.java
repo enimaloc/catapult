@@ -842,6 +842,13 @@ class RealApiServiceTest {
     }
 
     @Test
+    void bungieLink_isDeletedOnTheChannel() {
+        expectDelete(channel("enimaloc") + "/settings/bungie");
+
+        assertThat(service.deleteBungieLink("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
     void blizzardRefusals_keepTheirStatus() {
         expect(HttpMethod.PUT, channel("enimaloc") + "/settings/blizzard/region")
                 .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(

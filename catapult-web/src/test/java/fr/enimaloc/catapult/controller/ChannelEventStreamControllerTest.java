@@ -157,6 +157,22 @@ class ChannelEventStreamControllerTest {
     }
 
     @Test
+    void theBungieLinkGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent("enimaloc", true, true,
+                "Guardian#4242", false, false, true, false);
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:BungieAccountChangedEvent",
+                "Guardian#4242");
+        assertThat(moderator.getResponse().getContentAsString())
+                .doesNotContain("BungieAccountChangedEvent").doesNotContain("Guardian#4242");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
+
+    @Test
     void theRetroAchievementsAccountGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
         MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
         MvcResult moderator = subscribe("enimaloc", member("a-moderator"));

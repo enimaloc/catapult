@@ -20,6 +20,7 @@ import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
 import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
+import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
 import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
 import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
@@ -176,6 +177,11 @@ public class ChannelEventRedisBridge {
                 var changed = read(data, ChannelEvents.BlizzardAccountChanged.class);
                 if (changed.account() == null) throw new IllegalArgumentException("no blizzard account");
                 yield List.of(BlizzardAccountChangedEvent.of(login, changed.account()));
+            }
+            case ChannelEvents.BUNGIE_ACCOUNT_CHANGED -> {
+                var changed = read(data, ChannelEvents.BungieAccountChanged.class);
+                if (changed.account() == null) throw new IllegalArgumentException("no bungie account");
+                yield List.of(BungieAccountChangedEvent.of(login, changed.account()));
             }
             default -> List.of();
         };

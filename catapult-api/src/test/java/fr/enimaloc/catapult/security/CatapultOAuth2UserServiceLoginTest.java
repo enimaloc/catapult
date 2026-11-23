@@ -83,7 +83,9 @@ class CatapultOAuth2UserServiceLoginTest {
                 new org.springframework.transaction.support.TransactionTemplate(
                         mock(org.springframework.transaction.PlatformTransactionManager.class)),
                 new org.springframework.beans.factory.support.StaticListableBeanFactory()
-                        .getBeanProvider(fr.enimaloc.catapult.service.blizzard.BlizzardWowImportService.class));
+                        .getBeanProvider(fr.enimaloc.catapult.service.blizzard.BlizzardWowImportService.class),
+                new org.springframework.beans.factory.support.StaticListableBeanFactory()
+                        .getBeanProvider(fr.enimaloc.catapult.service.bungie.BungieLinkService.class));
         ReflectionTestUtils.setField(service, "ownerId", "owner-1");
         ReflectionTestUtils.setField(service, "defaultNoGameName", "Just Chatting");
         ReflectionTestUtils.setField(service, "defaultNoGameId", "509658");

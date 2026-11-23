@@ -199,4 +199,29 @@ class Oauth2LoginFailureHandlerTest {
 
         assertThat(response.getRedirectedUrl()).isEqualTo("http://localhost:8081/login?error");
     }
+
+    @Test
+    void bungieRefusals_goBackToTheCard_andAnyOtherFailureIsAFailedLink() throws Exception {
+        for (String code : new String[]{"bungie_unavailable", "bungie_mismatch", "bungie_failed"}) {
+            request = callbackOf("bungie", "jeb_");
+            response = new MockHttpServletResponse();
+            handler.onAuthenticationFailure(request, response,
+                    new OAuth2AuthenticationException(new OAuth2Error(code)));
+            assertThat(response.getRedirectedUrl())
+                    .isEqualTo("http://localhost:8081/channel/jeb_?error=" + code + "#integrations");
+        }
+        request = callbackOf("bungie", "jeb_");
+        response = new MockHttpServletResponse();
+        handler.onAuthenticationFailure(request, response,
+                new OAuth2AuthenticationException(new OAuth2Error("invalid_token_response")));
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("http://localhost:8081/channel/jeb_?error=bungie_failed#integrations");
+
+        request = callbackOf("bungie", "jeb_");
+        response = new MockHttpServletResponse();
+        handler.onAuthenticationFailure(request, response,
+                new OAuth2AuthenticationException(new OAuth2Error("access_denied")));
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("http://localhost:8081/channel/jeb_?error=bungie_cancelled#integrations");
+    }
 }

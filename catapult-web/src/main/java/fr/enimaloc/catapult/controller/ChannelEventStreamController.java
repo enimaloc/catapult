@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
 import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
 import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
+import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
 import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
 import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.service.ApiService;
@@ -103,14 +104,15 @@ public class ChannelEventStreamController {
     /**
      * {@code event} as a moderator's stream gets it: without the custom bindings, which catapult-api shows the
      * owner alone (their page has no list to update). Null when they get nothing at
-     * all: the Battle.net, Ankama and Epic links and the speedrun.com, RetroAchievements and Blizzard accounts, whose names and
+     * all: the Battle.net, Ankama and Epic links and the speedrun.com, RetroAchievements, Blizzard and Bungie accounts, whose names and
      * card are the owner's alone.
      */
     static ChannelUpdatedEvent forModerators(ChannelUpdatedEvent event) {
         if (event instanceof BattleNetLinkEvent || event instanceof AnkamaLinkEvent || event instanceof EpicLinkEvent
                 || event instanceof SpeedrunAccountChangedEvent
                 || event instanceof RetroAchievementsAccountChangedEvent
-                || event instanceof BlizzardAccountChangedEvent) {
+                || event instanceof BlizzardAccountChangedEvent
+                || event instanceof BungieAccountChangedEvent) {
             return null;
         }
         return event instanceof CustomBindingsUpdatedEvent updated ? new CustomBindingsUpdatedEvent(updated.username())
