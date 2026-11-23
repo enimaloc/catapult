@@ -116,6 +116,7 @@ class OpenApiDocsTest {
     @MockitoBean RetroAchievementsStatsService retroAchievementsStatsService;
     @MockitoBean MemberFetchBudgets memberFetchBudgets;
     @MockitoBean BlizzardStatsService blizzardStatsService;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.chess.ChessStatsService chessStatsService;
     @MockitoBean BlizzardGameDataService blizzardGameDataService;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService bungieStatsService;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService riotStatsService;
@@ -254,7 +255,7 @@ class OpenApiDocsTest {
         assertThat(paths(docs)).contains("/api/me/stats", "/api/me/stats/steam/{appId}",
                 "/api/me/stats/xbox/{titleId}", "/api/me/stats/retroachievements/{gameId}",
                 "/api/me/stats/retroachievements", "/api/me/stats/blizzard/{game}", "/api/me/stats/riot/{game}",
-                "/api/me/stats/faceit/{game}");
+                "/api/me/stats/faceit/{game}", "/api/me/stats/chess");
         assertThat(versionHeader(docs, "/paths/~1api~1me~1stats~1steam~1{appId}/get/parameters").get("schema")
                 .get("enum").toString()).isEqualTo("[\"3\"]");
         JsonNode schemas = docs.at("/components/schemas");

@@ -4,6 +4,8 @@ import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.error.ErrorCode;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.service.enrichment.chess.ChessStats;
+import fr.enimaloc.catapult.service.enrichment.chess.ChessStatsService;
 import fr.enimaloc.catapult.service.enrichment.FetchBudget;
 import fr.enimaloc.catapult.service.enrichment.MemberFetchBudgets;
 import fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException;
@@ -82,6 +84,7 @@ public class MeStatsController {
     private final MemberFetchBudgets memberFetchBudgets;
     private final ApiUserResolver userResolver;
     private final PublicBaseUrl publicBaseUrl;
+    private final ChessStatsService chessStatsService;
 
     /** The member's stats on the game played now: inGame=false while nothing is detected. */
     public record CurrentStats(boolean inGame, GameInfoV3Response.StatsObject stats) {
@@ -96,7 +99,8 @@ public class MeStatsController {
                     + "blizzard with your BattleTag, region and the game's object (wow main character, sc2 or d3 "
                     + "profile), bungie with your Bungie Name and destiny2 profile, riot with your Riot ID, platform "
                     + "and the game's object (lol summoner, ranks and game in progress, tft rank), faceit with your "
-                    + "nickname and your CS2 level, Elo and last match. stats is null when nothing applies.")
+                    + "nickname and your CS2 level, Elo and last match, chess with your Chess.com and Lichess ratings "
+                    + "(see GET /api/me/stats/chess). stats is null when nothing applies.")
     @ApiResponse(responseCode = "200", description = "inGame=false while no game is detected; otherwise your stats.")
     public CurrentStats current(
             @AuthenticationPrincipal UUID userId,
@@ -298,6 +302,25 @@ public class MeStatsController {
         FaceitStats stats = detail(userId, "No FACEIT stats for you: no FACEIT nickname declared, or FACEIT stats "
                 + "unavailable", (user, budget) -> faceitStatsService.forGame(user, FaceitGame.CS2, budget, true));
         return GameInfoV3Response.faceitStats(stats, links());
+    }
+
+    @GetMapping("/chess")
+    @Operation(summary = "Get your chess stats on Chess.com and Lichess",
+            description = "The chess object of GET /api/me/stats (status, game = chess, account = the name shown, "
+                    + "and one object per declared site: chesscom with your ratings by time class, FIDE rating, "
+                    + "daily games in progress and how many wait for your move; lichess with your ratings by "
+                    + "variant, game counts and the game you are playing now), plus what only the detail has: "
+                    + "chesscom.games (every daily game in progress: link, colour, opponent, your move or not, move "
+                    + "deadline). A site not declared is null." + STATUS_NOTE + BUDGET_NOTE)
+    @ApiResponse(responseCode = "200", description = "Your chess stats.")
+    @ApiResponse(responseCode = "404", description = "No Chess.com nor Lichess account declared, or chess stats "
+            + "disabled.", content = @Content)
+    @ApiResponse(responseCode = "429", description = "Your refreshes are spent; retry after Retry-After seconds.",
+            content = @Content)
+    public ChessStats chess(@AuthenticationPrincipal UUID userId) {
+        ChessStats stats = detail(userId, "No chess stats for you: no Chess.com nor Lichess account declared",
+                (user, budget) -> chessStatsService.forMember(user, budget, true));
+        return GameInfoV3Response.chessStats(stats, links());
     }
 
     @GetMapping("/retroachievements")

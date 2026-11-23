@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.repository.chess.ChessAccountRepository;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentCache;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessClient;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessNotFoundException;
+import fr.enimaloc.catapult.service.enrichment.chess.ChessProfiles;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessSite;
 import fr.enimaloc.catapult.service.enrichment.chess.ChesscomPlayer;
 import fr.enimaloc.catapult.service.enrichment.chess.LichessUser;
@@ -43,8 +44,6 @@ public class ChessAccountService {
     private static final Pattern CHESSCOM_USERNAME = Pattern.compile("[A-Za-z0-9_-]{3,25}");
     /** Lichess names: 2 to 30 letters, digits, {@code _} or {@code -}, starting with a letter or a digit. */
     private static final Pattern LICHESS_USERNAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]{1,29}");
-    static final String CHESSCOM_PROFILE = "https://www.chess.com/member/";
-    static final String LICHESS_PROFILE = "https://lichess.org/@/";
 
     private final ChessAccountRepository accounts;
     private final ChessClient client;
@@ -132,8 +131,8 @@ public class ChessAccountService {
         Optional<ChessAccount> row = accounts.findById(userId);
         String chesscom = row.map(ChessAccount::getChesscomUsername).orElse(null);
         String lichess = row.map(ChessAccount::getLichessUsername).orElse(null);
-        return new ChessData(chesscom, chesscom == null ? null : CHESSCOM_PROFILE + chesscom,
-                lichess, lichess == null ? null : LICHESS_PROFILE + lichess);
+        return new ChessData(chesscom, chesscom == null ? null : ChessProfiles.chesscom(chesscom),
+                lichess, lichess == null ? null : ChessProfiles.lichess(lichess));
     }
 
     /** The member's cached stats were read with the old accounts: forgotten; then the owner's pages are told. */
