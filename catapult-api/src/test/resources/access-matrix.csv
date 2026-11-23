@@ -291,6 +291,9 @@ GET,/api/internal/admin/faceit-keys,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/faceit-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/faceit-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/faceit-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/osu-credentials,,,401,PASS,403,403,403,PASS,401
+PUT,/api/internal/admin/osu-credentials,,"{""clientId"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/osu-credentials,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/opencritic-keys,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/opencritic-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/opencritic-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401

@@ -2095,6 +2095,22 @@ class RealApiServiceTest {
     }
 
     @Test
+    void osuCredentials_readSetAndRemove() {
+        respond(HttpMethod.GET, "/api/internal/admin/osu-credentials",
+                "{\"configured\":true,\"clientId\":\"12345\",\"updatedAt\":null}");
+        expect(HttpMethod.PUT, "/api/internal/admin/osu-credentials")
+                .andExpect(content().json("{\"clientId\":\"12345\",\"clientSecret\":\"s\"}", true))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.DELETE, "/api/internal/admin/osu-credentials").andRespond(withNoContent());
+
+        var page = service.adminOsuCredentials();
+        assertThat(page.configured()).isTrue();
+        assertThat(page.clientId()).isEqualTo("12345");
+        assertThat(service.adminSaveOsuCredentials("12345", "s")).isEqualTo(400);
+        assertThat(service.adminDeleteOsuCredentials()).isEqualTo(204);
+    }
+
+    @Test
     void apiKeyActions_reachEachProvidersRoute() {
         expect(HttpMethod.POST, "/api/internal/admin/dtdd-keys")
                 .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());

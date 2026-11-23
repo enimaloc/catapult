@@ -105,11 +105,49 @@ window.CatapultAdminKeys = (function () {
         }
     }
 
+    /**
+     * The osu! card: Save posts the client id and secret (a blank secret keeps the one set; the field is cleared once
+     * accepted), Remove asks first. 400 is the card's own invalid text; then the tab is patched to show what is set.
+     */
+    async function osu(panel, root, card, button) {
+        const remove = button.matches(".admin-osu-delete");
+        button.disabled = true;
+        try {
+            if (remove && !await CatapultAdminTabs.confirmed(root, button.dataset.confirm)) return;
+            const field = name => card.querySelector(`[name="${name}"]`);
+            const clientId = (field("clientId").value ?? "").trim();
+            if (!remove && clientId === "") {
+                field("clientId").setAttribute("invalid", "");
+                field("clientId").reportValidity?.();
+                return;
+            }
+            const body = remove ? {} : { clientId, clientSecret: (field("clientSecret").value ?? "").trim() };
+            const status = await post(button, `/admin/osu-credentials/${remove ? "delete" : "save"}`, body);
+            button.disabled = true;
+            if (!ok(status)) {
+                CatapultChannel.showError(status === 400 ? card.dataset.labelInvalid : root.dataset.labelUnavailable);
+                return;
+            }
+            if (!remove) field("clientSecret").value = "";
+            window.mdui?.snackbar?.({ message: remove ? card.dataset.labelRemoved : card.dataset.labelSaved });
+            await CatapultAdminTabs.patch(panel);
+        } finally {
+            button.disabled = false;
+        }
+    }
+
     function attach() {
         const panel = document.querySelector('mdui-tab-panel[value="keys"]');
         if (!panel) return;
 
         panel.addEventListener("click", event => {
+            const osuButton = event.target.closest?.(".admin-osu-save, .admin-osu-delete");
+            if (osuButton && panel.contains(osuButton) && !osuButton.disabled) {
+                const root = panel.querySelector(".admin-keys");
+                const card = osuButton.closest(".admin-osu");
+                if (root && card) osu(panel, root, card, osuButton);
+                return;
+            }
             const bungieButton = event.target.closest?.(".admin-bungie-save, .admin-bungie-delete");
             if (bungieButton && panel.contains(bungieButton) && !bungieButton.disabled) {
                 const root = panel.querySelector(".admin-keys");
@@ -131,5 +169,5 @@ window.CatapultAdminKeys = (function () {
 
     document.addEventListener("catapult:render", attach);
 
-    return { attach, bungie };
+    return { attach, bungie, osu };
 })();

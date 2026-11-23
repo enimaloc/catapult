@@ -1691,6 +1691,24 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData adminOsuCredentials() {
+        return client.get("/api/internal/admin/osu-credentials",
+                fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData.class);
+    }
+
+    @Override
+    public int adminSaveOsuCredentials(String clientId, String clientSecret) {
+        return client.call(HttpMethod.PUT, "/api/internal/admin/osu-credentials",
+                new fr.enimaloc.catapult.common.dto.admin.OsuCredentialsRequest(clientId, clientSecret),
+                Void.class).status();
+    }
+
+    @Override
+    public int adminDeleteOsuCredentials() {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/osu-credentials", null, Void.class).status();
+    }
+
+    @Override
     public List<BattleNetAccountDto> adminBattleNetAccounts() {
         // a 404 (Battle.net disabled in catapult-api) is null, like any failed read
         BattleNetAccountDto[] accounts = client.get("/api/internal/admin/battlenet-accounts", BattleNetAccountDto[].class);

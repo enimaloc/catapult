@@ -2111,6 +2111,25 @@ public class MockApiService implements ApiService {
         return apiKeys.refresh();
     }
 
+    // The secret is never logged.
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData adminOsuCredentials() {
+        log.trace("adminOsuCredentials()");
+        return apiKeys.osu();
+    }
+
+    @Override
+    public int adminSaveOsuCredentials(String clientId, String clientSecret) {
+        log.trace("adminSaveOsuCredentials()");
+        return apiKeys.saveOsu(clientId, clientSecret);
+    }
+
+    @Override
+    public int adminDeleteOsuCredentials() {
+        log.trace("adminDeleteOsuCredentials()");
+        return apiKeys.deleteOsu();
+    }
+
     // The secrets are never logged.
     @Override
     public fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData adminBungieCredentials() {

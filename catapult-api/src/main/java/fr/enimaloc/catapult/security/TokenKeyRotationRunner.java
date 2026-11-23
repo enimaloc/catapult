@@ -39,7 +39,9 @@ public class TokenKeyRotationRunner implements ApplicationRunner {
             new Secret("retroachievements_account", "user_id", "api_key_enc"),
             new Secret("bungie_app_credentials", "id", "client_secret_enc"),
             new Secret("bungie_app_credentials", "id", "api_key_enc"),
-            new Secret("bungie_account", "user_id", "refresh_token_enc"));
+            new Secret("bungie_account", "user_id", "refresh_token_enc"),
+            new Secret("osu_app_credentials", "id", "client_secret_enc"),
+            new Secret("osu_account", "user_id", "refresh_token_enc"));
 
     record Secret(String table, String id, String column) {}
 

@@ -624,6 +624,13 @@ public interface ApiService {
     /** Reloads the provider's keys into its rotator; catapult-api's status (204), 502 when unreachable. */
     int adminRefreshApiKeys(ApiKeyProvider provider);
 
+    /** The osu! OAuth application set on catapult-api (client id, never the secret); null when it fails. */
+    fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData adminOsuCredentials();
+    /** Sets it (a blank secret keeps the one set); catapult-api's status (204; 400 malformed), 502 when unreachable. */
+    int adminSaveOsuCredentials(String clientId, String clientSecret);
+    /** Removes it (the osu! source and login go off); catapult-api's status (204), 502 when unreachable. */
+    int adminDeleteOsuCredentials();
+
     /** The Bungie.net application set on catapult-api (client id, key masked, never the secret); null when it fails. */
     fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData adminBungieCredentials();
     /** Sets it (a blank secret or key keeps the one set); catapult-api's status (204; 400 malformed), 502 when unreachable. */
