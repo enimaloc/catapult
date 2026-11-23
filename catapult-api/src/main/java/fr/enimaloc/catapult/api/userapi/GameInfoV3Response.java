@@ -491,7 +491,8 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
 
     /**
      * The publishers' public data on the game (Blizzard: WoW Token price, latest Hearthstone set, Diablo III
-     * season), null when no publisher applies. Public game data: never anything about the member.
+     * season; Bungie: the current season; Riot: the current patch; Hypixel: the games played on the server), null
+     * when no publisher applies. Public game data: never anything about the member.
      */
     public record PublisherObject(BlizzardPublisher blizzard, BungiePublisher bungie, RiotPublisher riot,
                                   HypixelPublisher hypixel) {
