@@ -255,9 +255,40 @@ class OsuTokenServiceTest {
 
     @Test
     void aSeededLoginToken_servesTheFirstRead_withoutARenewal() {
-        tokens.seed(USER, "login-access", now.get().plusSeconds(86_400));
+        tokens.seed(USER, OSU_ID, row().getLinkedAt(), "login-access", now.get().plusSeconds(86_400));
 
         assertThat(tokens.accessToken(USER)).contains("login-access");
+        verify(client, never()).refresh(anyString());
+    }
+
+    @Test
+    void aHeldToken_neverServesALinkMadeAgainElsewhere() {
+        tokens.seed(USER, OSU_ID, row().getLinkedAt(), "access-X", now.get().plusSeconds(86_400));
+        // linked again to another osu! account on another instance: this one still holds X's token
+        OsuAccount relinked = account(USER, 777L, "refresh-Y");
+        relinked.setLinkedAt(now.get().plusSeconds(5));
+        relinked.setVersion(9L);
+        rows.put(USER, relinked);
+        when(client.refresh("refresh-Y")).thenReturn(grant("access-Y", "refresh-Y2"));
+        when(client.me("access-Y")).thenReturn(me(777L));
+
+        assertThat(tokens.accessToken(USER)).contains("access-Y");
+    }
+
+    @Test
+    void evict_alsoForgetsTheMembersReadPacing() {
+        OsuPlayerPacer pacer = mock(OsuPlayerPacer.class);
+        new OsuTokenService(accounts, client, encryption, siteRole, listener, clock, pacer).evict(USER);
+
+        verify(pacer).forget(USER);
+    }
+
+    @Test
+    void aHeldToken_isDropped_onceTheLinkIsRefusedOrGone() {
+        tokens.seed(USER, OSU_ID, row().getLinkedAt(), "access-X", now.get().plusSeconds(86_400));
+        rows.get(USER).setInvalidSince(now.get());
+
+        assertThat(tokens.accessToken(USER)).isEmpty();
         verify(client, never()).refresh(anyString());
     }
 

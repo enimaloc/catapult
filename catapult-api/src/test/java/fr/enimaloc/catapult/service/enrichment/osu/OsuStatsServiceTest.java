@@ -227,7 +227,22 @@ class OsuStatsServiceTest {
         properties.getOsuRecent().setEnabled(false);
 
         assertThat(stats(false).orElseThrow().osu().lastScore()).isNull();
+        // the detail says "no scores read" (null), never "no recent play" ([])
+        assertThat(stats(true).orElseThrow().osu().recentScores()).isNull();
         verify(client, never()).recentScores(anyLong(), anyString(), anyInt(), anyString());
+    }
+
+    @Test
+    void failedScores_areNull_inTheDetail_andAnEmptyListOnlyWhenOsuSaysSo() {
+        when(client.recentScores(anyLong(), anyString(), anyInt(), anyString()))
+                .thenThrow(new OsuUnavailableException("down"));
+        assertThat(stats(true).orElseThrow().osu().recentScores()).isNull();
+
+        now.set(now.get().plus(OsuStatsService.PER_PLAYER).plusSeconds(1));
+        org.mockito.Mockito.reset(client);
+        when(client.me("token")).thenReturn(me(OSU_ID));
+        when(client.recentScores(anyLong(), anyString(), anyInt(), anyString())).thenReturn(List.of());
+        assertThat(stats(true).orElseThrow().osu().recentScores()).isEmpty();
     }
 
     @Test

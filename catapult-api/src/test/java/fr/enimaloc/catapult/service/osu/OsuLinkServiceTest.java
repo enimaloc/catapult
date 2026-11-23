@@ -100,6 +100,12 @@ class OsuLinkServiceTest {
     }
 
     @Test
+    void check_aSubjectThatIsNotAUserId_fallsBackToTheAccountRead() {
+        assertThat(links.check(jwt("{\"sub\":\"user-42\"}")).osuUserId()).isEqualTo(42L);
+        assertThat(links.check(jwt("{\"aud\":\"12345\"}")).osuUserId()).isEqualTo(42L);
+    }
+
+    @Test
     void check_anOpaqueToken_isTheAccountItReads() {
         assertThat(links.check("opaque-token").osuUserId()).isEqualTo(42L);
         assertThat(OsuLinkService.tokenSubject("a.%%%.c")).isEmpty();
@@ -134,7 +140,7 @@ class OsuLinkServiceTest {
         InOrder order = inOrder(tokens, accounts, cache, events);
         order.verify(tokens).locked(eq(user.getId()), any());
         order.verify(accounts).saveAndFlush(any());
-        order.verify(tokens).seed(user.getId(), "access-1", NOW.plusSeconds(86_400));
+        order.verify(tokens).seed(user.getId(), 42L, NOW, "access-1", NOW.plusSeconds(86_400));
         order.verify(cache).evictUser(user.getId(), List.of(EnrichmentSource.OSU_PROFILE, EnrichmentSource.OSU_RECENT));
         order.verify(events).osuAccountChanged(eq(user.getId()), any());
     }

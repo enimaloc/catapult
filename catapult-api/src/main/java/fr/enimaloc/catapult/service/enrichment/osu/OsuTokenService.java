@@ -66,7 +66,14 @@ public class OsuTokenService {
     public record LinkInvalidated(UUID userId) {
     }
 
-    private record Held(String token, Instant expiresAt, Instant obtainedAt) {
+    /** A held access token and the link it belongs to: the osu! account and when that account was linked. */
+    private record Held(String token, Instant expiresAt, Instant obtainedAt, Long osuUserId, Instant linkedAt) {
+
+        /** Whether this token is the one of {@code row}'s link (not of a link made again elsewhere). */
+        boolean of(OsuAccount row) {
+            return Objects.equals(osuUserId, row.getOsuUserId()) && Objects.equals(linkedAt, row.getLinkedAt());
+        }
+
         @Override
         public String toString() {
             return "Held[expiresAt=" + expiresAt + "]";
@@ -93,6 +100,7 @@ public class OsuTokenService {
     private final SiteRole siteRole;
     private final ApplicationEventPublisher events;
     private final Clock clock;
+    private final OsuPlayerPacer pacer;
     private final Map<UUID, Held> held = new ConcurrentHashMap<>();
     private final Map<UUID, Unsaved> unsaved = new ConcurrentHashMap<>();
     private final Map<UUID, Instant> cooldown = new ConcurrentHashMap<>();
@@ -102,12 +110,18 @@ public class OsuTokenService {
 
     @Autowired
     public OsuTokenService(OsuAccountRepository accounts, OsuClient client, TokenEncryptionService encryption,
-                           SiteRole siteRole, ApplicationEventPublisher events) {
-        this(accounts, client, encryption, siteRole, events, Clock.systemUTC());
+                           SiteRole siteRole, ApplicationEventPublisher events, OsuPlayerPacer pacer) {
+        this(accounts, client, encryption, siteRole, events, Clock.systemUTC(), pacer);
     }
 
     OsuTokenService(OsuAccountRepository accounts, OsuClient client, TokenEncryptionService encryption,
                     SiteRole siteRole, ApplicationEventPublisher events, Clock clock) {
+        this(accounts, client, encryption, siteRole, events, clock, new OsuPlayerPacer(clock));
+    }
+
+    OsuTokenService(OsuAccountRepository accounts, OsuClient client, TokenEncryptionService encryption,
+                    SiteRole siteRole, ApplicationEventPublisher events, Clock clock, OsuPlayerPacer pacer) {
+        this.pacer = pacer;
         this.accounts = accounts;
         this.client = client;
         this.encryption = encryption;
@@ -131,13 +145,30 @@ public class OsuTokenService {
      *         refused just after a renewal, the link changed meanwhile, the renewed token could not be checked)
      */
     public Optional<String> accessToken(UUID userId) {
+        // The row is read first: a held token only serves the link it came with (a link made again on another
+        // instance, or refused since, is never answered with the former link's token)
+        Optional<OsuAccount> current = accounts.findById(userId).filter(OsuAccount::usable);
+        if (current.isEmpty()) {
+            held.remove(userId);
+            return Optional.empty();
+        }
         Held known = held.get(userId);
-        if (fresh(known) && !unsaved.containsKey(userId)) {
+        if (fresh(known) && known.of(current.get()) && !unsaved.containsKey(userId)) {
             return Optional.of(known.token());
         }
         synchronized (lock(userId)) {
             retryUnsaved(userId);
+            Optional<OsuAccount> row = accounts.findById(userId).filter(OsuAccount::usable);
+            if (row.isEmpty()) {
+                held.remove(userId);
+                return Optional.empty();
+            }
+            OsuAccount read = row.get();
             known = held.get(userId);
+            if (known != null && !known.of(read)) {
+                held.remove(userId, known);
+                known = null;
+            }
             if (fresh(known)) {
                 return Optional.of(known.token());
             }
@@ -145,11 +176,6 @@ public class OsuTokenService {
             if (waitUntil != null && waitUntil.isAfter(clock.instant())) {
                 throw new OsuUnavailableException("osu! refused a just renewed token, not renewing yet");
             }
-            Optional<OsuAccount> row = accounts.findById(userId).filter(OsuAccount::usable);
-            if (row.isEmpty()) {
-                return Optional.empty();
-            }
-            OsuAccount read = row.get();
             try {
                 siteRole.requireActive("osu token refresh");
             } catch (StandbyException e) {
@@ -201,7 +227,8 @@ public class OsuTokenService {
                 }
                 return Optional.empty();
             }
-            held.put(userId, new Held(grant.accessToken(), grant.expiresAt(), clock.instant()));
+            held.put(userId, new Held(grant.accessToken(), grant.expiresAt(), clock.instant(), read.getOsuUserId(),
+                    read.getLinkedAt()));
             return Optional.of(grant.accessToken());
         }
     }
@@ -220,18 +247,22 @@ public class OsuTokenService {
         }
     }
 
-    /** Holds the access token a fresh link came with (valid 24 h): the first read does not renew at once. */
-    public void seed(UUID userId, String accessToken, Instant expiresAt) {
+    /**
+     * Holds the access token a fresh link came with (valid 24 h), for the link of osu! account {@code osuUserId}
+     * made at {@code linkedAt}: the first read does not renew at once.
+     */
+    public void seed(UUID userId, long osuUserId, Instant linkedAt, String accessToken, Instant expiresAt) {
         if (accessToken != null && expiresAt != null) {
-            held.put(userId, new Held(accessToken, expiresAt, clock.instant()));
+            held.put(userId, new Held(accessToken, expiresAt, clock.instant(), osuUserId, linkedAt));
         }
     }
 
-    /** Forgets everything held for the member (unlinked, linked again, account deleted). */
+    /** Forgets everything held for the member (unlinked, linked again, account deleted), their read pacing too. */
     public void evict(UUID userId) {
         held.remove(userId);
         unsaved.remove(userId);
         cooldown.remove(userId);
+        pacer.forget(userId);
         // The lock entry stays: evict runs under it, and a fresh one would let two renewals race on one token
     }
 

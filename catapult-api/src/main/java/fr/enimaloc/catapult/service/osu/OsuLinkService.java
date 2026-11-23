@@ -141,7 +141,10 @@ public class OsuLinkService {
             throw new RefusedException(Refusal.FAILED);
         }
         Optional<String> named = tokenSubject(accessToken);
-        if (named.isPresent() && !named.get().equals(Long.toString(me.id()))) {
+        if (named.isPresent() && !named.get().matches("[0-9]{1,20}")) {
+            // Not the numeric user id expected (osu!'s token format unverified): the account /me read is the link
+            log.info("osu! login: the token's subject is not a user id, the account read stands");
+        } else if (named.isPresent() && !named.get().equals(Long.toString(me.id()))) {
             log.warn("osu! login: the token named another account than the one it reads");
             throw new RefusedException(Refusal.MISMATCH);
         }
@@ -164,7 +167,9 @@ public class OsuLinkService {
         boolean changed = tokens.locked(userId, () -> {
             boolean replaced = write(userId, pending, refreshToken);
             tokens.evict(userId);
-            tokens.seed(userId, accessToken, accessExpiresAt);
+            // the token held is bound to this link (account and linking time), never served to a later one
+            Instant linkedAt = accounts.findById(userId).map(OsuAccount::getLinkedAt).orElse(null);
+            tokens.seed(userId, pending.osuUserId(), linkedAt, accessToken, accessExpiresAt);
             return replaced;
         });
         if (changed) {

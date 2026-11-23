@@ -40,7 +40,7 @@ import java.util.function.Supplier;
 public class OsuStatsService {
 
     /** The least time between two reads of one member's same data (osu!'s rule). */
-    static final Duration PER_PLAYER = Duration.ofMinutes(1);
+    static final Duration PER_PLAYER = OsuPlayerPacer.PER_PLAYER;
     /** The latest scores read: the aggregate shows the first, the detail all of them. */
     static final int RECENT = 5;
 
@@ -61,25 +61,24 @@ public class OsuStatsService {
     private final OsuCredentialsService credentials;
     private final OsuAccountRepository accounts;
     private final EnrichmentProperties properties;
-    private final Clock clock;
-    private final Map<String, Instant> lastAsked = new ConcurrentHashMap<>();
+    private final OsuPlayerPacer pacer;
 
     @Autowired
     public OsuStatsService(EnrichmentCache cache, OsuClient client, OsuTokenService tokens,
                            OsuCredentialsService credentials, OsuAccountRepository accounts,
-                           EnrichmentProperties properties) {
-        this(cache, client, tokens, credentials, accounts, properties, Clock.systemUTC());
-    }
-
-    OsuStatsService(EnrichmentCache cache, OsuClient client, OsuTokenService tokens, OsuCredentialsService credentials,
-                    OsuAccountRepository accounts, EnrichmentProperties properties, Clock clock) {
+                           EnrichmentProperties properties, OsuPlayerPacer pacer) {
         this.cache = cache;
         this.client = client;
         this.tokens = tokens;
         this.credentials = credentials;
         this.accounts = accounts;
         this.properties = properties;
-        this.clock = clock;
+        this.pacer = pacer;
+    }
+
+    OsuStatsService(EnrichmentCache cache, OsuClient client, OsuTokenService tokens, OsuCredentialsService credentials,
+                    OsuAccountRepository accounts, EnrichmentProperties properties, Clock clock) {
+        this(cache, client, tokens, credentials, accounts, properties, new OsuPlayerPacer(clock));
     }
 
     /** The member's stats for the game being played, when it is osu! (by IGDB id). */
@@ -149,7 +148,9 @@ public class OsuStatsService {
         }
         Profile profile = new Profile(Status.OK, ruleset, s.pp(), s.globalRank(), s.countryRank(), m.countryCode(),
                 round(s.accuracy()), s.playCount(), s.playTimeSeconds(), s.level(),
-                scores.isEmpty() ? null : scores.getFirst(), rulesets, detail ? scores : null);
+                scores.isEmpty() ? null : scores.getFirst(), rulesets,
+                // the scores off or failed: null, never an empty list that reads "no recent play"
+                detail && recent != null ? scores : null);
         return Optional.of(of(game, m.username() != null ? m.username() : account.getUsername(), profile));
     }
 
@@ -193,7 +194,8 @@ public class OsuStatsService {
 
     /**
      * The cached or fetched value; any failure of the fetch is an outage: {@code failed} is set and nothing is
-     * cached. A fetch less than {@link #PER_PLAYER} after the previous one of the same key is not sent: it fails.
+     * cached. A fetch is paced by {@link OsuPlayerPacer}: less than {@link #PER_PLAYER} after the previous one of the
+     * same key it is not sent, a read under way is waited for and shared.
      */
     private <T> Looked<T> look(EnrichmentSource source, String key, Class<T> type, FetchBudget budget,
                                Supplier<T> fetch) {
@@ -201,32 +203,12 @@ public class OsuStatsService {
         String asked = source.key() + "|" + key;
         Optional<T> value = cache.get(source, key, type, budget, () -> {
             try {
-                if (!askNow(asked)) {
-                    throw new OsuUnavailableException("this osu! player was asked less than a minute ago");
-                }
-                return Optional.of(fetch.get());
+                return Optional.of(pacer.pace(asked, fetch));
             } catch (RuntimeException e) {
                 failed.set(true);
                 throw e;
             }
         });
         return new Looked<>(value, failed.get());
-    }
-
-    /** Takes the player's slot: false when the previous read is less than {@link #PER_PLAYER} old. */
-    private boolean askNow(String key) {
-        Instant now = clock.instant();
-        AtomicBoolean taken = new AtomicBoolean();
-        lastAsked.compute(key, (k, previous) -> {
-            if (previous != null && previous.plus(PER_PLAYER).isAfter(now)) {
-                return previous;
-            }
-            taken.set(true);
-            return now;
-        });
-        if (lastAsked.size() > 10_000) {
-            lastAsked.values().removeIf(at -> at.plus(PER_PLAYER).isBefore(now));
-        }
-        return taken.get();
     }
 }
