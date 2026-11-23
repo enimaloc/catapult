@@ -89,9 +89,13 @@ class BungieCredentialsServiceTest {
         verify(repository, never()).save(any());
 
         service.save("12345", SECRET, KEY);
-        service.save("67890", " ", null);
+        service.save("12345", " ", null);
+        assertThat(service.current()).contains(new BungieCredentialsService.Credentials("12345", SECRET, KEY));
 
-        assertThat(service.current()).contains(new BungieCredentialsService.Credentials("67890", SECRET, KEY));
+        // another application needs its own secret and key
+        assertThatThrownBy(() -> service.save("67890", " ", null))
+                .isInstanceOfSatisfying(ApiProblem.class, e -> assertThat(e.code()).isEqualTo(ErrorCode.BAD_REQUEST));
+        assertThatThrownBy(() -> service.save("67890", SECRET, null)).isInstanceOf(ApiProblem.class);
     }
 
     @ParameterizedTest

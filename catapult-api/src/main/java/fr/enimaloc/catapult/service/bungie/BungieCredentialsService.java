@@ -100,7 +100,7 @@ public class BungieCredentialsService {
 
     /**
      * Sets the application. Every value is trimmed; a blank secret or key keeps the one set (400 when there is none
-     * yet), a malformed value is a 400. A write crossing another one is redone once, then is a 409.
+     * yet, or the client id changes: they belong to the application), a malformed value is a 400. A write crossing another one is redone once, then is a 409.
      */
     public void save(String clientId, String clientSecret, String apiKey) {
         String id = trim(clientId);
@@ -137,7 +137,9 @@ public class BungieCredentialsService {
 
     private void saveOnce(String id, String secret, String key) {
         Optional<BungieAppCredentials> found = repository.findById(BungieAppCredentials.ID);
-        if (found.isEmpty() && (secret.isEmpty() || key.isEmpty())) {
+        boolean newApplication = found.isEmpty() || !found.get().getClientId().equals(id);
+        if (newApplication && (secret.isEmpty() || key.isEmpty())) {
+            // The secret and the key belong to the application: another client id needs its own
             throw new ApiProblem(ErrorCode.BAD_REQUEST, "The client secret and the API key are needed");
         }
         BungieAppCredentials row = found.orElseGet(BungieAppCredentials::new);

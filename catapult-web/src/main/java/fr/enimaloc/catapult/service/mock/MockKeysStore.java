@@ -82,7 +82,6 @@ class MockKeysStore {
     /** The mock's Bungie.net application: set from the start, so that its card shows filled. */
     private String bungieClientId = "12345";
     private String bungieApiKey = "0123456789abcdef0123456789abcdef";
-    private boolean bungieSecretSet = true;
 
     synchronized fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData bungie() {
         return bungieClientId == null ? fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData.none()
@@ -99,9 +98,8 @@ class MockKeysStore {
                 || (!key.isEmpty() && !key.matches("[0-9A-Fa-f]{32}"))) {
             return 400;
         }
-        if (bungieClientId == null && (secret.isEmpty() || key.isEmpty())) return 400;
+        if ((bungieClientId == null || !bungieClientId.equals(id)) && (secret.isEmpty() || key.isEmpty())) return 400;
         bungieClientId = id;
-        bungieSecretSet = bungieSecretSet || !secret.isEmpty();
         if (!key.isEmpty()) bungieApiKey = key;
         return 204;
     }
@@ -109,7 +107,6 @@ class MockKeysStore {
     synchronized int deleteBungie() {
         bungieClientId = null;
         bungieApiKey = null;
-        bungieSecretSet = false;
         return 204;
     }
 }
