@@ -127,9 +127,19 @@ class ChannelApiTabRenderingTest {
         String html = render(page(true, null, null, null,
                 new fr.enimaloc.catapult.common.dto.channel.SupercellData(game, null, null)));
 
+        // Only the usable game is offered: the two others have no key pool and nothing declared
         assertThat(panel(html, "api")).contains("data-conn=\"supercell\"", "Chief (#2PP)",
-                "id=\"supercell-clash-royale-input\"");
+                "id=\"supercell-clash-of-clans-input\"").doesNotContain("id=\"supercell-clash-royale-input\"");
         assertThat(panel(html, "integrations")).doesNotContain("data-conn=\"supercell\"");
+    }
+
+    @Test
+    void aSupercellCardWithNoUsableGame_isNotShown() throws Exception {
+        var game = new fr.enimaloc.catapult.common.dto.channel.SupercellData.Game(null, null, false);
+        String api = panel(render(page(true, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.SupercellData(game, game, null))), "api");
+
+        assertThat(api).doesNotContain("data-conn=\"supercell\"");
     }
 
     @Test

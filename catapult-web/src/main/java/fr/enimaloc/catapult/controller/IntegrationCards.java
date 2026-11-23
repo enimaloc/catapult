@@ -108,28 +108,29 @@ public final class IntegrationCards {
         if (ch.retroAchievements() != null) {
             cards.add(retroAchievements(ch.retroAchievements()));
         }
-        if (ch.blizzardStats() != null) {
+        if (ch.blizzardStats() != null && offered(ch.blizzardStats().available(), ch.blizzardStats().linked())) {
             cards.add(blizzardStats(ch.blizzardStats()));
         }
-        if (ch.bungie() != null) {
+        if (ch.bungie() != null && offered(ch.bungie().available(), ch.bungie().linked())) {
             cards.add(bungie(ch.bungie()));
         }
-        if (ch.hypixel() != null) {
+        if (ch.hypixel() != null && offered(ch.hypixel().available(), saved(ch.hypixel().uuid()))) {
             cards.add(hypixel(ch.hypixel()));
         }
-        if (ch.supercell() != null) {
+        if (ch.supercell() != null && Stream.of(ch.supercell().clashOfClans(), ch.supercell().clashRoyale(),
+                ch.supercell().brawlStars()).anyMatch(IntegrationCards::offered)) {
             cards.add(supercell(ch.supercell()));
         }
-        if (ch.riot() != null) {
+        if (ch.riot() != null && offered(ch.riot().available(), saved(ch.riot().riotId()))) {
             cards.add(riot(ch.riot()));
         }
-        if (ch.faceit() != null) {
+        if (ch.faceit() != null && offered(ch.faceit().available(), saved(ch.faceit().nickname()))) {
             cards.add(faceit(ch.faceit()));
         }
         if (ch.chess() != null) {
             cards.add(chess(ch.chess()));
         }
-        if (ch.osu() != null) {
+        if (ch.osu() != null && offered(ch.osu().available(), ch.osu().linked())) {
             cards.add(osu(ch.osu()));
         }
         if (ch.obs() != null) {
@@ -141,6 +142,22 @@ public final class IntegrationCards {
         // The grid's cards first, the wide ones below them: the page reads in the order it shows (stable sort).
         cards.sort(Comparator.comparing(IntegrationDto::wide));
         return cards;
+    }
+
+    /**
+     * Whether an API tab card is shown: its service is usable on this instance (a key, an application), or the member
+     * already saved something there, which they must still be able to remove. An unusable service is not offered.
+     */
+    static boolean offered(boolean available, boolean saved) {
+        return available || saved;
+    }
+
+    private static boolean offered(SupercellData.Game game) {
+        return game != null && offered(game.available(), saved(game.tag()));
+    }
+
+    private static boolean saved(String value) {
+        return value != null && !value.isBlank();
     }
 
     /** A card of the grid: it never shows more than two buttons at once. */
@@ -633,7 +650,9 @@ public final class IntegrationCards {
                 case "clash-royale" -> supercell.clashRoyale();
                 default -> supercell.brawlStars();
             };
-            nodes.add(supercellGame(route, field, data == null ? new SupercellData.Game(null, null, false) : data));
+            if (offered(data)) {
+                nodes.add(supercellGame(route, field, data));
+            }
         }
         nodes.add(new Text(Attrs.cls("supercell-help"), true, key(SUPERCELL_PREFIX + "help")));
         return wideCard("supercell", nodes.toArray(IntegrationNode[]::new));
