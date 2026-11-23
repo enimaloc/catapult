@@ -424,10 +424,8 @@ class ChannelEventRedisBridgeTest {
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.SUPERCELL_ACCOUNT_CHANGED,
                 new ChannelEvents.SupercellAccountChanged(owner.toString(), "streamer", account))))
                 .containsExactly(fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent.of("streamer", account));
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ChannelEventRedisBridge.events(channel,
-                envelope(ChannelEvents.SUPERCELL_ACCOUNT_CHANGED,
-                        new ChannelEvents.SupercellAccountChanged(owner.toString(), "streamer", null))))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.SUPERCELL_ACCOUNT_CHANGED,
+                new ChannelEvents.SupercellAccountChanged(owner.toString(), "streamer", null)))).isEmpty();
     }
 
     @Test
