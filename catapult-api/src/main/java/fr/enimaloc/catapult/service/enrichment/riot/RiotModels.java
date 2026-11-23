@@ -10,8 +10,11 @@ public final class RiotModels {
     private RiotModels() {
     }
 
-    /** A Riot account (account-v1): its PUUID and Riot ID as Riot spells it. */
-    public record RiotAccountRef(String puuid, String gameName, String tagLine) {
+    /**
+     * A Riot account (account-v1): its PUUID, the Riot ID as Riot spells it, and the id ({@code ApiKeyHasher.id}) of
+     * the key that resolved it, the only key the PUUID is valid with (Riot encrypts its ids per key project).
+     */
+    public record RiotAccountRef(String puuid, String gameName, String tagLine, String keyId) {
     }
 
     /** A League of Legends summoner (summoner-v4). */

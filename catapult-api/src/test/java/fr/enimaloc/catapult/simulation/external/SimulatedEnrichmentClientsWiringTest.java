@@ -299,11 +299,11 @@ class SimulatedEnrichmentClientsWiringTest {
         assertThat(account.puuid()).isEqualTo("sim-catapult-euw");
         assertThatThrownBy(() -> riot.accountByRiotId(RiotPlatform.Cluster.EUROPE, "Ghost", "0000"))
                 .isInstanceOf(RiotNotFoundException.class);
-        assertThat(riot.lolSummoner(RiotPlatform.EUW1, "p").level()).isEqualTo(312);
-        assertThat(riot.lolLeague(RiotPlatform.EUW1, "p")).hasSize(2);
-        assertThat(riot.lolActiveGame(RiotPlatform.EUW1, "p")).hasValueSatisfying(g ->
+        assertThat(riot.lolSummoner(RiotPlatform.EUW1, "p", "k").level()).isEqualTo(312);
+        assertThat(riot.lolLeague(RiotPlatform.EUW1, "p", "k")).hasSize(2);
+        assertThat(riot.lolActiveGame(RiotPlatform.EUW1, "p", "k")).hasValueSatisfying(g ->
                 assertThat(g.championId()).isEqualTo(266));
-        assertThat(riot.tftLeague(RiotPlatform.EUW1, "p").getFirst().tier()).isEqualTo("PLATINUM");
+        assertThat(riot.tftLeague(RiotPlatform.EUW1, "p", "k").getFirst().tier()).isEqualTo("PLATINUM");
         assertThat(riot.champions(riot.latestVersion(), "en_US").byKey()).containsKey("266");
     }
 }

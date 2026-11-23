@@ -38,28 +38,28 @@ public class SimulatedRiotClient implements RiotClient {
             throw new RiotNotFoundException("simulated: no such Riot ID");
         }
         return new RiotAccountRef("sim-" + gameName.toLowerCase(Locale.ROOT) + "-" + tagLine.toLowerCase(Locale.ROOT),
-                gameName, tagLine);
+                gameName, tagLine, "simulated");
     }
 
     @Override
-    public LolSummoner lolSummoner(RiotPlatform platform, String puuid) {
+    public LolSummoner lolSummoner(RiotPlatform platform, String puuid, String keyId) {
         return new LolSummoner(312, 6);
     }
 
     @Override
-    public List<LeagueEntry> lolLeague(RiotPlatform platform, String puuid) {
+    public List<LeagueEntry> lolLeague(RiotPlatform platform, String puuid, String keyId) {
         return List.of(new LeagueEntry("RANKED_SOLO_5x5", "GOLD", "II", 57, 61, 54),
                 new LeagueEntry("RANKED_FLEX_SR", "SILVER", "I", 12, 10, 9));
     }
 
     @Override
-    public Optional<LiveGame> lolActiveGame(RiotPlatform platform, String puuid) {
+    public Optional<LiveGame> lolActiveGame(RiotPlatform platform, String puuid, String keyId) {
         return Optional.of(new LiveGame("CLASSIC", "MATCHED", 420, 266,
                 Instant.parse("2026-11-23T18:00:00Z"), 754L));
     }
 
     @Override
-    public List<LeagueEntry> tftLeague(RiotPlatform platform, String puuid) {
+    public List<LeagueEntry> tftLeague(RiotPlatform platform, String puuid, String keyId) {
         return List.of(new LeagueEntry("RANKED_TFT", "PLATINUM", "IV", 3, 22, 71));
     }
 

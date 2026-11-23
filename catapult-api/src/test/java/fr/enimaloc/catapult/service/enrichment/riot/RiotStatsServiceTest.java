@@ -47,12 +47,15 @@ class RiotStatsServiceTest {
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
     private static final String PUUID = "puuid-1";
+    private static final String KEY_ID = fr.enimaloc.catapult.service.ApiKeyHasher.id("RGAPI-k");
 
     private final GameEnrichmentCacheRepository repository = mock(GameEnrichmentCacheRepository.class);
     private final Map<String, GameEnrichmentCacheEntry> store = new ConcurrentHashMap<>();
     private final RiotClient client = mock(RiotClient.class);
     private final RiotApiKeyRepository keyRepository = mock(RiotApiKeyRepository.class);
     private final RiotAccountRepository accounts = mock(RiotAccountRepository.class);
+    private final fr.enimaloc.catapult.service.riot.RiotAccountService accountService =
+            mock(fr.enimaloc.catapult.service.riot.RiotAccountService.class);
     private final EnrichmentProperties properties = new EnrichmentProperties();
     private RiotApiKeyRotator keys;
     private RiotStatsService service;
@@ -72,24 +75,26 @@ class RiotStatsServiceTest {
         keys = new RiotApiKeyRotator(keyRepository, new SimpleMeterRegistry());
         EnrichmentCache cache = new EnrichmentCache(repository, properties, MAPPER);
         gameData = new RiotGameDataService(cache, client, keys, properties);
-        service = new RiotStatsService(cache, client, keys, accounts, gameData, properties);
+        service = new RiotStatsService(cache, client, keys, accounts, accountService, gameData, properties);
+        properties.getRiot().setTftIgdbId("1234");
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         RiotAccount row = new RiotAccount(user.getId());
         row.setGameName("Catapult");
         row.setTagLine("EUW");
         row.setPuuid(PUUID);
+        row.setPuuidKeyId(KEY_ID);
         row.setPlatform("euw1");
         row.setRegion("europe");
         when(accounts.findById(user.getId())).thenReturn(Optional.of(row));
-        when(client.lolSummoner(RiotPlatform.EUW1, PUUID)).thenReturn(new LolSummoner(312, 6));
-        when(client.lolLeague(RiotPlatform.EUW1, PUUID)).thenReturn(List.of(
+        when(client.lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID)).thenReturn(new LolSummoner(312, 6));
+        when(client.lolLeague(RiotPlatform.EUW1, PUUID, KEY_ID)).thenReturn(List.of(
                 new LeagueEntry("RANKED_SOLO_5x5", "GOLD", "II", 57, 61, 54),
                 new LeagueEntry("RANKED_FLEX_SR", "SILVER", "I", 12, 10, 9),
                 new LeagueEntry("CHERRY", "UNRANKED", null, 0, 1, 1)));
-        when(client.lolActiveGame(RiotPlatform.EUW1, PUUID)).thenReturn(Optional.of(new LiveGame("CLASSIC",
+        when(client.lolActiveGame(RiotPlatform.EUW1, PUUID, KEY_ID)).thenReturn(Optional.of(new LiveGame("CLASSIC",
                 "MATCHED", 420, 266, Instant.parse("2026-11-23T18:00:00Z"), 754L)));
-        when(client.tftLeague(RiotPlatform.EUW1, PUUID)).thenReturn(List.of(
+        when(client.tftLeague(RiotPlatform.EUW1, PUUID, KEY_ID)).thenReturn(List.of(
                 new LeagueEntry("RANKED_TFT", "PLATINUM", "IV", 3, 22, 71)));
         when(client.latestVersion()).thenReturn("16.23.1");
         when(client.champions("16.23.1", "fr_FR")).thenReturn(new Champions("16.23.1",
@@ -138,8 +143,8 @@ class RiotStatsServiceTest {
 
     @Test
     void anUnrankedSummoner_inNoGame_isOk_withEmptyRanks() {
-        when(client.lolLeague(RiotPlatform.EUW1, PUUID)).thenReturn(List.of());
-        when(client.lolActiveGame(RiotPlatform.EUW1, PUUID)).thenReturn(Optional.empty());
+        when(client.lolLeague(RiotPlatform.EUW1, PUUID, KEY_ID)).thenReturn(List.of());
+        when(client.lolActiveGame(RiotPlatform.EUW1, PUUID, KEY_ID)).thenReturn(Optional.empty());
 
         RiotStats.LolStats lol = stats(RiotGame.LOL, false).orElseThrow().lol();
 
@@ -150,36 +155,36 @@ class RiotStatsServiceTest {
 
     @Test
     void anUnknownSummoner_isNotFound_andCached() {
-        when(client.lolSummoner(RiotPlatform.EUW1, PUUID)).thenThrow(new RiotNotFoundException("no"));
+        when(client.lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID)).thenThrow(new RiotNotFoundException("no"));
 
         assertThat(stats(RiotGame.LOL, false).orElseThrow().status()).isEqualTo(Status.NOT_FOUND);
         assertThat(stats(RiotGame.LOL, false).orElseThrow().lol().status()).isEqualTo(Status.NOT_FOUND);
 
-        verify(client, times(1)).lolSummoner(RiotPlatform.EUW1, PUUID);
-        verify(client, never()).lolLeague(any(), anyString());
+        verify(client, times(1)).lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID);
+        verify(client, never()).lolLeague(any(), anyString(), any());
     }
 
     @Test
     void anOutage_isUnavailable_andNotCached() {
-        when(client.lolSummoner(RiotPlatform.EUW1, PUUID)).thenThrow(new RiotUnavailableException("down"));
+        when(client.lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID)).thenThrow(new RiotUnavailableException("down"));
 
         assertThat(stats(RiotGame.LOL, false).orElseThrow().status()).isEqualTo(Status.UNAVAILABLE);
         assertThat(stats(RiotGame.LOL, false).orElseThrow().status()).isEqualTo(Status.UNAVAILABLE);
 
-        verify(client, times(2)).lolSummoner(RiotPlatform.EUW1, PUUID);
+        verify(client, times(2)).lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID);
     }
 
     @Test
     void anyOtherFailure_isAnOutageToo() {
-        when(client.lolSummoner(RiotPlatform.EUW1, PUUID)).thenThrow(new IllegalStateException("garbled"));
+        when(client.lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID)).thenThrow(new IllegalStateException("garbled"));
 
         assertThat(stats(RiotGame.LOL, false).orElseThrow().status()).isEqualTo(Status.UNAVAILABLE);
     }
 
     @Test
     void failedParts_leaveTheSummoner_withUnknownRanksAndGame() {
-        when(client.lolLeague(RiotPlatform.EUW1, PUUID)).thenThrow(new RiotUnavailableException("down"));
-        when(client.lolActiveGame(RiotPlatform.EUW1, PUUID)).thenThrow(new RiotUnavailableException("down"));
+        when(client.lolLeague(RiotPlatform.EUW1, PUUID, KEY_ID)).thenThrow(new RiotUnavailableException("down"));
+        when(client.lolActiveGame(RiotPlatform.EUW1, PUUID, KEY_ID)).thenThrow(new RiotUnavailableException("down"));
         when(client.latestVersion()).thenThrow(new RiotUnavailableException("down"));
 
         RiotStats.LolStats lol = stats(RiotGame.LOL, true).orElseThrow().lol();
@@ -217,10 +222,10 @@ class RiotStatsServiceTest {
 
     @Test
     void tft_outage_isUnavailable_andUnranked_isOkWithoutRank() {
-        when(client.tftLeague(RiotPlatform.EUW1, PUUID)).thenThrow(new RiotUnavailableException("down"));
+        when(client.tftLeague(RiotPlatform.EUW1, PUUID, KEY_ID)).thenThrow(new RiotUnavailableException("down"));
         assertThat(stats(RiotGame.TFT, false).orElseThrow().status()).isEqualTo(Status.UNAVAILABLE);
 
-        org.mockito.Mockito.doReturn(List.of()).when(client).tftLeague(RiotPlatform.EUW1, PUUID);
+        org.mockito.Mockito.doReturn(List.of()).when(client).tftLeague(RiotPlatform.EUW1, PUUID, KEY_ID);
         RiotStats unranked = stats(RiotGame.TFT, false).orElseThrow();
         assertThat(unranked.status()).isEqualTo(Status.OK);
         assertThat(unranked.tft().rank()).isNull();
@@ -277,7 +282,7 @@ class RiotStatsServiceTest {
         RiotStats.LolStats lol = stats(RiotGame.LOL, false).orElseThrow().lol();
 
         assertThat(lol.inGame()).isNull();
-        verify(client, never()).lolActiveGame(any(), anyString());
+        verify(client, never()).lolActiveGame(any(), anyString(), any());
     }
 
     @Test
@@ -309,7 +314,8 @@ class RiotStatsServiceTest {
         stats(RiotGame.LOL, false);
 
         assertThat(store.keySet()).anyMatch(k -> k.equals(EnrichmentSource.RIOT_LOL_SUMMONER.key() + "|u:"
-                + user.getId() + ":lol:euw1:" + PUUID));
+                + user.getId() + ":lol:euw1"));
+        assertThat(store.keySet()).noneMatch(k -> k.contains(PUUID));
         assertThat(store.keySet()).anyMatch(k -> k.equals("riot-lol-patch|lol-patch"));
         assertThat(store.keySet()).filteredOn(k -> k.startsWith("riot-lol-patch") || k.startsWith("riot-lol-champions"))
                 .noneMatch(k -> k.contains(user.getId().toString()));
@@ -327,5 +333,88 @@ class RiotStatsServiceTest {
         EnrichmentProperties.SourceSettings settings = new EnrichmentProperties.SourceSettings();
         settings.setEnabled(false);
         return settings;
+    }
+
+    // ---------------------------------------------------------------- fix wave
+
+    private RiotAccount reresolved(String puuid, String keyId) {
+        RiotAccount fresh = new RiotAccount(user.getId());
+        fresh.setGameName("Catapult");
+        fresh.setTagLine("EUW");
+        fresh.setPuuid(puuid);
+        fresh.setPuuidKeyId(keyId);
+        fresh.setPlatform("euw1");
+        fresh.setRegion("europe");
+        return fresh;
+    }
+
+    @Test
+    void aStalePuuid_isResolvedAgainOnce_andTheStatsReadWithTheNewOne() {
+        when(client.lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID)).thenThrow(new RiotStaleIdException("gone"));
+        when(accountService.reresolve(user.getId())).thenReturn(Optional.of(reresolved("puuid-2", KEY_ID)));
+        when(client.lolSummoner(RiotPlatform.EUW1, "puuid-2", KEY_ID)).thenReturn(new LolSummoner(313, 6));
+        when(client.lolLeague(RiotPlatform.EUW1, "puuid-2", KEY_ID)).thenReturn(List.of());
+        when(client.lolActiveGame(RiotPlatform.EUW1, "puuid-2", KEY_ID)).thenReturn(Optional.empty());
+
+        RiotStats stats = stats(RiotGame.LOL, false).orElseThrow();
+
+        assertThat(stats.status()).isEqualTo(Status.OK);
+        assertThat(stats.lol().level()).isEqualTo(313);
+        verify(accountService, times(1)).reresolve(user.getId());
+    }
+
+    @Test
+    void aRiotIdRiotNoLongerKnows_isNotFound_andAFailedResolveUnavailable_andAStaleOneTwiceToo() {
+        when(client.lolSummoner(any(), anyString(), any())).thenThrow(new RiotStaleIdException("gone"));
+
+        when(accountService.reresolve(user.getId())).thenReturn(Optional.empty());
+        assertThat(stats(RiotGame.LOL, false).orElseThrow().status()).isEqualTo(Status.NOT_FOUND);
+
+        when(accountService.reresolve(user.getId())).thenThrow(new RiotUnavailableException("down"));
+        assertThat(stats(RiotGame.LOL, false).orElseThrow().status()).isEqualTo(Status.UNAVAILABLE);
+
+        org.mockito.Mockito.reset(accountService);
+        when(accountService.reresolve(user.getId())).thenReturn(Optional.of(reresolved("puuid-2", KEY_ID)));
+        assertThat(stats(RiotGame.LOL, false).orElseThrow().status()).isEqualTo(Status.UNAVAILABLE);
+    }
+
+    @Test
+    void aForbiddenTft_isUnsupported_notCached_andLolIsUntouched() {
+        when(client.tftLeague(RiotPlatform.EUW1, PUUID, KEY_ID)).thenThrow(new RiotForbiddenException("403"));
+
+        assertThat(stats(RiotGame.TFT, false).orElseThrow().status()).isEqualTo(Status.UNSUPPORTED);
+        assertThat(stats(RiotGame.LOL, false).orElseThrow().status()).isEqualTo(Status.OK);
+        assertThat(store.keySet()).noneMatch(k -> k.startsWith("riot-tft-league|"));
+    }
+
+    @Test
+    void tft_isOptIn_offWithoutItsIgdbId() {
+        properties.getRiot().setTftIgdbId("");
+
+        assertThat(stats(RiotGame.TFT, true)).isEmpty();
+        verifyNoInteractions(client);
+    }
+
+    @Test
+    void aLeagueRiotDoesNotKnow_isUnranked_cachedUnderTheSourceTtl() {
+        when(client.lolLeague(RiotPlatform.EUW1, PUUID, KEY_ID)).thenThrow(new RiotNotFoundException("no"));
+
+        assertThat(stats(RiotGame.LOL, false).orElseThrow().lol().ranked()).isEqualTo(new RiotStats.Ranked(null, null));
+        stats(RiotGame.LOL, false);
+
+        verify(client, times(1)).lolLeague(RiotPlatform.EUW1, PUUID, KEY_ID);
+        // a cell holding the absence: a value, under the source's TTL, not a known-absent row
+        assertThat(store.get("riot-lol-league|u:" + user.getId() + ":lol:euw1").getPayload()).isNotNull();
+    }
+
+    @Test
+    void aTftLeagueRiotDoesNotKnow_isNotFound_cachedAsAValue() {
+        when(client.tftLeague(RiotPlatform.EUW1, PUUID, KEY_ID)).thenThrow(new RiotNotFoundException("no"));
+
+        assertThat(stats(RiotGame.TFT, false).orElseThrow().status()).isEqualTo(Status.NOT_FOUND);
+        assertThat(stats(RiotGame.TFT, false).orElseThrow().status()).isEqualTo(Status.NOT_FOUND);
+
+        verify(client, times(1)).tftLeague(RiotPlatform.EUW1, PUUID, KEY_ID);
+        assertThat(store.get("riot-tft-league|u:" + user.getId() + ":tft:euw1").getPayload()).isNotNull();
     }
 }

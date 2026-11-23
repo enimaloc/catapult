@@ -49,6 +49,7 @@ class HttpRiotClientTest {
 
     static final String KEY = "RGAPI-12345678-abcd-4ef0-9abc-0123456789ab";
     static final String OTHER = "RGAPI-87654321-abcd-4ef0-9abc-0123456789ab";
+    static final String KEY_ID = fr.enimaloc.catapult.service.ApiKeyHasher.id(KEY);
     static final String PUUID = "Wb3JmG1dl8bE5P3zoUeVJmMSaMu3LvrHGwI6Gq3HpXXKSL6nXqQmZ0hHoWzMjz9aEdVq6Z1GqHJ3bA";
     static final String EUW = "https://euw1.api.riotgames.com";
     static final String EUROPE = "https://europe.api.riotgames.com";
@@ -150,7 +151,7 @@ class HttpRiotClientTest {
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUW)))
                 .andRespond(withStatus(HttpStatus.FOUND).header(HttpHeaders.LOCATION, "https://evil.example/steal"));
 
-        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID))
+        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID))
                 .isInstanceOf(RiotUnavailableException.class);
         server.verify();
     }
@@ -161,37 +162,114 @@ class HttpRiotClientTest {
     }
 
     @Test
-    void aRefusedKey_isSetAside_andTheCallTriedOnceWithAnother() throws IOException {
+    void accountByRiotId_givesTheIdOfTheKeyThatResolvedThePuuid() throws IOException {
+        json(EUROPE + "/riot/account/v1/accounts/by-riot-id/Catapult/EUW", "account.json");
+
+        assertThat(client.accountByRiotId(Cluster.EUROPE, "Catapult", "EUW").keyId()).isEqualTo(KEY_ID);
+    }
+
+    @Test
+    void aKeyRefusedOnTheAccountCall_isSetAsideOnThatCluster_andAnotherOneTriedOnce() throws IOException {
         when(repository.findByExclusiveFalse()).thenReturn(List.of(new RiotApiKeyEntry(KEY, null),
                 new RiotApiKeyEntry(OTHER, null)));
         rotator.refreshKeys();
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUW))).andRespond(withStatus(HttpStatus.UNAUTHORIZED)
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUROPE))).andRespond(withStatus(HttpStatus.UNAUTHORIZED)
                 .contentType(MediaType.APPLICATION_JSON).body(fixture("unauthorized.json")));
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUW)))
-                .andRespond(withSuccess(fixture("lol-summoner.json"), MediaType.APPLICATION_JSON));
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUROPE)))
+                .andRespond(withSuccess(fixture("account.json"), MediaType.APPLICATION_JSON));
 
-        assertThat(client.lolSummoner(RiotPlatform.EUW1, PUUID).level()).isEqualTo(312);
+        var account = client.accountByRiotId(Cluster.EUROPE, "Catapult", "EUW");
 
-        assertThat(rotator.blockedKeyCount()).isEqualTo(1);
+        String refused = rotator.blocked(KEY, Cluster.EUROPE) ? KEY : OTHER;
+        assertThat(account.keyId()).isNotEqualTo(fr.enimaloc.catapult.service.ApiKeyHasher.id(refused));
+        assertThat(rotator.blocked(refused, Cluster.AMERICAS)).isFalse();
         assertThat(buckets).hasSize(2);
         server.verify();
     }
 
     @Test
-    void theOnlyKeyRefused_isAnOutage() {
-        server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUW))).andRespond(withStatus(HttpStatus.FORBIDDEN));
+    void aSeaScopedKey_checksASeaRiotId_onTheAsiaHost() throws IOException {
+        when(repository.findByExclusiveFalse()).thenReturn(List.of(new RiotApiKeyEntry(KEY, "sea")));
+        rotator.refreshKeys();
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith("https://asia.api.riotgames.com/riot/account/")))
+                .andRespond(withSuccess(fixture("account.json"), MediaType.APPLICATION_JSON));
 
-        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID))
-                .isInstanceOf(RiotUnavailableException.class).hasMessageNotContaining(KEY);
-        assertThat(rotator.blockedKeyCount()).isEqualTo(1);
+        assertThat(client.accountByRiotId(Cluster.SEA, "Catapult", "OCE").keyId()).isEqualTo(KEY_ID);
         server.verify();
     }
 
     @Test
-    void everyKeySetAside_sendsNothing() {
-        rotator.onKeyRejected(KEY, Duration.ofHours(1));
+    void a401OnAPuuidCall_isAnOutage_andSetsTheKeyAsideOnThatClusterOnly() {
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUW))).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
 
-        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID))
+        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID))
+                .isInstanceOf(RiotUnavailableException.class).hasMessageNotContaining(KEY);
+        assertThat(rotator.blocked(KEY, Cluster.EUROPE)).isTrue();
+        assertThat(rotator.blocked(KEY, Cluster.AMERICAS)).isFalse();
+        // refused there: nothing more is sent to that cluster
+        assertThatThrownBy(() -> client.lolLeague(RiotPlatform.EUW1, PUUID, KEY_ID))
+                .isInstanceOf(RiotUnavailableException.class);
+        assertThat(buckets).hasSize(1);
+        server.verify();
+    }
+
+    @Test
+    void a403OnTheTftRoutes_keepsTheKeyOffTft_butLolWorksWithIt() throws IOException {
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUW + "/tft/"))).andRespond(withStatus(HttpStatus.FORBIDDEN));
+        json(EUW + "/lol/summoner/v4/summoners/by-puuid/" + PUUID, "lol-summoner.json");
+
+        assertThatThrownBy(() -> client.tftLeague(RiotPlatform.EUW1, PUUID, KEY_ID))
+                .isInstanceOf(RiotForbiddenException.class);
+        assertThat(client.lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID).level()).isEqualTo(312);
+        // kept off TFT: the next TFT call sends nothing
+        assertThatThrownBy(() -> client.tftLeague(RiotPlatform.EUW1, PUUID, KEY_ID))
+                .isInstanceOf(RiotForbiddenException.class);
+        assertThat(rotator.blockedKeyCount()).isZero();
+        assertThat(buckets).hasSize(2);
+        server.verify();
+    }
+
+    @Test
+    void theKeyOfThePuuidGoneFromThePool_isAStaleId_withoutAnyRequest() {
+        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID, "gone"))
+                .isInstanceOf(RiotStaleIdException.class);
+        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID, null))
+                .isInstanceOf(RiotStaleIdException.class);
+        assertThat(buckets).isEmpty();
+    }
+
+    @Test
+    void riotsExceptionDecrypting400_isAStaleId_anyOther400AnError() {
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUW))).andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"status\":{\"message\":\"Bad Request - Exception decrypting Wb3J\",\"status_code\":400}}"));
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUW))).andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"status\":{\"message\":\"Bad Request - Path parameter\",\"status_code\":400}}"));
+
+        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID))
+                .isInstanceOf(RiotStaleIdException.class);
+        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID))
+                .isInstanceOf(RiotUnavailableException.class);
+    }
+
+    @Test
+    void aResourceNotFound404_isAnError_notAnAbsence() {
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUW))).andRespond(withStatus(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"status\":{\"message\":\"Resource not found\",\"status_code\":404}}"));
+
+        assertThatThrownBy(() -> client.lolActiveGame(RiotPlatform.EUW1, PUUID, KEY_ID))
+                .isInstanceOf(RiotUnavailableException.class);
+    }
+
+    @Test
+    void everyKeyRefusedOnTheCluster_sendsNothing() {
+        rotator.onKeyRejected(KEY, Cluster.EUROPE, Duration.ofHours(1));
+
+        assertThatThrownBy(() -> client.accountByRiotId(Cluster.EUROPE, "x", "y"))
+                .isInstanceOf(RiotUnavailableException.class);
+        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID))
                 .isInstanceOf(RiotUnavailableException.class);
         assertThat(buckets).isEmpty();
         server.verify();
@@ -202,21 +280,24 @@ class HttpRiotClientTest {
         when(repository.findByExclusiveFalse()).thenReturn(List.of(new RiotApiKeyEntry(KEY, "americas")));
         rotator.refreshKeys();
 
-        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID))
+        assertThatThrownBy(() -> client.accountByRiotId(Cluster.EUROPE, "x", "y"))
                 .isInstanceOf(RiotUnavailableException.class);
         assertThat(buckets).isEmpty();
     }
 
     @Test
-    void a429_pausesTheBucket_cappingRetryAfter_andSetsTheKeyAsideForAnApplicationLimit() {
+    void anApplication429OnEuw1_pausesThatBucketOnly_theKeyStaysUsableElsewhere() throws IOException {
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUW))).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
                 .header(HttpHeaders.RETRY_AFTER, "99999").header("X-Rate-Limit-Type", "application"));
+        json("https://na1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/" + PUUID, "lol-summoner.json");
 
-        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID))
+        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID))
                 .isInstanceOf(RiotUnavailableException.class);
+        assertThat(client.lolSummoner(RiotPlatform.NA1, PUUID, KEY_ID).level()).isEqualTo(312);
 
-        verify(limiter).pause(startsWith(""), eq(Duration.ofMinutes(10)));
-        assertThat(rotator.blockedKeyCount()).isEqualTo(1);
+        verify(limiter).pause(eq(KEY_ID + "@" + EUW), eq(Duration.ofMinutes(10)));
+        assertThat(rotator.blockedKeyCount()).isZero();
+        assertThat(rotator.nextKey(Cluster.EUROPE, RiotApiKeyRotator.Family.LOL)).contains(KEY);
     }
 
     @Test
@@ -224,7 +305,7 @@ class HttpRiotClientTest {
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUW))).andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS)
                 .header("X-Rate-Limit-Type", "method"));
 
-        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID))
+        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID))
                 .isInstanceOf(RiotUnavailableException.class);
 
         verify(limiter).pause(anyString(), eq(Duration.ofSeconds(60)));
@@ -237,7 +318,7 @@ class HttpRiotClientTest {
                 .andRespond(withSuccess(fixture("lol-summoner.json"), MediaType.APPLICATION_JSON)
                         .header("X-App-Rate-Limit", "500:10,30000:600"));
 
-        client.lolSummoner(RiotPlatform.EUW1, PUUID);
+        client.lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID);
 
         verify(limiter).learn(anyString(), eq("500:10,30000:600"));
     }
@@ -246,7 +327,7 @@ class HttpRiotClientTest {
     void aRefusingLimiter_sendsNothing() {
         when(limiter.acquire(anyString())).thenReturn(false);
 
-        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID))
+        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID, KEY_ID))
                 .isInstanceOf(RiotUnavailableException.class);
         server.verify();
     }
@@ -257,11 +338,11 @@ class HttpRiotClientTest {
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUW))).andRespond(withSuccess("[]",
                 MediaType.APPLICATION_JSON));
 
-        List<LeagueEntry> entries = client.lolLeague(RiotPlatform.EUW1, PUUID);
+        List<LeagueEntry> entries = client.lolLeague(RiotPlatform.EUW1, PUUID, KEY_ID);
 
         assertThat(entries).containsExactly(new LeagueEntry("RANKED_SOLO_5x5", "GOLD", "II", 57, 61, 54),
                 new LeagueEntry("RANKED_FLEX_SR", "SILVER", "I", 12, 10, 9));
-        assertThat(client.lolLeague(RiotPlatform.EUW1, PUUID)).isEmpty();
+        assertThat(client.lolLeague(RiotPlatform.EUW1, PUUID, KEY_ID)).isEmpty();
     }
 
     @Test
@@ -271,15 +352,15 @@ class HttpRiotClientTest {
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUW))).andRespond(withSuccess("[{\"tier\":\"GOLD\"}]",
                 MediaType.APPLICATION_JSON));
 
-        assertThatThrownBy(() -> client.lolLeague(RiotPlatform.EUW1, PUUID)).isInstanceOf(RiotUnavailableException.class);
-        assertThatThrownBy(() -> client.tftLeague(RiotPlatform.EUW1, PUUID)).isInstanceOf(RiotUnavailableException.class);
+        assertThatThrownBy(() -> client.lolLeague(RiotPlatform.EUW1, PUUID, KEY_ID)).isInstanceOf(RiotUnavailableException.class);
+        assertThatThrownBy(() -> client.tftLeague(RiotPlatform.EUW1, PUUID, KEY_ID)).isInstanceOf(RiotUnavailableException.class);
     }
 
     @Test
     void tftLeague_readsTheQueue() throws IOException {
         json(EUW + "/tft/league/v1/by-puuid/" + PUUID, "tft-league.json");
 
-        assertThat(client.tftLeague(RiotPlatform.EUW1, PUUID))
+        assertThat(client.tftLeague(RiotPlatform.EUW1, PUUID, KEY_ID))
                 .containsExactly(new LeagueEntry("RANKED_TFT", "PLATINUM", "IV", 3, 22, 71));
     }
 
@@ -289,14 +370,14 @@ class HttpRiotClientTest {
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(EUW))).andRespond(withStatus(HttpStatus.NOT_FOUND)
                 .contentType(MediaType.APPLICATION_JSON).body(fixture("lol-active-game-404.json")));
 
-        LiveGame game = client.lolActiveGame(RiotPlatform.EUW1, PUUID).orElseThrow();
+        LiveGame game = client.lolActiveGame(RiotPlatform.EUW1, PUUID, KEY_ID).orElseThrow();
 
         assertThat(game.championId()).isEqualTo(266);
         assertThat(game.gameMode()).isEqualTo("CLASSIC");
         assertThat(game.queueId()).isEqualTo(420);
         assertThat(game.startedAt()).isEqualTo(Instant.ofEpochMilli(1763890000000L));
         assertThat(game.lengthSeconds()).isEqualTo(754L);
-        assertThat(client.lolActiveGame(RiotPlatform.EUW1, PUUID)).isEmpty();
+        assertThat(client.lolActiveGame(RiotPlatform.EUW1, PUUID, KEY_ID)).isEmpty();
     }
 
     @Test

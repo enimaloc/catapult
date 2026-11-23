@@ -78,7 +78,7 @@ class RiotAccountServiceTest {
             return inv.getArgument(0);
         });
         when(client.accountByRiotId(any(), anyString(), anyString())).thenAnswer(inv ->
-                new RiotAccountRef("puuid-" + inv.getArgument(1), inv.getArgument(1), inv.getArgument(2)));
+                new RiotAccountRef("puuid-" + inv.getArgument(1), inv.getArgument(1), inv.getArgument(2), "key-1"));
     }
 
     @Test
@@ -90,6 +90,7 @@ class RiotAccountServiceTest {
         assertThat(row.getPuuid()).isEqualTo("puuid-Catapult");
         assertThat(row.riotId()).isEqualTo("Catapult#EUW");
         assertThat(row.getPlatform()).isEqualTo("euw1");
+        assertThat(row.getPuuidKeyId()).isEqualTo("key-1");
         assertThat(row.getRegion()).isEqualTo("europe");
         assertThat(row.getUpdatedAt()).isEqualTo(NOW);
         verify(events).riotAccountChanged(user.getId(), new RiotData("Catapult#EUW", "euw1", true));
@@ -98,7 +99,7 @@ class RiotAccountServiceTest {
     @Test
     void save_keepsRiotsSpelling() {
         when(client.accountByRiotId(any(), anyString(), anyString()))
-                .thenReturn(new RiotAccountRef("p", "CataPult", "euw"));
+                .thenReturn(new RiotAccountRef("p", "CataPult", "euw", "key-1"));
 
         service.save(user, "catapult#EUW", "euw1");
 
@@ -240,5 +241,37 @@ class RiotAccountServiceTest {
         keys.refreshKeys();
         assertThat(service.data(user).available()).isFalse();
         verify(client, times(1)).accountByRiotId(any(), anyString(), anyString());
+    }
+
+    @Test
+    void reresolve_storesTheNewPuuidAndItsKey_andForgetsTheRiotCache() {
+        service.save(user, "Catapult#EUW", "euw1");
+        when(client.accountByRiotId(any(), anyString(), anyString()))
+                .thenReturn(new RiotAccountRef("puuid-new", "Catapult", "EUW", "key-2"));
+
+        RiotAccount again = service.reresolve(user.getId()).orElseThrow();
+
+        assertThat(again.getPuuid()).isEqualTo("puuid-new");
+        assertThat(again.getPuuidKeyId()).isEqualTo("key-2");
+        verify(client, times(2)).accountByRiotId(Cluster.EUROPE, "Catapult", "EUW");
+        verify(cache, times(2)).evictUser(eq(user.getId()), any());
+    }
+
+    @Test
+    void reresolve_ofARiotIdRiotNoLongerKnows_isEmpty_andKeepsTheRow() {
+        service.save(user, "Catapult#EUW", "euw1");
+        when(client.accountByRiotId(any(), anyString(), anyString())).thenThrow(new RiotNotFoundException("no"));
+
+        assertThat(service.reresolve(user.getId())).isEmpty();
+        assertThat(stored.get().getPuuid()).isEqualTo("puuid-Catapult");
+    }
+
+    @Test
+    void reresolve_withoutARow_isEmpty_andAnOutagePasses() {
+        assertThat(service.reresolve(user.getId())).isEmpty();
+
+        service.save(user, "Catapult#EUW", "euw1");
+        when(client.accountByRiotId(any(), anyString(), anyString())).thenThrow(new RiotUnavailableException("down"));
+        assertThatThrownBy(() -> service.reresolve(user.getId())).isInstanceOf(RiotUnavailableException.class);
     }
 }

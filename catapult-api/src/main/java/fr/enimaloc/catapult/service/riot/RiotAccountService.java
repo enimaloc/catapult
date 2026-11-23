@@ -104,6 +104,7 @@ public class RiotAccountService {
             row.setGameName(found.gameName());
             row.setTagLine(found.tagLine());
             row.setPuuid(found.puuid());
+            row.setPuuidKeyId(found.keyId());
             row.setPlatform(on.key());
             row.setRegion(on.cluster().key());
             return true;
@@ -112,6 +113,37 @@ public class RiotAccountService {
             cache.evictUser(user.getId(), SOURCES);
         }
         publish(user.getId());
+    }
+
+    /**
+     * Resolves the member's PUUID again from their declared Riot ID, with a key of the pool now (the one that
+     * resolved it left the pool, or Riot can no longer decrypt it), and stores it with that key's id; what the Riot
+     * sources cached for the member is forgotten. Empty when there is no row any more, or Riot no longer knows the
+     * Riot ID (the row is kept: the member is told {@code not_found}).
+     *
+     * @throws RuntimeException when Riot cannot be asked (an outage, for the caller)
+     */
+    public Optional<RiotAccount> reresolve(UUID userId) {
+        Optional<RiotAccount> row = accounts.findById(userId);
+        Optional<RiotPlatform> on = row.flatMap(r -> RiotPlatform.parse(r.getPlatform()));
+        if (row.isEmpty() || on.isEmpty()) {
+            return Optional.empty();
+        }
+        RiotAccountRef found;
+        try {
+            found = client.accountByRiotId(on.get().cluster(), row.get().getGameName(), row.get().getTagLine());
+        } catch (RiotNotFoundException e) {
+            return Optional.empty();
+        }
+        write(userId, false, current -> {
+            current.setGameName(found.gameName());
+            current.setTagLine(found.tagLine());
+            current.setPuuid(found.puuid());
+            current.setPuuidKeyId(found.keyId());
+            return true;
+        });
+        cache.evictUser(userId, SOURCES);
+        return accounts.findById(userId);
     }
 
     /** Forgets the member's Riot ID, and what the Riot sources cached for them. */

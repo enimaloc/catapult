@@ -14,7 +14,7 @@ import java.util.UUID;
 
 /**
  * A member's declared Riot ID: the name and tag they gave (as Riot spells them), the PUUID Riot proved for it
- * (stable when the Riot ID changes), the League of Legends platform they play on ({@code euw1}…) and its routing
+ * with the key that resolved it (stable when the Riot ID changes), the League of Legends platform they play on ({@code euw1}…) and its routing
  * cluster ({@code europe}…). No secret.
  */
 @Entity
@@ -36,6 +36,13 @@ public class RiotAccount {
 
     @Column(name = "puuid", nullable = false)
     private String puuid;
+
+    /**
+     * The id ({@code ApiKeyHasher.id}) of the pool key that resolved {@link #puuid}: Riot encrypts its ids per key
+     * project, so the PUUID is only valid with that key. Null when unknown (resolved again at first use).
+     */
+    @Column(name = "puuid_key_id")
+    private String puuidKeyId;
 
     @Column(name = "platform", nullable = false)
     private String platform;

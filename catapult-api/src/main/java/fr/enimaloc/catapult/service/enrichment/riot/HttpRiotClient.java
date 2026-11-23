@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.enrichment.riot;
 
 import fr.enimaloc.catapult.getter.riot.RiotApiKeyRotator;
+import fr.enimaloc.catapult.getter.riot.RiotApiKeyRotator.Family;
 import fr.enimaloc.catapult.service.ApiKeyHasher;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotModels.Champion;
@@ -38,8 +39,12 @@ import java.util.regex.Pattern;
  * Data Dragon ({@code ddragon.leagueoflegends.com}, no key). The key only travels in the {@code X-Riot-Token} header
  * (never in a URL), and no key or body is ever put in an exception message or a log. Redirects are never followed and
  * any 3xx is an error; a 2xx that is not JSON or not of the expected shape is an error, never "absent"; only Riot's
- * JSON 404 ({@code {"status":{"status_code":404}}}) means "not found". A key Riot refuses (401, 403) is set aside and
- * the call is tried once more with another key. Every request asks the {@link RiotRateLimiter} first.
+ * JSON "Data not found" 404 means "not found" (a "Resource not found" for a retired route is an error). The account
+ * call picks a key of the pool: one Riot refuses (401) is set aside for that cluster, one it does not let use the
+ * account routes (403) is kept off them, and the call is tried once more with another key. The calls by PUUID use the
+ * key that resolved it (Riot encrypts its ids per key project): that key gone from the pool, or Riot's 400
+ * "Exception decrypting", is a {@link RiotStaleIdException}; a 403 keeps the key off that game's routes only. A 429
+ * pauses only the key's bucket on that host (the limiter's). Every request asks the {@link RiotRateLimiter} first.
  */
 @Component
 public class HttpRiotClient implements RiotClient {
@@ -53,10 +58,8 @@ public class HttpRiotClient implements RiotClient {
     private static final Duration PAUSE = Duration.ofSeconds(60);
     /** The longest pause a 429 can ask for: a larger Retry-After is not trusted. */
     private static final Duration MAX_PAUSE = Duration.ofMinutes(10);
-    /** How long a refused key is set aside. */
+    /** How long a refused key (401) is set aside on the cluster. */
     static final Duration REJECTED_FOR = Duration.ofHours(1);
-    /** How long a key Riot answered 403 is set aside (an expired key, or a route it may not use). */
-    static final Duration FORBIDDEN_FOR = Duration.ofMinutes(5);
     private static final Pattern VERSION = Pattern.compile("\\d{1,4}(\\.\\d{1,4}){1,3}");
     private static final Pattern LOCALE = Pattern.compile("[a-z]{2}_[A-Z]{2}");
 
@@ -97,21 +100,43 @@ public class HttpRiotClient implements RiotClient {
     @Override
     public RiotAccountRef accountByRiotId(Cluster cluster, String gameName, String tagLine) {
         Cluster host = cluster.accountCluster();
-        JsonNode json = object(riot(host, host.host() + "/riot/account/v1/accounts/by-riot-id/{name}/{tag}",
-                gameName, tagLine));
-        if (!json.path("puuid").isString() || text(json.path("puuid")) == null) {
-            throw garbled();
+        String tried = null;
+        for (int attempt = 0; attempt < 2; attempt++) {
+            // the key is one that serves the member's cluster, even when another cluster's host answers
+            String key = keys.nextKey(cluster, Family.ACCOUNT)
+                    .orElseThrow(() -> new RiotUnavailableException("no usable Riot API key serves this cluster"));
+            if (key.equals(tried)) {
+                break;
+            }
+            tried = key;
+            String template = host.host() + "/riot/account/v1/accounts/by-riot-id/{name}/{tag}";
+            String bucket = bucket(key, template);
+            Answer answer = send(bucket, template, key, MAX_BYTES, gameName, tagLine);
+            limiter.learn(bucket, answer.appLimit());
+            if (answer.status() == 401) {
+                keys.onKeyRejected(key, cluster, REJECTED_FOR);
+                continue;
+            }
+            if (answer.status() == 403) {
+                keys.onForbidden(key, Family.ACCOUNT);
+                continue;
+            }
+            JsonNode json = object(interpret(bucket, answer));
+            if (!json.path("puuid").isString() || text(json.path("puuid")) == null) {
+                throw garbled();
+            }
+            String name = text(json.path("gameName"));
+            String tag = text(json.path("tagLine"));
+            return new RiotAccountRef(json.get("puuid").asString(), name == null ? gameName : name,
+                    tag == null ? tagLine : tag, ApiKeyHasher.id(key));
         }
-        String name = text(json.path("gameName"));
-        String tag = text(json.path("tagLine"));
-        return new RiotAccountRef(json.get("puuid").asString(), name == null ? gameName : name,
-                tag == null ? tagLine : tag);
+        throw new RiotUnavailableException("no usable Riot API key now");
     }
 
     @Override
-    public LolSummoner lolSummoner(RiotPlatform platform, String puuid) {
-        JsonNode json = object(riot(platform.cluster(), platform.host() + "/lol/summoner/v4/summoners/by-puuid/{puuid}",
-                puuid));
+    public LolSummoner lolSummoner(RiotPlatform platform, String puuid, String keyId) {
+        JsonNode json = object(personal(platform, Family.LOL, keyId,
+                platform.host() + "/lol/summoner/v4/summoners/by-puuid/{puuid}", puuid));
         if (!json.path("summonerLevel").isNumber()) {
             throw garbled();
         }
@@ -119,15 +144,16 @@ public class HttpRiotClient implements RiotClient {
     }
 
     @Override
-    public List<LeagueEntry> lolLeague(RiotPlatform platform, String puuid) {
-        return entries(riot(platform.cluster(), platform.host() + "/lol/league/v4/entries/by-puuid/{puuid}", puuid));
+    public List<LeagueEntry> lolLeague(RiotPlatform platform, String puuid, String keyId) {
+        return entries(personal(platform, Family.LOL, keyId,
+                platform.host() + "/lol/league/v4/entries/by-puuid/{puuid}", puuid));
     }
 
     @Override
-    public Optional<LiveGame> lolActiveGame(RiotPlatform platform, String puuid) {
+    public Optional<LiveGame> lolActiveGame(RiotPlatform platform, String puuid, String keyId) {
         JsonNode json;
         try {
-            json = object(riot(platform.cluster(),
+            json = object(personal(platform, Family.LOL, keyId,
                     platform.host() + "/lol/spectator/v5/active-games/by-summoner/{puuid}", puuid));
         } catch (RiotNotFoundException e) {
             return Optional.empty();
@@ -149,8 +175,9 @@ public class HttpRiotClient implements RiotClient {
     }
 
     @Override
-    public List<LeagueEntry> tftLeague(RiotPlatform platform, String puuid) {
-        return entries(riot(platform.cluster(), platform.host() + "/tft/league/v1/by-puuid/{puuid}", puuid));
+    public List<LeagueEntry> tftLeague(RiotPlatform platform, String puuid, String keyId) {
+        return entries(personal(platform, Family.TFT, keyId,
+                platform.host() + "/tft/league/v1/by-puuid/{puuid}", puuid));
     }
 
     private List<LeagueEntry> entries(JsonNode json) {
@@ -215,31 +242,36 @@ public class HttpRiotClient implements RiotClient {
 
     // --- HTTP ---
 
-    /** GET with a key that serves {@code cluster}; a refused key is set aside and another one tried once. */
-    private JsonNode riot(Cluster cluster, String template, Object... vars) {
-        String tried = null;
-        for (int attempt = 0; attempt < 2; attempt++) {
-            String key = keys.nextKey(cluster)
-                    .orElseThrow(() -> new RiotUnavailableException("no Riot API key serves this cluster"));
-            if (key.equals(tried) || keys.blocked(key)) {
-                // every key that serves the cluster is set aside: nothing is sent
-                break;
-            }
-            tried = key;
-            String bucket = ApiKeyHasher.id(key) + "@" + host(template, vars);
-            Answer answer = send(bucket, template, key, MAX_BYTES, vars);
-            limiter.learn(bucket, answer.appLimit());
-            if (answer.status() == 401 || answer.status() == 403) {
-                // 403 is also a route the key is not allowed: set aside for a short while only
-                keys.onKeyRejected(key, answer.status() == 401 ? REJECTED_FOR : FORBIDDEN_FOR);
-                continue;
-            }
-            if (answer.status() == 429 && "application".equalsIgnoreCase(answer.limitType())) {
-                keys.onKeyRateLimited(key, retryAfter(answer.retryAfter()));
-            }
-            return interpret(bucket, answer);
+    /**
+     * GET by PUUID with the key that resolved it. That key gone from the pool is a stale id; refused (401) there or
+     * kept off the game's routes, an outage or a forbidden route; nothing is sent then.
+     */
+    private JsonNode personal(RiotPlatform platform, Family family, String keyId, String template, Object... vars) {
+        Cluster cluster = platform.cluster();
+        String key = keys.keyFor(keyId, cluster)
+                .orElseThrow(() -> new RiotStaleIdException("the key that resolved this PUUID left the pool"));
+        if (keys.blocked(key, cluster)) {
+            throw new RiotUnavailableException("the Riot API key of this PUUID is refused for now");
         }
-        throw new RiotUnavailableException("no usable Riot API key now");
+        if (keys.forbidden(key, family)) {
+            throw new RiotForbiddenException("the Riot API key may not use these routes");
+        }
+        String bucket = bucket(key, template);
+        Answer answer = send(bucket, template, key, MAX_BYTES, vars);
+        limiter.learn(bucket, answer.appLimit());
+        if (answer.status() == 401) {
+            keys.onKeyRejected(key, cluster, REJECTED_FOR);
+            throw new RiotUnavailableException("Riot refused the API key");
+        }
+        if (answer.status() == 403) {
+            keys.onForbidden(key, family);
+            throw new RiotForbiddenException("the Riot API key may not use these routes");
+        }
+        return interpret(bucket, answer);
+    }
+
+    private static String bucket(String key, String template) {
+        return ApiKeyHasher.id(key) + "@" + host(template);
     }
 
     private JsonNode ddragon(String url, int maxBytes) {
@@ -247,7 +279,7 @@ public class HttpRiotClient implements RiotClient {
     }
 
     /** The host of a template: its scheme and authority (the bucket's region), before any variable. */
-    private static String host(String template, Object... vars) {
+    private static String host(String template) {
         int slash = template.indexOf('/', "https://".length());
         return slash < 0 ? template : template.substring(0, slash);
     }
@@ -272,7 +304,7 @@ public class HttpRiotClient implements RiotClient {
                 String retryAfter = headers.getFirst(HttpHeaders.RETRY_AFTER);
                 String limitType = headers.getFirst("X-Rate-Limit-Type");
                 String appLimit = headers.getFirst("X-App-Rate-Limit");
-                if (status != 404 && !res.getStatusCode().is2xxSuccessful()) {
+                if (status != 404 && status != 400 && !res.getStatusCode().is2xxSuccessful()) {
                     return new Answer(status, retryAfter, limitType, appLimit, null, false);
                 }
                 byte[] body = readLimited(res.getBody(), maxBytes);
@@ -300,10 +332,18 @@ public class HttpRiotClient implements RiotClient {
         }
         if (status == 404) {
             JsonNode body = parseOrNull(answer.body());
-            if (body != null && body.path("status").path("status_code").asInt(0) == 404) {
+            if (body != null && body.path("status").path("status_code").asInt(0) == 404
+                    && message(body).startsWith("Data not found")) {
                 throw new RiotNotFoundException("Riot does not know it");
             }
             throw new RiotUnavailableException("Riot answered 404 without a recognised body");
+        }
+        if (status == 400) {
+            JsonNode body = parseOrNull(answer.body());
+            if (body != null && message(body).contains("Exception decrypting")) {
+                throw new RiotStaleIdException("Riot cannot decrypt this id with this key");
+            }
+            throw new RiotUnavailableException("Riot answered 400");
         }
         if (status < 200 || status >= 300) {
             throw new RiotUnavailableException("Riot answered " + status);
@@ -313,6 +353,11 @@ public class HttpRiotClient implements RiotClient {
             throw new RiotUnavailableException("the Riot answer is not JSON");
         }
         return json;
+    }
+
+    private static String message(JsonNode body) {
+        String message = text(body.path("status").path("message"));
+        return message == null ? "" : message;
     }
 
     private JsonNode parseOrNull(byte[] body) {
