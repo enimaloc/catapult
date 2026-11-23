@@ -23,6 +23,7 @@ import fr.enimaloc.catapult.common.dto.channel.FaceitData;
 import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
 import fr.enimaloc.catapult.common.dto.channel.OsuAccountData;
 import fr.enimaloc.catapult.common.dto.channel.HypixelData;
+import fr.enimaloc.catapult.common.dto.channel.SupercellData;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
 import fr.enimaloc.catapult.common.dto.channel.RiotData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
@@ -161,6 +162,9 @@ public class MockData {
     /** The Minecraft account the mock session declared for Hypixel (name, UUID). */
     private String hypixelName;
     private String hypixelUuid;
+    /** The Supercell games of the card, and the player tag the mock session declared in each. */
+    static final List<String> SUPERCELL_GAMES = List.of("clash-of-clans", "clash-royale", "brawl-stars");
+    private final java.util.Map<String, String> supercellTags = new java.util.concurrent.ConcurrentHashMap<>();
     private ObsData obsData;
     private String obsPassword;
     private String twitchatBranch = TwitchatData.AUTO;
@@ -408,7 +412,7 @@ public class MockData {
                 // drops: the mock has no experiments, they are offered
                 drops(), ankamaData(), epicData(), speedrunData(), retroAchievementsData(), blizzardStatsData(),
                 bungieData(),
-                riotData(), faceitData(), chessData(), osuData(), hypixelData());
+                riotData(), faceitData(), chessData(), osuData(), hypixelData(), supercellData());
     }
 
     /** The mock's one running drops campaign, on the first binding's category. */
@@ -472,6 +476,28 @@ public class MockData {
     public void saveHypixelAccount(String name, String uuid) {
         this.hypixelName = name;
         this.hypixelUuid = uuid;
+    }
+
+    /**
+     * The Supercell card: like its Keys tab, the mock has a key for Clash of Clans only, so the two other games show
+     * their stats as off. A declared player is named after its tag.
+     */
+    public SupercellData supercellData() {
+        return new SupercellData(supercellGame("clash-of-clans", true), supercellGame("clash-royale", false),
+                supercellGame("brawl-stars", false));
+    }
+
+    private SupercellData.Game supercellGame(String game, boolean available) {
+        String tag = supercellTags.get(game);
+        return new SupercellData.Game(tag, tag == null ? null : "Chief " + tag.substring(1), available);
+    }
+
+    public void saveSupercellAccount(String game, String tag) {
+        supercellTags.put(game, tag);
+    }
+
+    public void deleteSupercellAccount(String game) {
+        supercellTags.remove(game);
     }
 
     public void deleteHypixelAccount() {

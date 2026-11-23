@@ -840,6 +840,15 @@ class RealApiServiceTest {
     }
 
     @Test
+    void supercellTag_isSavedAndForgottenOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/supercell/clash-royale", "{\"tag\":\"#2PP\"}");
+        expectDelete(channel("enimaloc") + "/settings/supercell/clash-royale");
+
+        assertThat(service.saveSupercellAccount("enimaloc", "clash-royale", "#2PP")).isEqualTo(204);
+        assertThat(service.deleteSupercellAccount("enimaloc", "clash-royale")).isEqualTo(204);
+    }
+
+    @Test
     void hypixelAccount_isSavedAndForgottenOnTheChannel() {
         expectPut(channel("enimaloc") + "/settings/hypixel/account", "{\"player\":\"Notch\"}");
         expectDelete(channel("enimaloc") + "/settings/hypixel/account");

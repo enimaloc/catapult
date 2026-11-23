@@ -365,6 +365,19 @@ class ChannelEventStreamControllerTest {
     }
 
     @Test
+    void theSupercellSettingsGoToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent.of("enimaloc", new fr.enimaloc.catapult.common.dto.channel.SupercellData(new fr.enimaloc.catapult.common.dto.channel.SupercellData.Game("#2PP", "Chief", true), null, null));
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:SupercellAccountChangedEvent", "#2PP");
+        assertThat(moderator.getResponse().getContentAsString()).doesNotContain("#2PP");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
+
+    @Test
     void theRiotSettingsGoToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
         MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
         MvcResult moderator = subscribe("enimaloc", member("a-moderator"));

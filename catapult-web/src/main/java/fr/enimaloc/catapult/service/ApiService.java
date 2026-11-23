@@ -163,6 +163,15 @@ public interface ApiService {
 
     int deleteHypixelAccount(String username);
 
+    /**
+     * Declares {@code tag} as the channel owner's player in the Supercell {@code game} ({@code clash-of-clans},
+     * {@code clash-royale}, {@code brawl-stars}); catapult-api's status: 400 when the game is unknown or the tag
+     * malformed or no player's, 429 when their refreshes are spent, 503 when Supercell cannot be asked.
+     */
+    int saveSupercellAccount(String username, String game, String tag);
+
+    int deleteSupercellAccount(String username, String game);
+
     /** Unlinks the owner's Bungie.net account and forgets their Destiny 2 stats. */
     int deleteBungieLink(String username);
     /**

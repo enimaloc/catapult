@@ -413,6 +413,19 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public int saveSupercellAccount(String username, String game, String tag) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/supercell/{game}",
+                new fr.enimaloc.catapult.common.dto.channel.SupercellAccountRequest(tag), id, game),
+                status -> status);
+    }
+
+    @Override
+    public int deleteSupercellAccount(String username, String game) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/supercell/{game}", id,
+                game), status -> status);
+    }
+
+    @Override
     public int saveHypixelAccount(String username, String player) {
         return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/hypixel/account",
                 new fr.enimaloc.catapult.common.dto.channel.HypixelAccountRequest(player), id), status -> status);

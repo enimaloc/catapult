@@ -304,6 +304,12 @@ describe("channel-connections", () => {
               <input id="hypixel-player-input" value="  Notch ">
               <button id="hypixel-save-btn"></button>
               <button id="hypixel-delete-btn"></button>
+              <input id="supercell-clash-of-clans-input" value="  #2pp ">
+              <button id="supercell-clash-of-clans-save-btn"></button>
+              <button id="supercell-clash-of-clans-delete-btn"></button>
+              <input id="supercell-brawl-stars-input" value="9YY">
+              <button id="supercell-brawl-stars-save-btn"></button>
+              <button id="supercell-brawl-stars-delete-btn"></button>
               <input id="faceit-nickname-input" value="  Catapult ">
               <button id="faceit-save-btn"></button>
               <button id="faceit-delete-btn"></button>
@@ -527,6 +533,42 @@ describe("channel-connections", () => {
             expect(snackbars()).toEqual([
                 "FACEIT does not know this nickname",
                 "FACEIT cannot be reached right now: try again later.",
+            ]);
+        });
+    });
+
+    describe("the Supercell player tags", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
+        it("saves each game's trimmed tag, and removes it with a post", async () => {
+            await click("#supercell-clash-of-clans-save-btn");
+            await click("#supercell-brawl-stars-save-btn");
+            await click("#supercell-clash-of-clans-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/supercell/clash-of-clans", { tag: "#2pp" }],
+                ["/channel/enimaloc/settings/supercell/brawl-stars", { tag: "9YY" }],
+                ["/channel/enimaloc/settings/supercell/clash-of-clans/delete", {}],
+            ]);
+            expect(snackbars()).toEqual([]);
+        });
+
+        it("sends nothing for an empty entry", async () => {
+            document.getElementById("supercell-brawl-stars-input").value = "  ";
+            await click("#supercell-brawl-stars-save-btn");
+
+            expect(posts()).toEqual([]);
+        });
+
+        it("tells a tag no player has, and that Supercell cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(400));
+            await click("#supercell-clash-of-clans-save-btn");
+            posted.mockResolvedValueOnce(response(503));
+            await click("#supercell-clash-of-clans-save-btn");
+
+            expect(snackbars()).toEqual([
+                "No player has this tag in this game.",
+                "Supercell cannot be reached right now: try again later.",
             ]);
         });
     });

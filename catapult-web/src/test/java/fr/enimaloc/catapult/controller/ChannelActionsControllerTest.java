@@ -907,6 +907,29 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void supercellTag_isSavedAndForgottenThroughTheApi_andRefusalsKeepTheirStatus() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/supercell/clash-of-clans").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"tag\":\"#2PP\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/supercell/clash-of-clans/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+        verify(apiService).saveSupercellAccount("enimaloc", "clash-of-clans", "#2PP");
+        verify(apiService).deleteSupercellAccount("enimaloc", "clash-of-clans");
+
+        when(apiService.saveSupercellAccount("enimaloc", "brawl-stars", "#000")).thenReturn(400);
+        when(apiService.saveSupercellAccount("enimaloc", "brawl-stars", "#9YY")).thenReturn(429);
+        mvc.perform(post("/channel/enimaloc/settings/supercell/brawl-stars").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"tag\":\"#000\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/channel/enimaloc/settings/supercell/brawl-stars").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"tag\":\"#9YY\"}"))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
     void faceitNickname_isSavedAndForgottenThroughTheApi_andRefusalsKeepTheirStatus() throws Exception {
         mvc.perform(post("/channel/enimaloc/settings/faceit/nickname").with(csrf())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)

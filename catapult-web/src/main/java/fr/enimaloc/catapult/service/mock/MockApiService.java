@@ -726,6 +726,43 @@ public class MockApiService implements ApiService {
         return hypixelChanged(username, MockData::deleteHypixelAccount);
     }
 
+    /**
+     * Like catapult-api: a known game and a tag of Supercell's characters ({@code #} optional, O read as 0); the tag
+     * {@code #000} is no player's.
+     */
+    @Override
+    public int saveSupercellAccount(String username, String game, String tag) {
+        log.trace("saveSupercellAccount({}, {}, {})", username, game, tag);
+        String body = tag == null ? "" : tag.replaceAll("\\s+", "").toUpperCase(java.util.Locale.ROOT).replace('O', '0');
+        body = body.startsWith("#") ? body.substring(1) : body;
+        if (!MockData.SUPERCELL_GAMES.contains(game) || !SUPERCELL_TAG.matcher(body).matches()
+                || body.equals("000")) {
+            return BAD_REQUEST;
+        }
+        String normalized = "#" + body;
+        return supercellChanged(username, data -> data.saveSupercellAccount(game, normalized));
+    }
+
+    @Override
+    public int deleteSupercellAccount(String username, String game) {
+        log.trace("deleteSupercellAccount({}, {})", username, game);
+        if (!MockData.SUPERCELL_GAMES.contains(game)) {
+            return BAD_REQUEST;
+        }
+        return supercellChanged(username, data -> data.deleteSupercellAccount(game));
+    }
+
+    /** The characters of a Supercell tag, after its {@code #}. */
+    private static final java.util.regex.Pattern SUPERCELL_TAG = java.util.regex.Pattern.compile("[0289PYLQGRJCUV]{3,12}");
+
+    private int supercellChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent.of(username,
+                data.supercellData()));
+        return NO_CONTENT;
+    }
+
     private int hypixelChanged(String username, java.util.function.Consumer<MockData> change) {
         MockData data = currentData();
         change.accept(data);

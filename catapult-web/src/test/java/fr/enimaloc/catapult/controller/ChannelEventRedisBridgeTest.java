@@ -418,6 +418,19 @@ class ChannelEventRedisBridgeTest {
     }
 
     @Test
+    void bridgeRelaysSupercellAccountChanged_andRefusesOneWithoutAccount() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.SupercellData(new fr.enimaloc.catapult.common.dto.channel.SupercellData.Game("#2PP", "Chief", true), null, null);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.SUPERCELL_ACCOUNT_CHANGED,
+                new ChannelEvents.SupercellAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent.of("streamer", account));
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> ChannelEventRedisBridge.events(channel,
+                envelope(ChannelEvents.SUPERCELL_ACCOUNT_CHANGED,
+                        new ChannelEvents.SupercellAccountChanged(owner.toString(), "streamer", null))))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void bridgeRelaysRiotAccountChanged() {
         var account = new fr.enimaloc.catapult.common.dto.channel.RiotData("Catapult#EUW", "euw1", true);
 
