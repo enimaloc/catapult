@@ -173,11 +173,27 @@ class OAuth2ClientConfigTest {
                 .isEqualTo("https://www.bungie.net/platform/app/oauth/token/");
         List<String> ids = new ArrayList<>();
         ((Iterable<ClientRegistration>) repository).forEach(r -> ids.add(r.getRegistrationId()));
-        assertThat(ids).contains("twitch", "bungie");
+        // Iterating (the filter chain's login links) never reads the run-time registrations
+        assertThat(ids).contains("twitch").doesNotContain("bungie");
 
         when(credentials.current()).thenReturn(Optional.empty());
         assertThat(repository.findByRegistrationId("bungie")).isNull();
         assertThat(repository.findByRegistrationId("twitch")).isNotNull();
+    }
+
+    @Test
+    void bungie_unreadableCredentials_areNoRegistration_neverAnError() {
+        BungieCredentialsService credentials = mock(BungieCredentialsService.class);
+        StaticListableBeanFactory beans = new StaticListableBeanFactory();
+        beans.addBean("bungieCredentials", credentials);
+        when(credentials.current()).thenThrow(new IllegalStateException("database down"));
+        ClientRegistrationRepository repository =
+                config.clientRegistrationRepository(beans.getBeanProvider(BungieCredentialsService.class));
+
+        assertThat(repository.findByRegistrationId("bungie")).isNull();
+        assertThat(repository.findByRegistrationId("twitch")).isNotNull();
+        ((Iterable<ClientRegistration>) repository).forEach(r -> { });
+        org.mockito.Mockito.verify(credentials, org.mockito.Mockito.times(1)).current();
     }
 
     @Test

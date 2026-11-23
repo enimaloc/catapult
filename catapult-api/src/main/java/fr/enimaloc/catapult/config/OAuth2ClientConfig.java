@@ -131,9 +131,18 @@ public class OAuth2ClientConfig {
         // CatapultOAuth2UserService reads the memberships itself, with the API key. Its callback,
         // <base>/login/oauth2/code/bungie, must be declared on Bungie's portal.
         return new DynamicClientRegistrationRepository(registrations, Map.of("bungie",
-            () -> Optional.ofNullable(bungieCredentials.getIfAvailable())
+            () -> bungieRegistration(bungieCredentials)));
+    }
+
+    /** The Bungie registration from the admin's credentials; empty when none is set or they cannot be read now. */
+    private Optional<ClientRegistration> bungieRegistration(ObjectProvider<BungieCredentialsService> credentials) {
+        try {
+            return Optional.ofNullable(credentials.getIfAvailable())
                 .flatMap(BungieCredentialsService::current)
-                .map(c -> bungie(c.clientId(), c.clientSecret()))));
+                .map(c -> bungie(c.clientId(), c.clientSecret()));
+        } catch (RuntimeException e) {
+            return Optional.empty();
+        }
     }
 
     /** The Bungie.net registration of {@code clientId}. */

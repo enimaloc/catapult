@@ -13,8 +13,11 @@ import java.util.function.Supplier;
 
 /**
  * The registrations set at startup, plus those whose credentials an admin sets at run time (Bungie): each of these is
- * built again from its supplier on every lookup, so that it appears once its credentials are set and is gone (null:
- * the login is refused, its button is not offered) once they are removed.
+ * built again from its supplier on every lookup by id, so that it appears once its credentials are set and is gone
+ * (null: the login is refused, its button is not offered) once they are removed. A supplier that fails is no
+ * registration, never an error. Iterating (what Spring does while building the security filter chain, to list the
+ * login links) only yields the fixed registrations: the run-time ones are secondary links, never a login entry
+ * point, and building the chain must not read the database.
  */
 public class DynamicClientRegistrationRepository implements ClientRegistrationRepository, Iterable<ClientRegistration> {
 
@@ -31,7 +34,12 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
     public ClientRegistration findByRegistrationId(String registrationId) {
         Supplier<Optional<ClientRegistration>> supplier = registrationId == null ? null : dynamic.get(registrationId);
         if (supplier != null) {
-            return supplier.get().orElse(null);
+            try {
+                return supplier.get().orElse(null);
+            } catch (RuntimeException e) {
+                // Credentials unreadable now (database down…): that login is off, the others keep working
+                return null;
+            }
         }
         return fixed.findByRegistrationId(registrationId);
     }
@@ -40,7 +48,6 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
     public Iterator<ClientRegistration> iterator() {
         List<ClientRegistration> all = new ArrayList<>();
         fixed.forEach(all::add);
-        dynamic.values().forEach(supplier -> supplier.get().ifPresent(all::add));
         return all.iterator();
     }
 }
