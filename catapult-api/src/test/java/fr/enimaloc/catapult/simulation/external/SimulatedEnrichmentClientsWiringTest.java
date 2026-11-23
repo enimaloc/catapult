@@ -12,6 +12,9 @@ import fr.enimaloc.catapult.service.enrichment.riot.HttpRiotClient;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotClient;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotNotFoundException;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotPlatform;
+import fr.enimaloc.catapult.service.enrichment.faceit.FaceitClient;
+import fr.enimaloc.catapult.service.enrichment.faceit.FaceitNotFoundException;
+import fr.enimaloc.catapult.service.enrichment.faceit.HttpFaceitClient;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticClient;
 import fr.enimaloc.catapult.service.enrichment.pcgw.HttpPcGamingWikiClient;
 import fr.enimaloc.catapult.service.enrichment.prices.HttpItadClient;
@@ -73,6 +76,7 @@ class SimulatedEnrichmentClientsWiringTest {
             return mock(fr.enimaloc.catapult.service.enrichment.bungie.HttpBungieClient.class);
         }
         @Bean HttpRiotClient riot() { return mock(HttpRiotClient.class); }
+        @Bean HttpFaceitClient faceit() { return mock(HttpFaceitClient.class); }
         @Bean org.springframework.web.client.RestClient.Builder restClientBuilder() {
             return org.springframework.web.client.RestClient.builder();
         }
@@ -83,7 +87,7 @@ class SimulatedEnrichmentClientsWiringTest {
     @Configuration(proxyBeanMethods = false)
     @ComponentScan(basePackageClasses = SimulatedProtonDbClient.class, useDefaultFilters = false,
             includeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
-                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity|SteamStats|XboxStats|RetroAchievements|Blizzard|Bungie|Riot)Client|.*SimulatedBlizzardAppTokenService"))
+                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity|SteamStats|XboxStats|RetroAchievements|Blizzard|Bungie|Riot|Faceit)Client|.*SimulatedBlizzardAppTokenService"))
     static class SimulatedClients {
     }
 
@@ -107,6 +111,7 @@ class SimulatedEnrichmentClientsWiringTest {
                     .isInstanceOf(SimulatedRetroAchievementsClient.class);
             assertThat(ctx.getBean(BlizzardClient.class)).isInstanceOf(SimulatedBlizzardClient.class);
             assertThat(ctx.getBean(RiotClient.class)).isInstanceOf(SimulatedRiotClient.class);
+            assertThat(ctx.getBean(FaceitClient.class)).isInstanceOf(SimulatedFaceitClient.class);
             assertThat(ctx.getBean(BlizzardAppTokenService.class))
                     .isInstanceOf(SimulatedBlizzardAppTokenService.class);
             assertThat(ctx.getBean(fr.enimaloc.catapult.service.enrichment.bungie.BungieClient.class))
@@ -132,6 +137,7 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(fr.enimaloc.catapult.service.enrichment.bungie.BungieClient.class))
                     .isInstanceOf(fr.enimaloc.catapult.service.enrichment.bungie.HttpBungieClient.class);
             assertThat(ctx.getBean(RiotClient.class)).isInstanceOf(HttpRiotClient.class);
+            assertThat(ctx.getBean(FaceitClient.class)).isInstanceOf(HttpFaceitClient.class);
         });
     }
 
@@ -305,5 +311,19 @@ class SimulatedEnrichmentClientsWiringTest {
                 assertThat(g.championId()).isEqualTo(266));
         assertThat(riot.tftLeague(RiotPlatform.EUW1, "p", "k").getFirst().tier()).isEqualTo("PLATINUM");
         assertThat(riot.champions(riot.latestVersion(), "en_US").byKey()).containsKey("266");
+    }
+
+    @Test
+    void simulatedFaceit_answersDeterministically() {
+        var faceit = new SimulatedFaceitClient();
+        var player = faceit.playerByNickname("catapult");
+        assertThat(player.playerId()).isEqualTo(SimulatedFaceitClient.PLAYER_ID);
+        assertThat(player.cs2().elo()).isEqualTo(1850);
+        assertThat(faceit.player(SimulatedFaceitClient.PLAYER_ID).nickname()).isEqualTo("Catapult");
+        assertThatThrownBy(() -> faceit.playerByNickname("Ghost")).isInstanceOf(FaceitNotFoundException.class);
+        assertThatThrownBy(() -> faceit.player("nope")).isInstanceOf(FaceitNotFoundException.class);
+        assertThat(faceit.lifetime(SimulatedFaceitClient.PLAYER_ID, "cs2").matches()).isEqualTo(420);
+        assertThat(faceit.lastMatch(SimulatedFaceitClient.PLAYER_ID, "cs2")).hasValueSatisfying(m ->
+                assertThat(m.map()).isEqualTo("de_mirage"));
     }
 }

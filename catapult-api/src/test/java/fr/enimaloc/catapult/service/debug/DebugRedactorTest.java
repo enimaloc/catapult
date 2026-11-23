@@ -313,4 +313,15 @@ class DebugRedactorTest {
         assertThat(redactor.text("RGAPI-docs page", false)).isEqualTo("RGAPI-docs page");
         assertThat(redactor.text("refused " + key, true)).contains(key);
     }
+
+    @Test
+    void theFaceitKey_isMaskedAsItsAuthorizationHeader_andAsABearerInText() {
+        String key = "12345678-abcd-4ef0-9abc-0123456789ab";
+        assertThat(redactor.headers(header("Authorization", "Bearer " + key), false))
+                .isEqualTo("Authorization: [masqué]");
+        assertThat(redactor.text("FACEIT 401 with Authorization: Bearer " + key, false)).doesNotContain("12345678");
+        assertThat(redactor.text("FACEIT refused Bearer " + key + " at 10:00", false))
+                .isEqualTo("FACEIT refused Bearer [masqué] at 10:00");
+        assertThat(redactor.text("refused Bearer " + key, true)).contains(key);
+    }
 }
