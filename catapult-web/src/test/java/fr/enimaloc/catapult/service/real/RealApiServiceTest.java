@@ -840,6 +840,15 @@ class RealApiServiceTest {
     }
 
     @Test
+    void hypixelAccount_isSavedAndForgottenOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/hypixel/account", "{\"player\":\"Notch\"}");
+        expectDelete(channel("enimaloc") + "/settings/hypixel/account");
+
+        assertThat(service.saveHypixelAccount("enimaloc", "Notch")).isEqualTo(204);
+        assertThat(service.deleteHypixelAccount("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
     void blizzardSettings_areSavedAndForgottenOnTheChannel() {
         expectPut(channel("enimaloc") + "/settings/blizzard/region", "{\"region\":\"us\"}");
         expectPut(channel("enimaloc") + "/settings/blizzard/wow-main", "{\"region\":\"eu\",\"characterId\":1001}");
