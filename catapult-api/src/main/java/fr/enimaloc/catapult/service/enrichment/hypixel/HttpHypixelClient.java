@@ -205,6 +205,10 @@ public class HttpHypixelClient implements HypixelClient {
             String bucket = "key:" + ApiKeyHasher.id(key);
             Answer answer = send(bucket, HYPIXEL + path, key, vars);
             if (answer.status() == 403) {
+                if (!invalidKey(answer)) {
+                    // a refusal of this route only: the key stays in use for the others
+                    throw new HypixelUnavailableException("Hypixel refused the request (403)");
+                }
                 keys.onKeyRejected(key, REJECTED_FOR);
                 continue;
             }
@@ -218,6 +222,12 @@ public class HttpHypixelClient implements HypixelClient {
             return object(interpret(bucket, answer, true));
         }
         throw new HypixelUnavailableException("Hypixel refused the API key");
+    }
+
+    /** Hypixel's documented refusal of the key itself: a 403 {@code {"success":false,"cause":"Invalid API key"}}. */
+    private boolean invalidKey(Answer answer) {
+        JsonNode body = parseOrNull(answer.body());
+        return body != null && "Invalid API key".equalsIgnoreCase(text(body.path("cause")));
     }
 
     /** Charges the limiter, then sends; the key is only ever put in the {@code API-Key} header. */
@@ -240,7 +250,7 @@ public class HttpHypixelClient implements HypixelClient {
                 String retryAfter = headers.getFirst(HttpHeaders.RETRY_AFTER);
                 String remaining = headers.getFirst("RateLimit-Remaining");
                 String reset = headers.getFirst("RateLimit-Reset");
-                if (status != 404 && status != 429 && !res.getStatusCode().is2xxSuccessful()) {
+                if (status != 403 && status != 404 && status != 429 && !res.getStatusCode().is2xxSuccessful()) {
                     return new Answer(status, retryAfter, remaining, reset, null, false);
                 }
                 byte[] body = readLimited(res.getBody(), MAX_BYTES);

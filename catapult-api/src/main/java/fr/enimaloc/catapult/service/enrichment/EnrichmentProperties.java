@@ -189,6 +189,9 @@ public class EnrichmentProperties {
     private SourceSettings faceitPlayer = new SourceSettings();
     private SourceSettings faceitStats = new SourceSettings();
     private SourceSettings faceitLastMatch = new SourceSettings();
+    private SourceSettings hypixelPlayer = new SourceSettings();
+    private SourceSettings hypixelStatus = new SourceSettings();
+    private SourceSettings hypixelGames = new SourceSettings();
     private Blizzard blizzard = new Blizzard();
     private SourceSettings bungieProfile = new SourceSettings();
     private SourceSettings bungieTriumphs = new SourceSettings();
@@ -374,6 +377,9 @@ public class EnrichmentProperties {
             case CHESS_LICHESS_USER -> chessLichessUser;
             case OSU_PROFILE -> osuProfile;
             case OSU_RECENT -> osuRecent;
+            case HYPIXEL_PLAYER -> hypixelPlayer;
+            case HYPIXEL_STATUS -> hypixelStatus;
+            case HYPIXEL_GAMES -> hypixelGames;
         };
     }
 
@@ -410,6 +416,9 @@ public class EnrichmentProperties {
             case CHESS_CHESSCOM_STATS -> Duration.ofMinutes(10);
             case CHESS_CHESSCOM_GAMES, CHESS_LICHESS_USER -> Duration.ofMinutes(2);
             case OSU_PROFILE, OSU_RECENT -> Duration.ofMinutes(2);
+            case HYPIXEL_PLAYER -> Duration.ofMinutes(5);
+            case HYPIXEL_STATUS -> Duration.ofMinutes(1);
+            case HYPIXEL_GAMES -> Duration.ofDays(1);
         };
     }
 }

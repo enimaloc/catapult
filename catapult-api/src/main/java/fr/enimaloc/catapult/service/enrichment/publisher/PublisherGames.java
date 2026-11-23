@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.domain.binding.GameBinding.SourceType;
 import fr.enimaloc.catapult.getter.DetectedGame;
 
 import java.util.Locale;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.Set;
 
@@ -155,5 +156,25 @@ public final class PublisherGames {
         }
         return game != null && game.getSourceName() != null
                 && CHESS_NAMES.contains(game.getSourceName().strip().toLowerCase(Locale.ROOT));
+    }
+
+    /** The Hypixel "game" (the Minecraft server: one per publisher, its modes are in the stats). */
+    public enum HypixelGame {
+        @JsonProperty("hypixel") HYPIXEL
+    }
+
+    /**
+     * Whether a detected game is the one Hypixel is played on: a Minecraft presence detection, or one of the IGDB
+     * ids of Minecraft ({@code minecraftIgdbIds}). Whether the member is on Hypixel itself is their online status.
+     */
+    public static Optional<HypixelGame> hypixel(DetectedGame game, String igdbId, Collection<String> minecraftIgdbIds) {
+        if (game != null && game.getSourceType() == SourceType.MINECRAFT) {
+            return Optional.of(HypixelGame.HYPIXEL);
+        }
+        if (igdbId == null || igdbId.isBlank() || minecraftIgdbIds == null) {
+            return Optional.empty();
+        }
+        return minecraftIgdbIds.stream().map(String::strip).anyMatch(igdbId::equals)
+                ? Optional.of(HypixelGame.HYPIXEL) : Optional.empty();
     }
 }

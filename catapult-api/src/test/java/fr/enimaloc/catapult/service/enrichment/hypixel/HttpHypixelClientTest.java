@@ -188,7 +188,8 @@ class HttpHypixelClientTest {
 
     @Test
     void theOnlyKeyRefused_isAnOutage_andNothingIsSentWhileItIsSetAside() {
-        server.expect(requestTo(PLAYER)).andRespond(withStatus(HttpStatus.FORBIDDEN));
+        server.expect(requestTo(PLAYER)).andRespond(withStatus(HttpStatus.FORBIDDEN)
+                .contentType(MediaType.APPLICATION_JSON).body("{\"success\":false,\"cause\":\"Invalid API key\"}"));
 
         assertThatThrownBy(() -> client.player(UUID))
                 .isInstanceOf(HypixelUnavailableException.class).hasMessageNotContaining(KEY);
@@ -198,6 +199,21 @@ class HttpHypixelClientTest {
         buckets.clear();
         assertThatThrownBy(() -> client.player(UUID)).isInstanceOf(HypixelUnavailableException.class);
         assertThat(buckets).isEmpty();
+    }
+
+    @Test
+    void aForbiddenRoute_isAnOutage_withoutSettingTheKeyAside() throws IOException {
+        server.expect(requestTo(STATUS)).andRespond(withStatus(HttpStatus.FORBIDDEN)
+                .contentType(MediaType.APPLICATION_JSON).body("{\"success\":false,\"cause\":\"Forbidden\"}"));
+        server.expect(requestTo(STATUS)).andRespond(withStatus(HttpStatus.FORBIDDEN));
+        keyed(PLAYER, "player.json");
+
+        assertThatThrownBy(() -> client.status(UUID)).isInstanceOf(HypixelUnavailableException.class);
+        assertThatThrownBy(() -> client.status(UUID)).isInstanceOf(HypixelUnavailableException.class);
+
+        assertThat(rotator.blockedKeyCount()).isZero();
+        assertThat(client.player(UUID).displayName()).isEqualTo("Notch");
+        server.verify();
     }
 
     @Test
