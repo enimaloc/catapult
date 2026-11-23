@@ -38,7 +38,7 @@ import java.util.regex.Pattern;
  * response (Steam app list, IGDB game JSON) can't swamp the log line. The
  * suffix {@code …(+N bytes)} makes the cut visible.</p>
  *
- * <p>{@code Authorization} / {@code X-API-KEY} / {@code X-Riot-Token} values are never echoed — only
+ * <p>{@code Authorization} / {@code X-API-KEY} / {@code X-Riot-Token} / {@code API-Key} (Hypixel) values are never echoed — only
  * their presence is reported. Neither are the values of the {@code key},
  * {@code api_key}, {@code apikey}, {@code token}, {@code y}, {@code client_secret}, {@code access_token} and
  * {@code refresh_token} query parameters (any case),
@@ -260,7 +260,8 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
         boolean hasAuth = headers.getFirst("Authorization") != null;
         boolean hasApiKey = headers.getFirst("X-API-KEY") != null
                 || headers.getFirst("Client-Id") != null
-                || headers.getFirst("X-Riot-Token") != null;
+                || headers.getFirst("X-Riot-Token") != null
+                || headers.getFirst("API-Key") != null;
         if (hasAuth && hasApiKey) return "Bearer+ApiKey";
         if (hasAuth) return "Bearer";
         if (hasApiKey) return "ApiKey";

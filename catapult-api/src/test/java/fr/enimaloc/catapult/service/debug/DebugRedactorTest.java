@@ -228,6 +228,18 @@ class DebugRedactorTest {
     }
 
     @Test
+    void hypixel_apiKeyHeader_isMasked_asHeaderAndInFreeText() {
+        String key = "12345678-abcd-4ef0-9abc-0123456789ab";
+        assertThat(redactor.headers(header("API-Key", key), false)).isEqualTo("API-Key: [masqué]");
+        assertThat(redactor.headers(header("api-key", key), false)).isEqualTo("api-key: [masqué]");
+        assertThat(redactor.text("request headers:\nAPI-Key: " + key + "\nAccept: */*", false))
+                .isEqualTo("request headers:\nAPI-Key: [masqué]\nAccept: */*");
+        assertThat(redactor.text("{\"API-Key\":\"" + key + "\"}", false)).doesNotContain(key);
+        assertThat(redactor.text("GET https://api.hypixel.net/v2/player?uuid=069a&key=" + key, false))
+                .doesNotContain(key).contains("uuid=069a");
+    }
+
+    @Test
     void anyNameCarryingACredential_isMasked_byRule() {
         assertThat(json("{\"client_assertion_secret\":\"a\",\"sessionTicket\":\"b\",\"x_signature\":\"c\","
                 + "\"new_password\":\"d\",\"tokenType\":\"JWT\"}"))

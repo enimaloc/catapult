@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.common.dto.channel.RiotData;
 import fr.enimaloc.catapult.common.dto.channel.FaceitData;
 import fr.enimaloc.catapult.common.dto.channel.ChessData;
 import fr.enimaloc.catapult.common.dto.channel.OsuAccountData;
+import fr.enimaloc.catapult.common.dto.channel.HypixelData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
@@ -189,6 +190,12 @@ public class ChannelEventPublisher {
     public void osuAccountChanged(UUID channelOwnerId, OsuAccountData account) {
         publish(channelOwnerId, ChannelEvents.OSU_ACCOUNT_CHANGED,
                 (id, login) -> new ChannelEvents.OsuAccountChanged(id, login, account));
+    }
+
+    /** The owner's Hypixel settings now stand as {@code account} (the Minecraft name and UUID only). */
+    public void hypixelAccountChanged(UUID channelOwnerId, HypixelData account) {
+        publish(channelOwnerId, ChannelEvents.HYPIXEL_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.HypixelAccountChanged(id, login, account));
     }
 
     /** The owner's RetroAchievements settings now stand as {@code account} (the name only, never the key). */

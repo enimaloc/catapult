@@ -270,7 +270,8 @@ public class ChannelFixture {
                 mock(fr.enimaloc.catapult.service.riot.RiotAccountService.class),
                 mock(fr.enimaloc.catapult.service.faceit.FaceitAccountService.class),
                 mock(fr.enimaloc.catapult.service.chess.ChessAccountService.class),
-                mock(fr.enimaloc.catapult.service.osu.OsuLinkService.class));
+                mock(fr.enimaloc.catapult.service.osu.OsuLinkService.class),
+                mock(fr.enimaloc.catapult.service.hypixel.HypixelAccountService.class));
     }
 
     /** The category events and Twitch writes, in order. */

@@ -134,6 +134,10 @@ class GameEnrichmentAssemblerTest {
     private final FaceitStatsService faceitStats = mock(FaceitStatsService.class);
     private final fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService osuStats =
             mock(fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService.class);
+    private final fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService hypixelStats =
+            mock(fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService.class);
+    private final fr.enimaloc.catapult.service.enrichment.hypixel.HypixelGameDataService hypixelData =
+            mock(fr.enimaloc.catapult.service.enrichment.hypixel.HypixelGameDataService.class);
     private final EnrichmentProperties properties = new EnrichmentProperties();
 
     private GameEnrichmentAssembler assembler;
@@ -145,7 +149,7 @@ class GameEnrichmentAssemblerTest {
                 twitch, speedrunGames, speedrunIdentity, speedrunPersonal, igdbService, igdbGameDetailsService,
                 trailers, steamStats, xboxStats, raStats, blizzardStats, blizzardData, bungieStats, bungieData,
                 riotStats, riotData, faceitStats,
-                properties, chessStats, osuStats);
+                properties, chessStats, osuStats, hypixelStats, hypixelData);
         when(hltb.timeToBeat(any(), any())).thenReturn(Optional.of(TTB));
         when(protonDb.summary(anyString(), any())).thenReturn(Optional.of(PROTON));
         when(steamGridDb.bySteamAppId(anyString(), any())).thenReturn(Optional.of(SGDB));
@@ -395,6 +399,8 @@ class GameEnrichmentAssemblerTest {
                 .withBean(FaceitStatsService.class, () -> faceitStats)
                 .withBean(fr.enimaloc.catapult.service.enrichment.chess.ChessStatsService.class, () -> chessStats)
                 .withBean(fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService.class, () -> osuStats)
+                .withBean(fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService.class, () -> hypixelStats)
+                .withBean(fr.enimaloc.catapult.service.enrichment.hypixel.HypixelGameDataService.class, () -> hypixelData)
                 .withBean(EnrichmentProperties.class)
                 .withUserConfiguration(GameEnrichmentAssembler.class)
                 .run(ctx -> assertThat(ctx).hasSingleBean(GameEnrichmentAssembler.class));
@@ -1025,5 +1031,43 @@ class GameEnrichmentAssemblerTest {
 
         assertThat(result.stats().osu()).isEqualTo(OSU_STATS);
         assertThat(result.stats().bungie()).isNull();
+    }
+
+    // ---------------------------------------------------------------- Hypixel
+
+    private static final DetectedGame MINECRAFT = new DetectedGame("minecraft", GameBinding.SourceType.MINECRAFT,
+            "Minecraft");
+    private static final fr.enimaloc.catapult.service.enrichment.hypixel.HypixelPublisher HYPIXEL_GAMES =
+            new fr.enimaloc.catapult.service.enrichment.hypixel.HypixelPublisher(
+                    fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.HypixelGame.HYPIXEL,
+                    List.of(new fr.enimaloc.catapult.service.enrichment.hypixel.HypixelPublisher.HypixelPublishedGame(
+                            "BEDWARS", "Bed Wars")));
+
+    @Test
+    void publicAggregateHasNoHypixelStats_butTheGames() {
+        when(hypixelStats.gameOf(eq(MINECRAFT), any())).thenReturn(Optional.of(
+                fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.HypixelGame.HYPIXEL));
+        when(hypixelData.forGame(any(), any())).thenReturn(Optional.of(HYPIXEL_GAMES));
+
+        GameEnrichment result = assembler.enrich(MINECRAFT, Optional.empty(), Optional.empty(), "Minecraft",
+                "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
+
+        assertThat(result.stats()).isNull();
+        verify(hypixelStats, never()).forDetected(any(), any(), any(), any());
+        assertThat(result.publisher()).isEqualTo(new PublisherEnrichment(null, null, null, HYPIXEL_GAMES));
+    }
+
+    @Test
+    void memberHypixelStats_comeWithTheMember() {
+        UserAccount user = member();
+        var stats = new fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStats(Status.OK,
+                fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.HypixelGame.HYPIXEL, "Notch", null,
+                null, null, null, null);
+        when(hypixelStats.forDetected(eq(user), eq(MINECRAFT), any(), any())).thenReturn(Optional.of(stats));
+
+        GameEnrichment result = assembler.enrich(MINECRAFT, Optional.empty(), Optional.empty(), "Minecraft",
+                "FR", null, LINKS, Optional.of(user), Locale.FRENCH);
+
+        assertThat(result.stats().hypixel()).isEqualTo(stats);
     }
 }

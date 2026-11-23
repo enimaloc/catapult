@@ -208,6 +208,8 @@ abstract class AccessMatrixSupport {
     /** The chess settings check the Chess.com or Lichess name a member saves. */
     @MockitoBean
     fr.enimaloc.catapult.service.enrichment.chess.ChessClient chessClient;
+    @MockitoBean
+    fr.enimaloc.catapult.service.enrichment.hypixel.HypixelClient hypixelClient;
 
     @Autowired
     MockMvc mvc;

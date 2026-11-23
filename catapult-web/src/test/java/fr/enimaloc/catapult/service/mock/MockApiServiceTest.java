@@ -589,6 +589,25 @@ class MockApiServiceTest {
     }
 
     @Test
+    void hypixelAccount_isSavedByNameOrUuid_refusedWhenMalformed_andForgotten() {
+        assertThat(service.saveHypixelAccount(username, "not a name!")).isEqualTo(400);
+        assertThat(service.saveHypixelAccount(username, "ghost")).isEqualTo(400);
+
+        assertThat(service.saveHypixelAccount(username, "Notch")).isEqualTo(204);
+        assertThat(data.hypixelData().name()).isEqualTo("Notch");
+        assertThat(data.hypixelData().uuid()).hasSize(32);
+
+        assertThat(service.saveHypixelAccount(username, "069A79F4-44E9-4726-A5BE-FCA90E38AAF5")).isEqualTo(204);
+        assertThat(data.hypixelData().uuid()).isEqualTo("069a79f444e94726a5befca90e38aaf5");
+
+        assertThat(service.deleteHypixelAccount(username)).isEqualTo(204);
+        assertThat(data.hypixelData().uuid()).isNull();
+
+        assertThat(events).hasSize(3).allSatisfy(event ->
+                assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.hypixel.HypixelAccountChangedEvent.class));
+    }
+
+    @Test
     void ankamaStatus_isTheMockLink() {
         assertThat(service.ankamaStatus(username)).isEqualTo(data.getAnkamaLink());
     }

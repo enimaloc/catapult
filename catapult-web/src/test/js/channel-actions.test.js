@@ -301,6 +301,9 @@ describe("channel-connections", () => {
               <input id="retroachievements-key-input" value=" abc123 ">
               <button id="retroachievements-key-save-btn"></button>
               <button id="retroachievements-key-delete-btn"></button>
+              <input id="hypixel-player-input" value="  Notch ">
+              <button id="hypixel-save-btn"></button>
+              <button id="hypixel-delete-btn"></button>
               <input id="faceit-nickname-input" value="  Catapult ">
               <button id="faceit-save-btn"></button>
               <button id="faceit-delete-btn"></button>
@@ -524,6 +527,40 @@ describe("channel-connections", () => {
             expect(snackbars()).toEqual([
                 "FACEIT does not know this nickname",
                 "FACEIT cannot be reached right now: try again later.",
+            ]);
+        });
+    });
+
+    describe("the Hypixel account", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
+        it("saves the trimmed name, and removes it with a post", async () => {
+            await click("#hypixel-save-btn");
+            await click("#hypixel-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/hypixel/account", { player: "Notch" }],
+                ["/channel/enimaloc/settings/hypixel/account/delete", {}],
+            ]);
+            expect(snackbars()).toEqual([]);
+        });
+
+        it("sends nothing for an empty entry", async () => {
+            document.getElementById("hypixel-player-input").value = "  ";
+            await click("#hypixel-save-btn");
+
+            expect(posts()).toEqual([]);
+        });
+
+        it("tells an unknown account, and that Hypixel cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(400));
+            await click("#hypixel-save-btn");
+            posted.mockResolvedValueOnce(response(503));
+            await click("#hypixel-save-btn");
+
+            expect(snackbars()).toEqual([
+                "This name does not exist, or this account never joined Hypixel.",
+                "Hypixel cannot be reached right now: try again later.",
             ]);
         });
     });

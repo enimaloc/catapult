@@ -271,6 +271,20 @@ public class ChannelActionsController {
         return ApiStatus.answer(apiService.deleteBlizzardWowCharacters(username));
     }
 
+    // The member's Minecraft account for Hypixel: 400 for a malformed or unknown name or an account that never joined
+    // Hypixel, 429 when their refreshes are spent, 503 when Hypixel cannot be asked.
+
+    @PostMapping("/channel/{username}/settings/hypixel/account")
+    public ResponseEntity<Void> saveHypixelAccount(@PathVariable String username,
+                                                   @RequestBody fr.enimaloc.catapult.common.dto.channel.HypixelAccountRequest body) {
+        return ApiStatus.answer(apiService.saveHypixelAccount(username, body == null ? null : body.player()));
+    }
+
+    @PostMapping("/channel/{username}/settings/hypixel/account/delete")
+    public ResponseEntity<Void> deleteHypixelAccount(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteHypixelAccount(username));
+    }
+
     // Unlinking Bungie.net; linking is a login (/oauth2/authorization/bungie), not a route here.
     @PostMapping("/channel/{username}/settings/bungie/delete")
     public ResponseEntity<Void> deleteBungieLink(@PathVariable String username) {

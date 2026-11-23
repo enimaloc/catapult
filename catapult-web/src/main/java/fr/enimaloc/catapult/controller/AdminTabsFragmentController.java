@@ -491,6 +491,7 @@ public class AdminTabsFragmentController {
             model.addAttribute("bungie", apiService.adminBungieCredentials());
             model.addAttribute("riot", apiService.adminApiKeys(ApiKeyProvider.RIOT));
             model.addAttribute("faceit", apiService.adminApiKeys(ApiKeyProvider.FACEIT));
+            model.addAttribute("hypixel", apiService.adminApiKeys(ApiKeyProvider.HYPIXEL));
             model.addAttribute("minecraft", apiService.adminMinecraftAccounts());
             model.addAttribute("battlenet", apiService.adminBattleNetAccounts());
             model.addAttribute("ankama", apiService.adminAnkamaAccounts());

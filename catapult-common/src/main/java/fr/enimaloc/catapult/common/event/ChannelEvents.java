@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.common.dto.channel.RiotData;
 import fr.enimaloc.catapult.common.dto.channel.FaceitData;
 import fr.enimaloc.catapult.common.dto.channel.ChessData;
 import fr.enimaloc.catapult.common.dto.channel.OsuAccountData;
+import fr.enimaloc.catapult.common.dto.channel.HypixelData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 
 import java.util.List;
@@ -54,6 +55,7 @@ public final class ChannelEvents {
     public static final String FACEIT_ACCOUNT_CHANGED = "faceit.account.changed";
     public static final String CHESS_ACCOUNT_CHANGED = "chess.account.changed";
     public static final String OSU_ACCOUNT_CHANGED = "osu.account.changed";
+    public static final String HYPIXEL_ACCOUNT_CHANGED = "hypixel.account.changed";
     public static final String CUSTOM_BINDING_CHANGED = "custom.binding.changed";
     public static final String CUSTOM_BINDINGS_UPDATED = "custom.bindings.updated";
 
@@ -152,6 +154,9 @@ public final class ChannelEvents {
 
     /** The owner's osu! link changed: {@code account} is how the card stands now (names only, never a token). */
     public record OsuAccountChanged(String channelId, String channelLogin, OsuAccountData account) {}
+
+    /** The owner's Hypixel settings changed: {@code account} is how the settings card stands now (no secret). */
+    public record HypixelAccountChanged(String channelId, String channelLogin, HypixelData account) {}
 
     /**
      * The owner's RetroAchievements settings changed: {@code account} is how the settings card stands now. It

@@ -97,6 +97,7 @@ class AccountResolutionPerRequestTest {
     @MockitoBean ChannelEventPublisher channelEventPublisher;
     @MockitoBean fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinkService;
     @MockitoBean fr.enimaloc.catapult.service.osu.OsuLinkService osuLinkService;
+    @MockitoBean fr.enimaloc.catapult.service.hypixel.HypixelAccountService hypixelAccountService;
     @MockitoBean SchedulerService schedulerService;
     @MockitoBean TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     @MockitoBean TwitchatEventActionService twitchatEventActionService;

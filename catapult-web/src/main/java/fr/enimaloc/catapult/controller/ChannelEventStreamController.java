@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent;
 import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
 import fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent;
 import fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent;
+import fr.enimaloc.catapult.event.hypixel.HypixelAccountChangedEvent;
 import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
 import fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent;
 import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
@@ -108,7 +109,7 @@ public class ChannelEventStreamController {
     /**
      * {@code event} as a moderator's stream gets it: without the custom bindings, which catapult-api shows the
      * owner alone (their page has no list to update). Null when they get nothing at
-     * all: the Battle.net, Ankama and Epic links and the speedrun.com, RetroAchievements, Blizzard, Bungie, Riot, FACEIT, chess and osu! accounts, whose names and
+     * all: the Battle.net, Ankama and Epic links and the speedrun.com, RetroAchievements, Blizzard, Bungie, Riot, FACEIT, chess, osu! and Hypixel accounts, whose names and
      * card are the owner's alone.
      */
     static ChannelUpdatedEvent forModerators(ChannelUpdatedEvent event) {
@@ -120,7 +121,8 @@ public class ChannelEventStreamController {
                 || event instanceof RiotAccountChangedEvent
                 || event instanceof FaceitAccountChangedEvent
                 || event instanceof ChessAccountChangedEvent
-                || event instanceof OsuAccountChangedEvent) {
+                || event instanceof OsuAccountChangedEvent
+                || event instanceof HypixelAccountChangedEvent) {
             return null;
         }
         return event instanceof CustomBindingsUpdatedEvent updated ? new CustomBindingsUpdatedEvent(updated.username())

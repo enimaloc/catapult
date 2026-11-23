@@ -1,5 +1,5 @@
 /**
- * Handlers for the Steam/Minecraft/Battle.net/Ankama/Epic/Speedrun.com/RetroAchievements/Blizzard stats/Riot/FACEIT/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
+ * Handlers for the Steam/Minecraft/Battle.net/Ankama/Epic/Speedrun.com/RetroAchievements/Blizzard stats/Hypixel/Riot/FACEIT/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
  * pre-rendered and only toggled via the `hidden` class (spa:if/spa:switch, see
  * channel.html) instead of being created/destroyed per SSE event, so handlers only
  * need attaching once, at render — no refresh() either: the SSE echo updates the cards.
@@ -270,6 +270,16 @@ window.CatapultConnections = (function () {
         });
         on("retroachievements-key-delete-btn", "click", () =>
             postJson(`${baseUrl}/settings/retroachievements/api-key/delete`, {}));
+
+        // Hypixel: a Minecraft name or UUID, checked by Hypixel first; the card follows from
+        // HypixelAccountChangedEvent.
+        on("hypixel-save-btn", "click", async () => {
+            const input = document.getElementById("hypixel-player-input");
+            await saveSpeedrun(`${baseUrl}/settings/hypixel/account`, { player: input.value.trim() }, input,
+                ["labelHypixelRefused", "This name does not exist, or this account never joined Hypixel."],
+                ["labelHypixelUnavailable", "Hypixel cannot be reached right now: try again later."]);
+        });
+        on("hypixel-delete-btn", "click", () => postJson(`${baseUrl}/settings/hypixel/account/delete`, {}));
 
         // Riot: the Riot ID and the server are saved together, Riot checking the Riot ID first; the card follows
         // from RiotAccountChangedEvent.

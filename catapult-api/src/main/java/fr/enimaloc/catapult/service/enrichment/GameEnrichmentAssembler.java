@@ -20,6 +20,9 @@ import fr.enimaloc.catapult.service.enrichment.chess.ChessStats;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessStatsService;
 import fr.enimaloc.catapult.service.enrichment.osu.OsuStats;
 import fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService;
+import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelGameDataService;
+import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStats;
+import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticService;
@@ -133,6 +136,8 @@ public class GameEnrichmentAssembler {
     private final EnrichmentProperties properties;
     private final ChessStatsService chessStatsService;
     private final OsuStatsService osuStatsService;
+    private final HypixelStatsService hypixelStatsService;
+    private final HypixelGameDataService hypixelGameDataService;
 
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
@@ -172,6 +177,8 @@ public class GameEnrichmentAssembler {
         var bungiePublisher = supply("bungie publisher", () -> PublisherGames.bungie(igdb)
                 .flatMap(game -> bungieGameDataService.forGame(game, locale, FetchBudget.UNLIMITED)).orElse(null));
         var riotPublisher = supply("riot publisher", () -> riotPublisher(igdb));
+        var hypixelPublisher = supply("hypixel publisher", () -> hypixelStatsService.gameOf(detected, igdb)
+                .flatMap(game -> hypixelGameDataService.forGame(game, FetchBudget.UNLIMITED)).orElse(null));
 
         return new GameEnrichment(
                 await(hltb, deadline, "hltb"),
@@ -188,7 +195,8 @@ public class GameEnrichmentAssembler {
                 stats == null ? null : stats.await(deadline),
                 PublisherEnrichment.of(await(blizzardPublisher, deadline, "blizzard publisher"),
                         await(bungiePublisher, deadline, "bungie publisher"),
-                        await(riotPublisher, deadline, "riot publisher")));
+                        await(riotPublisher, deadline, "riot publisher"),
+                        await(hypixelPublisher, deadline, "hypixel publisher")));
     }
 
     /** The public data of the Riot game {@code igdb} is (the current patch); null when it is none or has none. */
@@ -258,7 +266,10 @@ public class GameEnrichmentAssembler {
                 .forDetected(user, detected, igdb, FetchBudget.UNLIMITED).orElse(null));
         CompletableFuture<OsuStats> osu = supply("osu stats", () -> osuStatsService
                 .forDetected(user, igdb, FetchBudget.UNLIMITED).orElse(null));
-        return new Stats(steam, xbox, retro, blizzard, detected.getSourceType(), bungie, riot, faceit, chess, osu);
+        CompletableFuture<HypixelStats> hypixel = supply("hypixel stats", () -> hypixelStatsService
+                .forDetected(user, detected, igdb, FetchBudget.UNLIMITED).orElse(null));
+        return new Stats(steam, xbox, retro, blizzard, detected.getSourceType(), bungie, riot, faceit, chess, osu,
+                hypixel);
     }
 
     private PlatformStats xboxStats(UserAccount user, DetectedGame detected, String igdb, String searched,
@@ -293,7 +304,7 @@ public class GameEnrichmentAssembler {
                          CompletableFuture<BlizzardStats> blizzard, GameBinding.SourceType detectedOn,
                          CompletableFuture<BungieStats> bungie, CompletableFuture<RiotStats> riot,
                          CompletableFuture<FaceitStats> faceit, CompletableFuture<ChessStats> chess,
-                         CompletableFuture<OsuStats> osu) {
+                         CompletableFuture<OsuStats> osu, CompletableFuture<HypixelStats> hypixel) {
 
         /** What arrived before {@code deadline}; null when no platform applies. */
         PersonalStatsEnrichment await(long deadline) {
@@ -306,7 +317,8 @@ public class GameEnrichmentAssembler {
                     GameEnrichmentAssembler.await(riot, deadline, "riot stats"),
                     GameEnrichmentAssembler.await(faceit, deadline, "faceit stats"),
                     GameEnrichmentAssembler.await(chess, deadline, "chess stats"),
-                    GameEnrichmentAssembler.await(osu, deadline, "osu stats"));
+                    GameEnrichmentAssembler.await(osu, deadline, "osu stats"),
+                    GameEnrichmentAssembler.await(hypixel, deadline, "hypixel stats"));
         }
     }
 

@@ -14,6 +14,8 @@ import fr.enimaloc.catapult.service.enrichment.bungie.BungieStats;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotPublisher;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotStats;
 import fr.enimaloc.catapult.service.enrichment.faceit.FaceitStats;
+import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelPublisher;
+import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStats;
 import fr.enimaloc.catapult.service.enrichment.osu.OsuStats;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessStats;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
@@ -318,7 +320,14 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
      */
     public record StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
                               @JsonIgnore GameBinding.SourceType detectedOn, BungieStats bungie, RiotStats riot,
-                              FaceitStats faceit, ChessStats chess, OsuStats osu) {
+                              FaceitStats faceit, ChessStats chess, OsuStats osu, HypixelStats hypixel) {
+
+        /** Without the Hypixel stats. */
+        public StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
+                           GameBinding.SourceType detectedOn, BungieStats bungie, RiotStats riot,
+                           FaceitStats faceit, ChessStats chess, OsuStats osu) {
+            this(steam, xbox, retroachievements, blizzard, detectedOn, bungie, riot, faceit, chess, osu, null);
+        }
 
         /** Without the osu! stats. */
         public StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
@@ -359,7 +368,7 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
             return new StatsObject(SteamStats.of(s.steam(), links), XboxStats.of(s.xbox(), links),
                     RaStats.of(s.retroachievements(), links), blizzardStats(s.blizzard(), links), s.detectedOn(),
                     bungieStats(s.bungie(), links), riotStats(s.riot(), links), faceitStats(s.faceit(), links),
-                    chessStats(s.chess(), links), osuStats(s.osu(), links));
+                    chessStats(s.chess(), links), osuStats(s.osu(), links), hypixelStats(s.hypixel(), links));
         }
 
         List<PlatformObject> platforms() {
@@ -482,12 +491,22 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
 
     /**
      * The publishers' public data on the game (Blizzard: WoW Token price, latest Hearthstone set, Diablo III
-     * season), null when no publisher applies. Public game data: never anything about the member.
+     * season; Bungie: the current season; Riot: the current patch; Hypixel: the games played on the server), null
+     * when no publisher applies. Public game data: never anything about the member.
      */
-    public record PublisherObject(BlizzardPublisher blizzard, BungiePublisher bungie, RiotPublisher riot) {
+    public record PublisherObject(BlizzardPublisher blizzard, BungiePublisher bungie, RiotPublisher riot,
+                                  HypixelPublisher hypixel) {
         static PublisherObject of(PublisherEnrichment p) {
-            return p == null ? null : new PublisherObject(p.blizzard(), p.bungie(), p.riot());
+            return p == null ? null : new PublisherObject(p.blizzard(), p.bungie(), p.riot(), p.hypixel());
         }
+    }
+
+    /**
+     * The member's Hypixel stats with the "more" link to {@code /api/me/stats/hypixel}: the aggregate and the detail
+     * route serve this same record.
+     */
+    static HypixelStats hypixelStats(HypixelStats s, MoreLinks links) {
+        return s == null ? null : s.withMore(links.toMe(ApiV2.ME_STATS_PATH + "/hypixel"));
     }
 
     /**

@@ -702,6 +702,38 @@ public class MockApiService implements ApiService {
         return NO_CONTENT;
     }
 
+    /** Like catapult-api: a Minecraft name or UUID; the name "ghost" is unknown, "stranger" never joined Hypixel. */
+    @Override
+    public int saveHypixelAccount(String username, String player) {
+        log.trace("saveHypixelAccount({}, {})", username, player);
+        String raw = player == null ? "" : player.strip();
+        boolean uuid = raw.matches("[0-9a-fA-F]{32}|[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}");
+        if (!uuid && !raw.matches("[A-Za-z0-9_]{3,16}")) {
+            return BAD_REQUEST;
+        }
+        if (raw.equalsIgnoreCase("ghost") || raw.equalsIgnoreCase("stranger")) {
+            return BAD_REQUEST;
+        }
+        String id = uuid ? raw.replace("-", "").toLowerCase(java.util.Locale.ROOT)
+                : java.util.UUID.nameUUIDFromBytes(raw.toLowerCase(java.util.Locale.ROOT)
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString().replace("-", "");
+        return hypixelChanged(username, data -> data.saveHypixelAccount(uuid ? id : raw, id));
+    }
+
+    @Override
+    public int deleteHypixelAccount(String username) {
+        log.trace("deleteHypixelAccount({})", username);
+        return hypixelChanged(username, MockData::deleteHypixelAccount);
+    }
+
+    private int hypixelChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(fr.enimaloc.catapult.event.hypixel.HypixelAccountChangedEvent.of(username,
+                data.hypixelData()));
+        return NO_CONTENT;
+    }
+
     private int retroAchievementsChanged(String username, java.util.function.Consumer<MockData> change) {
         MockData data = currentData();
         change.accept(data);

@@ -57,6 +57,9 @@ public class ExternalServices {
         if (within(host, "ppy.sh")) {
             return "osu";
         }
+        if (within(host, "hypixel.net")) {
+            return "hypixel";
+        }
         if (within(host, "ankama.com")) {
             return "ankama";
         }

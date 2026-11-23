@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.FaceitData;
 import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
+import fr.enimaloc.catapult.common.dto.channel.HypixelData;
 import fr.enimaloc.catapult.common.dto.channel.RiotData;
 import fr.enimaloc.catapult.common.dto.channel.OsuAccountData;
 import fr.enimaloc.catapult.common.dto.channel.EpicData;
@@ -92,6 +93,9 @@ public final class IntegrationCards {
         }
         if (ch.bungie() != null) {
             cards.add(bungie(ch.bungie()));
+        }
+        if (ch.hypixel() != null) {
+            cards.add(hypixel(ch.hypixel()));
         }
         if (ch.riot() != null) {
             cards.add(riot(ch.riot()));
@@ -578,6 +582,36 @@ public final class IntegrationCards {
                                 new Button(Attrs.id("blizzard-forget-btn").withState(importedState),
                                         Button.Kind.TEXT, key(BLIZZARD_PREFIX + "forget")))),
                         new Text(Attrs.cls("blizzard-stats-help"), true, key(BLIZZARD_PREFIX + "help")))));
+    }
+
+    // Hypixel: the Minecraft account the member declares (a name, looked up at Mojang, or a UUID), checked with Hypixel
+    // before anything is kept. The declared one shows as a chip that HypixelAccountChangedEvent replaces in place.
+    // Without a key in the shared pool the card says the stats are off on this instance (a save would be refused).
+    // No secret is ever held for a member.
+
+    private static final String HYPIXEL_EVENT = "HypixelAccountChangedEvent";
+    private static final String HYPIXEL_PREFIX = PREFIX + "hypixel.";
+
+    static IntegrationDto hypixel(HypixelData hypixel) {
+        boolean declared = hypixel.uuid() != null && !hypixel.uuid().isBlank();
+        SpaState declaredState = SpaState.flag("hypixelDeclared", declared, HYPIXEL_EVENT + ".uuid");
+        return wideCard("hypixel",
+                new Container(Attrs.cls("hypixel-account").withState(declaredState), Container.Kind.DIV, List.of(
+                        new Text(Attrs.NONE, false, key(HYPIXEL_PREFIX + "account")),
+                        new Chip(Attrs.cls("hypixel-account-name").withState(
+                                SpaState.sync("textContent", HYPIXEL_EVENT + ".name")),
+                                Message.literal(declared && hypixel.name() != null ? hypixel.name() : "")))),
+                new Text(Attrs.cls("hypixel-none").withState(SpaState.flag("hypixelNone", !declared,
+                        HYPIXEL_EVENT + ".!uuid")), false, key(HYPIXEL_PREFIX + "none")),
+                new Text(Attrs.cls("hypixel-unavailable").withState(SpaState.flag("hypixelUnavailable",
+                        !hypixel.available(), HYPIXEL_EVENT + ".!available")), true, key(HYPIXEL_PREFIX + "unavailable")),
+                new Input(Attrs.id("hypixel-player-input"), "text", key(HYPIXEL_PREFIX + "player.placeholder"), null,
+                        null, null, null, "off"),
+                new Container(Attrs.id("hypixel-actions").withClass("card-actions"), Container.Kind.SEGMENTED_GROUP,
+                        List.of(segmented(Attrs.id("hypixel-save-btn"), key(HYPIXEL_PREFIX + "save")),
+                                segmented(Attrs.id("hypixel-delete-btn").withState(declaredState),
+                                        key(HYPIXEL_PREFIX + "delete")))),
+                new Text(Attrs.cls("hypixel-help"), true, key(HYPIXEL_PREFIX + "help")));
     }
 
     // Bungie: the owner's Bungie.net link (Destiny 2 stats). Linking leaves for Bungie's login (catapult-api's

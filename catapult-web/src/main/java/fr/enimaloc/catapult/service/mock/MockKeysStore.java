@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * The mock's Steam, DTDD, SteamGridDB, IsThereAnyDeal, OpenCritic, RetroAchievements, Riot and FACEIT shared API keys: one store for the whole application. Answers like
+ * The mock's Steam, DTDD, SteamGridDB, IsThereAnyDeal, OpenCritic, RetroAchievements, Riot, FACEIT and Hypixel shared API keys: one store for the whole application. Answers like
  * catapult-api: the same key formats (400 otherwise), an already listed key changes nothing, an
  * unknown key id is a 404, and only the masked form ever leaves the store.
  */
@@ -28,6 +28,8 @@ class MockKeysStore {
             ApiKeyProvider.RIOT, Pattern.compile(
                     "RGAPI-[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"),
             ApiKeyProvider.FACEIT, Pattern.compile(
+                    "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"),
+            ApiKeyProvider.HYPIXEL, Pattern.compile(
                     "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"));
 
     private final Map<ApiKeyProvider, List<String>> keys = new EnumMap<>(ApiKeyProvider.class);
@@ -42,6 +44,7 @@ class MockKeysStore {
         keys.put(ApiKeyProvider.RETROACHIEVEMENTS, new ArrayList<>(List.of("MockRaKey0123456789abcdefghijklmn")));
         keys.put(ApiKeyProvider.RIOT, new ArrayList<>(List.of("RGAPI-00000000-0000-4000-8000-000000000000")));
         keys.put(ApiKeyProvider.FACEIT, new ArrayList<>(List.of("00000000-0000-4000-8000-0000000fac17")));
+        keys.put(ApiKeyProvider.HYPIXEL, new ArrayList<>(List.of("00000000-0000-4000-8000-00000000beef")));
     }
 
     private static String mask(String key) {
@@ -60,7 +63,8 @@ class MockKeysStore {
         if (provider == ApiKeyProvider.STEAMGRIDDB || provider == ApiKeyProvider.ITAD
                 || provider == ApiKeyProvider.OPENCRITIC || provider == ApiKeyProvider.RETROACHIEVEMENTS
                 || provider == ApiKeyProvider.RIOT
-                || provider == ApiKeyProvider.FACEIT) {
+                || provider == ApiKeyProvider.FACEIT
+                || provider == ApiKeyProvider.HYPIXEL) {
             return new KeyUsageDto(window, null, 60, null, "DAY", 40 + tick % 20, null, null);
         }
         return provider == ApiKeyProvider.STEAM
