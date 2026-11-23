@@ -54,6 +54,8 @@ import fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddSearchCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
@@ -111,6 +113,75 @@ public interface ApiService {
     int saveSteamToken(String username, String token, boolean shared);
     int steamTokenSharing(String username, boolean shared);
     int deleteSteamToken(String username);
+
+    /**
+     * Declares {@code speedrunName} as the channel owner's speedrun.com name; catapult-api's status: 400 when
+     * speedrun.com does not know it, 503 when it cannot be asked.
+     */
+    int saveSpeedrunUsername(String username, String speedrunName);
+    int deleteSpeedrunUsername(String username);
+    /** Saves the owner's personal speedrun.com key (never logged); 400 when speedrun.com refuses it, 503 when unreachable. */
+    int saveSpeedrunApiKey(String username, String apiKey);
+    int deleteSpeedrunApiKey(String username);
+    /**
+     * Declares {@code raName} as the channel owner's RetroAchievements name; catapult-api's status: 400 when
+     * RetroAchievements does not know it, 503 when it cannot be asked.
+     */
+    int saveRetroAchievementsUsername(String username, String raName);
+
+    /**
+     * Declares {@code nickname} as the channel owner's FACEIT nickname; catapult-api's status: 400 when malformed or
+     * unknown to FACEIT, 503 when FACEIT cannot be asked.
+     */
+    int saveFaceitNickname(String username, String nickname);
+
+    int deleteFaceitNickname(String username);
+
+    /**
+     * Declares {@code riotId} ({@code gameName#tagLine}) on the League of Legends {@code platform} as the channel
+     * owner's; catapult-api's status: 400 when malformed or unknown to Riot, 503 when Riot cannot be asked.
+     */
+    int saveRiotAccount(String username, String riotId, String platform);
+
+    int deleteRiotAccount(String username);
+    int deleteRetroAchievementsUsername(String username);
+    /** Saves the owner's personal RetroAchievements key (never logged); 400 when refused, 503 when unreachable. */
+    int saveRetroAchievementsApiKey(String username, String apiKey);
+    int deleteRetroAchievementsApiKey(String username);
+    /** Sets the region of the owner's Battle.net account (400 for an unknown one, 404 without a Battle.net link). */
+    int saveBlizzardRegion(String username, String region);
+    /** Picks the imported World of Warcraft character {@code characterId} of {@code region} as the owner's main (400 when not one). */
+    int saveBlizzardWowMain(String username, String region, long characterId);
+    /** Forgets the owner's imported World of Warcraft characters and their main. */
+    int deleteBlizzardWowCharacters(String username);
+    /**
+     * Declares {@code player} (a Minecraft name or UUID) as the channel owner's account for Hypixel; catapult-api's
+     * status: 400 when malformed, unknown or never on Hypixel, 429 when their refreshes are spent, 503 when Hypixel
+     * cannot be asked.
+     */
+    int saveHypixelAccount(String username, String player);
+
+    int deleteHypixelAccount(String username);
+
+    /**
+     * Declares {@code tag} as the channel owner's player in the Supercell {@code game} ({@code clash-of-clans},
+     * {@code clash-royale}, {@code brawl-stars}); catapult-api's status: 400 when the game is unknown or the tag
+     * malformed or no player's, 429 when their refreshes are spent, 503 when Supercell cannot be asked.
+     */
+    int saveSupercellAccount(String username, String game, String tag);
+
+    int deleteSupercellAccount(String username, String game);
+
+    /** Unlinks the owner's Bungie.net account and forgets their Destiny 2 stats. */
+    int deleteBungieLink(String username);
+    /**
+     * Declares {@code name} as the channel owner's account on chess site {@code site} ({@code chesscom} or
+     * {@code lichess}); catapult-api's status: 400 when the site does not know it, 503 when it cannot be asked.
+     */
+    int saveChessUsername(String username, String site, String name);
+    int deleteChessUsername(String username, String site);
+    /** Unlinks the owner's osu! account and forgets their osu! stats. */
+    int deleteOsuLink(String username);
     int refreshSteamProfileCache(String username);
     LinkStateResponse minecraftStatus(String username);
     int minecraftEnroll(String username, String name);
@@ -424,6 +495,15 @@ public interface ApiService {
     ApiClient.Result<GameMappingResult> adminUpdateGameMapping(UUID id, GameMappingRequest request);
     /** catapult-api's status (200; 404 unknown) and result (no mapping), 502 when unreachable. */
     ApiClient.Result<GameMappingResult> adminDeleteGameMapping(UUID id, boolean applyLive);
+    /** The Battle.net game variants, by game then key; null when catapult-api fails. */
+    List<BattleNetGameVariantDto> adminBattleNetGameVariants();
+    /** catapult-api's status (201; 400 invalid; 409 key already used by the game) and variant, 502 when unreachable. */
+    ApiClient.Result<BattleNetGameVariantDto> adminCreateBattleNetGameVariant(BattleNetGameVariantRequest request);
+    /** catapult-api's status (200; 400 invalid or game/key changed; 404 unknown) and variant, 502 when unreachable. */
+    ApiClient.Result<BattleNetGameVariantDto> adminUpdateBattleNetGameVariant(UUID id,
+                                                                              BattleNetGameVariantRequest request);
+    /** catapult-api's status (204; 404 unknown), 502 when unreachable. */
+    ApiClient.Result<Void> adminDeleteBattleNetGameVariant(UUID id);
 
     /** The DTDD caches' sizes and stale entries, the keys' quotas and the bulk refetch; null when catapult-api fails. */
     DtddCachesSummaryDto adminDtddCaches();
@@ -563,6 +643,20 @@ public interface ApiService {
     int adminDeleteApiKey(ApiKeyProvider provider, String keyId);
     /** Reloads the provider's keys into its rotator; catapult-api's status (204), 502 when unreachable. */
     int adminRefreshApiKeys(ApiKeyProvider provider);
+
+    /** The osu! OAuth application set on catapult-api (client id, never the secret); null when it fails. */
+    fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData adminOsuCredentials();
+    /** Sets it (a blank secret keeps the one set); catapult-api's status (204; 400 malformed), 502 when unreachable. */
+    int adminSaveOsuCredentials(String clientId, String clientSecret);
+    /** Removes it (the osu! source and login go off); catapult-api's status (204), 502 when unreachable. */
+    int adminDeleteOsuCredentials();
+
+    /** The Bungie.net application set on catapult-api (client id, key masked, never the secret); null when it fails. */
+    fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData adminBungieCredentials();
+    /** Sets it (a blank secret or key keeps the one set); catapult-api's status (204; 400 malformed), 502 when unreachable. */
+    int adminSaveBungieCredentials(String clientId, String clientSecret, String apiKey);
+    /** Removes it (the Bungie source and login go off); catapult-api's status (204), 502 when unreachable. */
+    int adminDeleteBungieCredentials();
 
     /** The Minecraft service accounts; null when catapult-api fails (Minecraft disabled included). */
     List<AccountDto> adminMinecraftAccounts();

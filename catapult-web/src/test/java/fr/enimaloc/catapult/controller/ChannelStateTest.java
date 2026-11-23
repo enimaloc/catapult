@@ -86,6 +86,114 @@ class ChannelStateTest {
     }
 
     @Test
+    void speedrunAccount_asItsEvent() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.SpeedrunData("n1", true, false, "KeyOwner", "KeyOwner",
+                "https://www.speedrun.com/users/KeyOwner", "api_key"));
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent("enimaloc", "n1", true,
+                        false, "KeyOwner", "KeyOwner", "https://www.speedrun.com/users/KeyOwner", "api_key"));
+    }
+
+    @Test
+    void retroAchievementsAccount_asItsEvent() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData("Bob",
+                "https://retroachievements.org/user/Bob", true, false, true));
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent("enimaloc", "Bob",
+                        "https://retroachievements.org/user/Bob", true, false, true));
+    }
+
+    @Test
+    void blizzardSettings_asItsEvent() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(true, "eu", true,
+                        List.of(new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData.WowCharacterOption("eu:1", "Thrall")), "eu:1", true,
+                        java.time.Instant.parse("2026-11-20T23:30:00Z")));
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent("enimaloc", true, "eu", true, true, "eu:1", "2026-11-20", true));
+    }
+
+    @Test
+    void osuLink_asItsEvent() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.OsuAccountData(true, "Inspector", false, true,
+                        java.time.Instant.parse("2026-11-20T23:30:00Z")));
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent("enimaloc", true, true,
+                        "Inspector", false, true, false));
+    }
+
+    @Test
+    void bungieLink_asItsEvent() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.BungieAccountData(true, "G#0042", "steam", false, true,
+                        java.time.Instant.parse("2026-11-20T23:30:00Z")));
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent("enimaloc", true, true,
+                        "G#0042", false, false, true, false));
+    }
+
+    @Test
+    void chessAccounts_asItsEvent() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.ChessData("hikaru", "DrNykterstein"));
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent("enimaloc", "hikaru", "DrNykterstein"));
+    }
+
+    @Test
+    void noChessAccounts_noEvent() {
+        ChannelPageData ch = page(null, new PagedBindings(0, 0, 0, List.of()), null, null, null, null);
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .noneMatch(event -> event instanceof fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent);
+    }
+
+    @Test
+    void noBlizzardSettings_noEvent() {
+        ChannelPageData ch = page(null, new PagedBindings(0, 0, 0, List.of()), null, null, null, null);
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .noneMatch(event -> event instanceof fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent);
+    }
+
+    @Test
+    void noRetroAchievementsAccount_noEvent() {
+        ChannelPageData ch = page(null, new PagedBindings(0, 0, 0, List.of()), null, null, null, null);
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .noneMatch(event -> event instanceof fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent);
+    }
+
+    @Test
+    void noSpeedrunAccount_noEvent() {
+        ChannelPageData ch = page(null, new PagedBindings(0, 0, 0, List.of()), null, null, null, null);
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .noneMatch(event -> event instanceof fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent);
+    }
+
+    @Test
     void epicLink_withoutStatus_isNone() {
         ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
                 false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
@@ -176,5 +284,41 @@ class ChannelStateTest {
                 new ChannelEvents.Settings.IncompleteFallback("3", "Art", Set.of("Drugs")),
                 new ChannelEvents.Settings.Raid(30),
                 new ChannelEvents.Settings.Title(false, null)));
+    }
+
+    @Test
+    void supercellSettings_asItsEvent() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.SupercellData(null, new fr.enimaloc.catapult.common.dto.channel.SupercellData.Game("#2PP", "Chief", true), null);
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, account);
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null))).contains(fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent.of("enimaloc", account));
+    }
+
+    @Test
+    void riotSettings_asItsEvent() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.RiotData("Catapult#EUW", "euw1", true));
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent("enimaloc", "Catapult#EUW",
+                        "euw1", true));
+    }
+
+    @Test
+    void faceitSettings_asItsEvent() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.FaceitData("Catapult",
+                        "https://www.faceit.com/en/players/Catapult", true));
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent("enimaloc", "Catapult",
+                        "https://www.faceit.com/en/players/Catapult", true));
     }
 }

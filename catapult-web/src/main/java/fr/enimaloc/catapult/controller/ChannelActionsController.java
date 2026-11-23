@@ -15,6 +15,15 @@ import fr.enimaloc.catapult.common.dto.channel.ProposeRequest;
 import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardRegionRequest;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardWowMainRequest;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsApiKeyRequest;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
+import fr.enimaloc.catapult.common.dto.channel.FaceitNicknameRequest;
+import fr.enimaloc.catapult.common.dto.channel.RiotAccountRequest;
+import fr.enimaloc.catapult.common.dto.channel.ChessUsernameRequest;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenSharingRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchExtensionsDto;
@@ -150,6 +159,156 @@ public class ChannelActionsController {
     @PostMapping("/channel/{username}/settings/steam-personal-token/delete")
     public ResponseEntity<Void> deleteSteamToken(@PathVariable String username) {
         return ApiStatus.answer(apiService.deleteSteamToken(username));
+    }
+
+    // The member's speedrun.com account. catapult-api answers 400 for a name or key speedrun.com refuses and 503
+    // when it cannot be asked: the page tells them apart by status. The key only ever travels in these bodies.
+
+    @PostMapping("/channel/{username}/settings/speedrun/username")
+    public ResponseEntity<Void> saveSpeedrunUsername(@PathVariable String username,
+                                                     @RequestBody SpeedrunUsernameRequest body) {
+        return ApiStatus.answer(apiService.saveSpeedrunUsername(username, body.username()));
+    }
+
+    @PostMapping("/channel/{username}/settings/speedrun/username/delete")
+    public ResponseEntity<Void> deleteSpeedrunUsername(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteSpeedrunUsername(username));
+    }
+
+    @PostMapping("/channel/{username}/settings/speedrun/api-key")
+    public ResponseEntity<Void> saveSpeedrunApiKey(@PathVariable String username,
+                                                   @RequestBody SpeedrunApiKeyRequest body) {
+        return ApiStatus.answer(apiService.saveSpeedrunApiKey(username, body.apiKey()));
+    }
+
+    @PostMapping("/channel/{username}/settings/speedrun/api-key/delete")
+    public ResponseEntity<Void> deleteSpeedrunApiKey(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteSpeedrunApiKey(username));
+    }
+
+    // The member's FACEIT nickname: 400 for a malformed or unknown nickname, 503 when FACEIT cannot be asked.
+
+    @PostMapping("/channel/{username}/settings/faceit/nickname")
+    public ResponseEntity<Void> saveFaceitNickname(@PathVariable String username,
+                                                   @RequestBody FaceitNicknameRequest body) {
+        return ApiStatus.answer(apiService.saveFaceitNickname(username, body.nickname()));
+    }
+
+    @PostMapping("/channel/{username}/settings/faceit/nickname/delete")
+    public ResponseEntity<Void> deleteFaceitNickname(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteFaceitNickname(username));
+    }
+
+    // The member's RetroAchievements account, answered like speedrun.com's: 400 for a name or key RetroAchievements
+    // refuses, 503 when it cannot be asked. The key only ever travels in these bodies.
+
+    @PostMapping("/channel/{username}/settings/retroachievements/username")
+    public ResponseEntity<Void> saveRetroAchievementsUsername(@PathVariable String username,
+                                                              @RequestBody RetroAchievementsUsernameRequest body) {
+        return ApiStatus.answer(apiService.saveRetroAchievementsUsername(username, body.username()));
+    }
+
+    @PostMapping("/channel/{username}/settings/retroachievements/username/delete")
+    public ResponseEntity<Void> deleteRetroAchievementsUsername(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteRetroAchievementsUsername(username));
+    }
+
+    @PostMapping("/channel/{username}/settings/retroachievements/api-key")
+    public ResponseEntity<Void> saveRetroAchievementsApiKey(@PathVariable String username,
+                                                            @RequestBody RetroAchievementsApiKeyRequest body) {
+        return ApiStatus.answer(apiService.saveRetroAchievementsApiKey(username, body.apiKey()));
+    }
+
+    @PostMapping("/channel/{username}/settings/retroachievements/api-key/delete")
+    public ResponseEntity<Void> deleteRetroAchievementsApiKey(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteRetroAchievementsApiKey(username));
+    }
+
+    // The member's Riot ID: 400 for a malformed or unknown Riot ID or platform, 503 when Riot cannot be asked.
+
+    @PostMapping("/channel/{username}/settings/riot/account")
+    public ResponseEntity<Void> saveRiotAccount(@PathVariable String username,
+                                                @RequestBody RiotAccountRequest body) {
+        return ApiStatus.answer(apiService.saveRiotAccount(username, body.riotId(), body.platform()));
+    }
+
+    @PostMapping("/channel/{username}/settings/riot/account/delete")
+    public ResponseEntity<Void> deleteRiotAccount(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteRiotAccount(username));
+    }
+
+    // The member's chess accounts (Chess.com, Lichess), answered like RetroAchievements': 400 for a name the site does
+    // not know, 503 when it cannot be asked. Only these two sites are relayed.
+
+    @PostMapping("/channel/{username}/settings/chess/{site:chesscom|lichess}")
+    public ResponseEntity<Void> saveChessUsername(@PathVariable String username, @PathVariable String site,
+                                                  @RequestBody ChessUsernameRequest body) {
+        return ApiStatus.answer(apiService.saveChessUsername(username, site, body.username()));
+    }
+
+    @PostMapping("/channel/{username}/settings/chess/{site:chesscom|lichess}/delete")
+    public ResponseEntity<Void> deleteChessUsername(@PathVariable String username, @PathVariable String site) {
+        return ApiStatus.answer(apiService.deleteChessUsername(username, site));
+    }
+
+    // The member's Blizzard settings: 400 for an unknown region or a character that is not an imported one, 404 without a
+    // Battle.net link. Importing the characters is a login (/oauth2/authorization/battlenet-stats), not a route here.
+
+    @PostMapping("/channel/{username}/settings/blizzard/region")
+    public ResponseEntity<Void> saveBlizzardRegion(@PathVariable String username,
+                                                   @RequestBody BlizzardRegionRequest body) {
+        return ApiStatus.answer(apiService.saveBlizzardRegion(username, body.region()));
+    }
+
+    @PostMapping("/channel/{username}/settings/blizzard/wow-main")
+    public ResponseEntity<Void> saveBlizzardWowMain(@PathVariable String username,
+                                                    @RequestBody BlizzardWowMainRequest body) {
+        return ApiStatus.answer(apiService.saveBlizzardWowMain(username, body.region(), body.characterId()));
+    }
+
+    @PostMapping("/channel/{username}/settings/blizzard/wow-characters/delete")
+    public ResponseEntity<Void> deleteBlizzardWowCharacters(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteBlizzardWowCharacters(username));
+    }
+
+    // The member's Minecraft account for Hypixel: 400 for a malformed or unknown name or an account that never joined
+    // Hypixel, 429 when their refreshes are spent, 503 when Hypixel cannot be asked.
+
+    @PostMapping("/channel/{username}/settings/hypixel/account")
+    public ResponseEntity<Void> saveHypixelAccount(@PathVariable String username,
+                                                   @RequestBody fr.enimaloc.catapult.common.dto.channel.HypixelAccountRequest body) {
+        return ApiStatus.answer(apiService.saveHypixelAccount(username, body == null ? null : body.player()));
+    }
+
+    // The member's Supercell player tag in one game (clash-of-clans, clash-royale, brawl-stars): 400 for an unknown game,
+    // a malformed tag or a tag no player has, 429 when their refreshes are spent, 503 when Supercell cannot be asked.
+
+    @PostMapping("/channel/{username}/settings/supercell/{game}")
+    public ResponseEntity<Void> saveSupercellAccount(@PathVariable String username, @PathVariable String game,
+            @RequestBody fr.enimaloc.catapult.common.dto.channel.SupercellAccountRequest body) {
+        return ApiStatus.answer(apiService.saveSupercellAccount(username, game, body == null ? null : body.tag()));
+    }
+
+    @PostMapping("/channel/{username}/settings/supercell/{game}/delete")
+    public ResponseEntity<Void> deleteSupercellAccount(@PathVariable String username, @PathVariable String game) {
+        return ApiStatus.answer(apiService.deleteSupercellAccount(username, game));
+    }
+
+    @PostMapping("/channel/{username}/settings/hypixel/account/delete")
+    public ResponseEntity<Void> deleteHypixelAccount(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteHypixelAccount(username));
+    }
+
+    // Unlinking Bungie.net; linking is a login (/oauth2/authorization/bungie), not a route here.
+    @PostMapping("/channel/{username}/settings/bungie/delete")
+    public ResponseEntity<Void> deleteBungieLink(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteBungieLink(username));
+    }
+
+    // Unlinking osu!; linking is a login (/oauth2/authorization/osu), not a route here.
+    @PostMapping("/channel/{username}/settings/osu/delete")
+    public ResponseEntity<Void> deleteOsuLink(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteOsuLink(username));
     }
 
     @PostMapping("/channel/{username}/steam/refresh-profile-cache")

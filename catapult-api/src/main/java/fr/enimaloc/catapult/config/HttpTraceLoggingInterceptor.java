@@ -19,10 +19,12 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 /**
  * Logs every outbound HTTP call performed through a Spring {@link org.springframework.web.client.RestClient}
@@ -36,8 +38,11 @@ import java.util.function.Supplier;
  * response (Steam app list, IGDB game JSON) can't swamp the log line. The
  * suffix {@code …(+N bytes)} makes the cut visible.</p>
  *
- * <p>{@code Authorization} / {@code X-API-KEY} values are never echoed — only
- * their presence is reported.</p>
+ * <p>{@code Authorization} / {@code X-API-KEY} / {@code X-Riot-Token} / {@code API-Key} (Hypixel) values are never echoed — only
+ * their presence is reported. Neither are the values of the {@code key},
+ * {@code api_key}, {@code apikey}, {@code token}, {@code y}, {@code client_secret}, {@code access_token} and
+ * {@code refresh_token} query parameters (any case),
+ * masked in the logged URI.</p>
  *
  * <p>The same exchange also feeds the per-member debug mode: it joins the active
  * {@link DebugContext#capture capture} if any, else it is recorded for the current
@@ -49,6 +54,27 @@ import java.util.function.Supplier;
 public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor {
 
     static final int MAX_BODY_CHARS = 4096;
+    /** A credential query parameter: its name and {@code =} (group 1), then its value up to the next one. */
+    private static final Pattern SECRET_QUERY_PARAM =
+            Pattern.compile("([?&](?:key|api_key|apikey|token|y|client_secret|access_token|refresh_token)=)[^&#]*",
+                    Pattern.CASE_INSENSITIVE);
+
+    /** A credential field of a form-encoded request body (an OAuth token request): its name and {@code =}. */
+    private static final Pattern SECRET_FORM_FIELD =
+            Pattern.compile("((?:^|&)(?:client_secret|access_token|refresh_token|password)=)[^&]*",
+                    Pattern.CASE_INSENSITIVE);
+
+    /** A Riot API key ({@code RGAPI-<uuid>}) quoted in a body: never logged. */
+    private static final Pattern RIOT_KEY =
+            Pattern.compile("(?i)RGAPI-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+
+    /** A JWT (a Supercell API key is one) quoted in a body: never logged. */
+    private static final Pattern JWT =
+            Pattern.compile("eyJ[A-Za-z0-9_-]{8,}\\.eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]+");
+
+    /** An OAuth token answer, from any provider: its tokens are credentials (they never reach the log). */
+    private static final Pattern ACCESS_TOKEN_FIELD =
+            Pattern.compile("(\"(?:access_token|refresh_token|id_token)\"\\s*:\\s*\")(?:[^\"\\\\]|\\\\.)*(\")");
 
     private final DebugMemberRegistry registry;
     private final DebugExchangeRecorder recorder;
@@ -74,9 +100,9 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
         if (trace) {
             log.trace("HTTP req -> {} {} auth={} body={}",
                     request.getMethod(),
-                    request.getURI(),
+                    masked(request.getURI()),
                     redactAuth(request),
-                    truncate(body));
+                    truncate(loggedRequest(body)));
         }
         ClientHttpResponse response;
         try {
@@ -85,7 +111,7 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
             long elapsedMs = (System.nanoTime() - started) / 1_000_000L;
             if (trace) {
                 log.trace("HTTP req x  {} {} after {}ms: {}",
-                        request.getMethod(), request.getURI(), elapsedMs, ex.toString());
+                        request.getMethod(), masked(request.getURI()), elapsedMs, ex.toString());
             }
             if (debug != null) {
                 debug.emit(raw(at, request, body, null, null, ex.toString(), elapsedMs));
@@ -103,7 +129,7 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
             // Unreadable to the caller as well: hand it the response as it came.
             if (trace) {
                 log.trace("HTTP res <- {} {} {} in {}ms body=<unreadable body: {}>",
-                        response.getStatusCode().value(), request.getMethod(), request.getURI(),
+                        response.getStatusCode().value(), request.getMethod(), masked(request.getURI()),
                         elapsedMs, e.getMessage());
             }
             if (debug != null) {
@@ -115,9 +141,9 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
             log.trace("HTTP res <- {} {} {} in {}ms body={}",
                     response.getStatusCode().value(),
                     request.getMethod(),
-                    request.getURI(),
+                    masked(request.getURI()),
                     elapsedMs,
-                    truncate(respBody));
+                    truncate(logged(respBody)));
         }
         if (debug != null) {
             debug.emit(raw(at, request, body, response, respBody, null, elapsedMs));
@@ -209,11 +235,38 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
         }
     }
 
+    /** {@code uri} with the value of every credential query parameter replaced by {@code ***}. */
+    static String masked(URI uri) {
+        return SECRET_QUERY_PARAM.matcher(uri.toString()).replaceAll("$1***");
+    }
+
+    /** The request body as it may be logged: the credentials of a form-encoded token request are masked. */
+    private static byte[] loggedRequest(byte[] body) {
+        if (body == null || body.length == 0) {
+            return body;
+        }
+        String masked = SECRET_FORM_FIELD.matcher(new String(body, StandardCharsets.UTF_8)).replaceAll("$1***");
+        return masked.getBytes(StandardCharsets.UTF_8);
+    }
+
+    /** The response body as it may be logged: the tokens of an OAuth token answer are masked. */
+    private static byte[] logged(byte[] respBody) {
+        if (respBody == null || respBody.length == 0) {
+            return respBody;
+        }
+        String masked = ACCESS_TOKEN_FIELD.matcher(new String(respBody, StandardCharsets.UTF_8)).replaceAll("$1***$2");
+        masked = RIOT_KEY.matcher(masked).replaceAll("***");
+        masked = JWT.matcher(masked).replaceAll("***");
+        return masked.getBytes(StandardCharsets.UTF_8);
+    }
+
     private static String redactAuth(HttpRequest request) {
         var headers = request.getHeaders();
         boolean hasAuth = headers.getFirst("Authorization") != null;
         boolean hasApiKey = headers.getFirst("X-API-KEY") != null
-                || headers.getFirst("Client-Id") != null;
+                || headers.getFirst("Client-Id") != null
+                || headers.getFirst("X-Riot-Token") != null
+                || headers.getFirst("API-Key") != null;
         if (hasAuth && hasApiKey) return "Bearer+ApiKey";
         if (hasAuth) return "Bearer";
         if (hasApiKey) return "ApiKey";

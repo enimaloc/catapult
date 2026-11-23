@@ -230,6 +230,165 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void speedrunUsername_isSavedAndRemovedThroughTheApi() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/speedrun/username").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"Linkus7\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/speedrun/username/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveSpeedrunUsername("enimaloc", "Linkus7");
+        verify(apiService).deleteSpeedrunUsername("enimaloc");
+    }
+
+    @Test
+    void speedrunApiKey_isSavedAndDeletedThroughTheApi() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/speedrun/api-key").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"apiKey\":\"abc123\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/speedrun/api-key/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveSpeedrunApiKey("enimaloc", "abc123");
+        verify(apiService).deleteSpeedrunApiKey("enimaloc");
+    }
+
+    @Test
+    void speedrun_refusalsKeepTheirStatus() throws Exception {
+        when(apiService.saveSpeedrunUsername("enimaloc", "nobody")).thenReturn(400);
+        when(apiService.saveSpeedrunApiKey("enimaloc", "bad")).thenReturn(503);
+
+        mvc.perform(post("/channel/enimaloc/settings/speedrun/username").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"nobody\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/channel/enimaloc/settings/speedrun/api-key").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"apiKey\":\"bad\"}"))
+                .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void retroAchievementsUsername_isSavedAndRemovedThroughTheApi() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/retroachievements/username").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"Bob\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/retroachievements/username/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveRetroAchievementsUsername("enimaloc", "Bob");
+        verify(apiService).deleteRetroAchievementsUsername("enimaloc");
+    }
+
+    @Test
+    void retroAchievementsApiKey_isSavedAndDeletedThroughTheApi() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/retroachievements/api-key").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"apiKey\":\"abc123\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/retroachievements/api-key/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveRetroAchievementsApiKey("enimaloc", "abc123");
+        verify(apiService).deleteRetroAchievementsApiKey("enimaloc");
+    }
+
+    @Test
+    void retroAchievements_refusalsKeepTheirStatus() throws Exception {
+        when(apiService.saveRetroAchievementsUsername("enimaloc", "nobody")).thenReturn(400);
+        when(apiService.saveRetroAchievementsApiKey("enimaloc", "bad")).thenReturn(503);
+
+        mvc.perform(post("/channel/enimaloc/settings/retroachievements/username").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"nobody\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/channel/enimaloc/settings/retroachievements/api-key").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"apiKey\":\"bad\"}"))
+                .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void chessNames_areSavedAndRemovedThroughTheApi_andRefusalsKeepTheirStatus() throws Exception {
+        when(apiService.saveChessUsername("enimaloc", "lichess", "nobody")).thenReturn(400);
+        for (String site : List.of("chesscom", "lichess")) {
+            mvc.perform(post("/channel/enimaloc/settings/chess/" + site).with(csrf())
+                            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                            .content("{\"username\":\"hikaru\"}"))
+                    .andExpect(status().isNoContent());
+            mvc.perform(post("/channel/enimaloc/settings/chess/" + site + "/delete").with(csrf()))
+                    .andExpect(status().isNoContent());
+            verify(apiService).saveChessUsername("enimaloc", site, "hikaru");
+            verify(apiService).deleteChessUsername("enimaloc", site);
+        }
+        mvc.perform(post("/channel/enimaloc/settings/chess/lichess").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"nobody\"}"))
+                .andExpect(status().isBadRequest());
+        // only the two sites are relayed
+        mvc.perform(post("/channel/enimaloc/settings/chess/other").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"hikaru\"}"))
+                .andExpect(status().is4xxClientError());
+    }
+
+    @Test
+    void blizzardSettings_areSavedAndForgottenThroughTheApi() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/blizzard/region").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"region\":\"us\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/blizzard/wow-main").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"region\":\"eu\",\"characterId\":1001}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/blizzard/wow-characters/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).saveBlizzardRegion("enimaloc", "us");
+        verify(apiService).saveBlizzardWowMain("enimaloc", "eu", 1001L);
+        verify(apiService).deleteBlizzardWowCharacters("enimaloc");
+    }
+
+    @Test
+    void osuLink_isUnlinkedThroughTheApi() throws Exception {
+        org.mockito.Mockito.when(apiService.deleteOsuLink("enimaloc")).thenReturn(204);
+
+        mvc.perform(post("/channel/enimaloc/settings/osu/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).deleteOsuLink("enimaloc");
+    }
+
+    @Test
+    void bungieLink_isUnlinkedThroughTheApi() throws Exception {
+        org.mockito.Mockito.when(apiService.deleteBungieLink("enimaloc")).thenReturn(204);
+
+        mvc.perform(post("/channel/enimaloc/settings/bungie/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(apiService).deleteBungieLink("enimaloc");
+    }
+
+    @Test
+    void blizzardSettings_refusalsKeepTheirStatus() throws Exception {
+        when(apiService.saveBlizzardRegion("enimaloc", "xx")).thenReturn(400);
+        when(apiService.saveBlizzardWowMain("enimaloc", "eu", 9L)).thenReturn(404);
+
+        mvc.perform(post("/channel/enimaloc/settings/blizzard/region").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"region\":\"xx\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/channel/enimaloc/settings/blizzard/wow-main").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"region\":\"eu\",\"characterId\":9}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void refreshSteamProfileCache_callsApiService() throws Exception {
         mvc.perform(post("/channel/enimaloc/steam/refresh-profile-cache").with(csrf()))
                 .andExpect(status().isNoContent());
@@ -722,5 +881,74 @@ class ChannelActionsControllerTest {
                 .andExpect(status().isForbidden());
 
         verify(apiService, org.mockito.Mockito.times(1)).cancelAccountDeletion("me");
+    }
+
+    @Test
+    void riotSettings_areSavedAndForgottenThroughTheApi_andRefusalsKeepTheirStatus() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/riot/account").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"riotId\":\"Catapult#EUW\",\"platform\":\"euw1\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/riot/account/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+        verify(apiService).saveRiotAccount("enimaloc", "Catapult#EUW", "euw1");
+        verify(apiService).deleteRiotAccount("enimaloc");
+
+        when(apiService.saveRiotAccount("enimaloc", "Ghost#0000", "euw1")).thenReturn(400);
+        when(apiService.saveRiotAccount("enimaloc", "Down#EUW", "euw1")).thenReturn(503);
+        mvc.perform(post("/channel/enimaloc/settings/riot/account").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"riotId\":\"Ghost#0000\",\"platform\":\"euw1\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/channel/enimaloc/settings/riot/account").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"riotId\":\"Down#EUW\",\"platform\":\"euw1\"}"))
+                .andExpect(status().isServiceUnavailable());
+    }
+
+    @Test
+    void supercellTag_isSavedAndForgottenThroughTheApi_andRefusalsKeepTheirStatus() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/supercell/clash-of-clans").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"tag\":\"#2PP\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/supercell/clash-of-clans/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+        verify(apiService).saveSupercellAccount("enimaloc", "clash-of-clans", "#2PP");
+        verify(apiService).deleteSupercellAccount("enimaloc", "clash-of-clans");
+
+        when(apiService.saveSupercellAccount("enimaloc", "brawl-stars", "#000")).thenReturn(400);
+        when(apiService.saveSupercellAccount("enimaloc", "brawl-stars", "#9YY")).thenReturn(429);
+        mvc.perform(post("/channel/enimaloc/settings/supercell/brawl-stars").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"tag\":\"#000\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/channel/enimaloc/settings/supercell/brawl-stars").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"tag\":\"#9YY\"}"))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void faceitNickname_isSavedAndForgottenThroughTheApi_andRefusalsKeepTheirStatus() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/faceit/nickname").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"Catapult\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/faceit/nickname/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+        verify(apiService).saveFaceitNickname("enimaloc", "Catapult");
+        verify(apiService).deleteFaceitNickname("enimaloc");
+
+        when(apiService.saveFaceitNickname("enimaloc", "Ghost")).thenReturn(400);
+        when(apiService.saveFaceitNickname("enimaloc", "Down")).thenReturn(503);
+        mvc.perform(post("/channel/enimaloc/settings/faceit/nickname").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"Ghost\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/channel/enimaloc/settings/faceit/nickname").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"Down\"}"))
+                .andExpect(status().isServiceUnavailable());
     }
 }

@@ -17,6 +17,26 @@ class AdminPathNamesTest {
         assertThat(ApiKeyProvider.DTDD.apiPath()).isEqualTo("dtdd-keys");
         assertThat(ApiKeyProvider.STEAM.pathName()).isEqualTo("steam");
         assertThat(ApiKeyProvider.DTDD.pathName()).isEqualTo("dtdd");
+        assertThat(ApiKeyProvider.STEAMGRIDDB.apiPath()).isEqualTo("steamgriddb-keys");
+        assertThat(ApiKeyProvider.STEAMGRIDDB.pathName()).isEqualTo("steamgriddb");
+        assertThat(ApiKeyProvider.ITAD.apiPath()).isEqualTo("itad-keys");
+        assertThat(ApiKeyProvider.ITAD.pathName()).isEqualTo("itad");
+        assertThat(ApiKeyProvider.RETROACHIEVEMENTS.apiPath()).isEqualTo("retroachievements-keys");
+        assertThat(ApiKeyProvider.RETROACHIEVEMENTS.pathName()).isEqualTo("retroachievements");
+        assertThat(ApiKeyProvider.OPENCRITIC.apiPath()).isEqualTo("opencritic-keys");
+        assertThat(ApiKeyProvider.OPENCRITIC.pathName()).isEqualTo("opencritic");
+        assertThat(ApiKeyProvider.RIOT.apiPath()).isEqualTo("riot-keys");
+        assertThat(ApiKeyProvider.RIOT.pathName()).isEqualTo("riot");
+        assertThat(ApiKeyProvider.FACEIT.apiPath()).isEqualTo("faceit-keys");
+        assertThat(ApiKeyProvider.FACEIT.pathName()).isEqualTo("faceit");
+        assertThat(ApiKeyProvider.HYPIXEL.apiPath()).isEqualTo("hypixel-keys");
+        assertThat(ApiKeyProvider.HYPIXEL.pathName()).isEqualTo("hypixel");
+        assertThat(ApiKeyProvider.CLASHOFCLANS.apiPath()).isEqualTo("supercell-keys/clash-of-clans/keys");
+        assertThat(ApiKeyProvider.CLASHOFCLANS.pathName()).isEqualTo("clashofclans");
+        assertThat(ApiKeyProvider.CLASHROYALE.apiPath()).isEqualTo("supercell-keys/clash-royale/keys");
+        assertThat(ApiKeyProvider.CLASHROYALE.pathName()).isEqualTo("clashroyale");
+        assertThat(ApiKeyProvider.BRAWLSTARS.apiPath()).isEqualTo("supercell-keys/brawl-stars/keys");
+        assertThat(ApiKeyProvider.BRAWLSTARS.pathName()).isEqualTo("brawlstars");
     }
 
     @ParameterizedTest

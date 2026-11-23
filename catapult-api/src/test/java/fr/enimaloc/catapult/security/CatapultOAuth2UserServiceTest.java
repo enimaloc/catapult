@@ -13,6 +13,9 @@ import fr.enimaloc.catapult.service.access.WhitelistService;
 import fr.enimaloc.catapult.service.account.AdminMigrationService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetFriendService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
+import fr.enimaloc.catapult.service.blizzard.BlizzardImportRefusedException;
+import fr.enimaloc.catapult.service.blizzard.BlizzardWowImportService;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardUnavailableException;
 import fr.enimaloc.catapult.service.epic.EpicEnrollmentException;
 import fr.enimaloc.catapult.service.epic.EpicFriendService;
 import fr.enimaloc.catapult.service.epic.EpicGateService;
@@ -23,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -40,6 +44,7 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -71,6 +76,12 @@ class CatapultOAuth2UserServiceTest {
     @Mock private EpicFriendService epicFriends;
     @Mock private ObjectProvider<EpicFriendService> epicFriendsProvider;
     @Mock private PlatformTransactionManager transactionManager;
+    @Mock private BlizzardWowImportService wowImport;
+    @Mock private ObjectProvider<BlizzardWowImportService> wowImportProvider;
+    @Mock private ObjectProvider<fr.enimaloc.catapult.service.bungie.BungieLinkService> bungieLinkProvider;
+    @Mock private fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinks;
+    @Mock private ObjectProvider<fr.enimaloc.catapult.service.osu.OsuLinkService> osuLinkProvider;
+    @Mock private fr.enimaloc.catapult.service.osu.OsuLinkService osuLinks;
 
     @Mock private RestClient.RequestHeadersUriSpec getSpec;
     @Mock private RestClient.RequestHeadersSpec headersSpec;
@@ -84,7 +95,8 @@ class CatapultOAuth2UserServiceTest {
             userAccountRepository, oAuthTokenRepository, userSettingsRepository,
             getterConfigRepository, tokenEncryptionService, eventPublisher, restClient, whitelistService,
             adminMigrationService, inviteService, battleNetGate, battleNetFriendsProvider,
-            epicGate, epicFriendsProvider, new TransactionTemplate(transactionManager)
+            epicGate, epicFriendsProvider, new TransactionTemplate(transactionManager), wowImportProvider,
+            bungieLinkProvider, osuLinkProvider
         );
         ReflectionTestUtils.setField(service, "ownerId", "");
         ReflectionTestUtils.setField(service, "defaultNoGameName", "");
@@ -96,6 +108,7 @@ class CatapultOAuth2UserServiceTest {
     @AfterEach
     void tearDown() {
         SecurityContextHolder.clearContext();
+        LocaleContextHolder.resetLocaleContext();
     }
 
     private OAuth2UserRequest buildRequest() {
@@ -385,6 +398,108 @@ class CatapultOAuth2UserServiceTest {
         verifyNoInteractions(transactionManager);
     }
 
+    private OAuth2UserRequest battleNetStatsRequest() {
+        ClientRegistration reg = ClientRegistration.withRegistrationId("battlenet-stats")
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .clientId("client-id")
+            .redirectUri("http://localhost/callback")
+            .scope("wow.profile")
+            .authorizationUri("https://oauth.battle.net/authorize")
+            .tokenUri("https://oauth.battle.net/token")
+            .userInfoUri("https://oauth.battle.net/userinfo")
+            .userNameAttributeName("sub")
+            .build();
+        OAuth2AccessToken token = new OAuth2AccessToken(
+            OAuth2AccessToken.TokenType.BEARER, "wow-token", Instant.now(), Instant.now().plusSeconds(3600));
+        return new OAuth2UserRequest(reg, token);
+    }
+
+    private UserAccount statsStreamer(boolean gateOpen) {
+        // The callback request's language (RequestContextFilter sets it in a real request)
+        LocaleContextHolder.setLocale(Locale.FRENCH);
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        signedInStreamer(account);
+        ReflectionTestUtils.setField(service, "delegate", battleNetUserInfo);
+        lenient().when(wowImportProvider.getIfAvailable()).thenReturn(wowImport);
+        lenient().when(battleNetGate.isAvailableFor(account)).thenReturn(gateOpen);
+        return account;
+    }
+
+    @Test
+    void statsConsentNeverEnrolls() {
+        UserAccount account = statsStreamer(true);
+        CatapultOAuth2User principal = (CatapultOAuth2User) SecurityContextHolder.getContext()
+            .getAuthentication().getPrincipal();
+
+        var user = service.loadUser(battleNetStatsRequest());
+
+        verify(wowImport).importFor(account, "wow-token", Locale.FRENCH);
+        assertThat(user).isSameAs(principal);
+        verifyNoInteractions(battleNetFriends, battleNetFriendsProvider, battleNetUserInfo);
+        verifyNoInteractions(oAuthTokenRepository, transactionManager);
+    }
+
+    @Test
+    void statsConsentLeavesTheCharacterCountForTheRedirect() {
+        UserAccount account = statsStreamer(true);
+        when(wowImport.importFor(account, "wow-token", Locale.FRENCH)).thenReturn(0);
+        var web = new org.springframework.mock.web.MockHttpServletRequest();
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(web));
+        try {
+            service.loadUser(battleNetStatsRequest());
+        } finally {
+            org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+        }
+
+        assertThat(web.getAttribute(TwitchLoginSuccessHandler.WOW_IMPORT_COUNT_ATTRIBUTE)).isEqualTo(0);
+    }
+
+    @Test
+    void statsConsentWithoutTwitchSessionIsUnauthorized() {
+        lenient().when(wowImportProvider.getIfAvailable()).thenReturn(wowImport);
+
+        assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("unauthorized");
+        verifyNoInteractions(wowImport);
+    }
+
+    @Test
+    void statsConsentWithBattleNetOffOrAClosedGateIsUnavailable() {
+        UserAccount account = statsStreamer(false);
+        assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_unavailable");
+
+        lenient().when(battleNetGate.isAvailableFor(account)).thenReturn(true);
+        when(wowImportProvider.getIfAvailable()).thenReturn(null);
+        assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_unavailable");
+        verifyNoInteractions(wowImport, battleNetFriends);
+    }
+
+    @Test
+    void statsConsentRefusalsAndFailuresHaveTheirCodes() {
+        UserAccount account = statsStreamer(true);
+
+        when(wowImport.importFor(account, "wow-token", Locale.FRENCH)).thenThrow(
+            new BlizzardImportRefusedException(BlizzardImportRefusedException.Reason.NOT_LINKED));
+        assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_unavailable");
+
+        reset(wowImport);
+        when(wowImport.importFor(account, "wow-token", Locale.FRENCH)).thenThrow(
+            new BlizzardImportRefusedException(BlizzardImportRefusedException.Reason.OTHER_ACCOUNT));
+        assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_mismatch");
+
+        reset(wowImport);
+        when(wowImport.importFor(account, "wow-token", Locale.FRENCH))
+            .thenThrow(new BlizzardUnavailableException("down"));
+        assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_failed");
+
+        reset(wowImport);
+        when(wowImport.importFor(account, "wow-token", Locale.FRENCH))
+            .thenThrow(new IllegalStateException("boom"));
+        assertThat(errorCodeOf(battleNetStatsRequest())).isEqualTo("battlenet_stats_failed");
+        verifyNoInteractions(battleNetFriends, oAuthTokenRepository);
+    }
+
     private OAuth2UserRequest epicRequest() {
         ClientRegistration reg = ClientRegistration.withRegistrationId("epic")
             .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
@@ -472,5 +587,120 @@ class CatapultOAuth2UserServiceTest {
         assertThat(errorCodeOf(epicRequest())).isEqualTo("epic_full");
         assertThat(errorCodeOf(epicRequest())).isEqualTo("epic_full");
         assertThat(errorCodeOf(epicRequest())).isEqualTo("epic_already_linked");
+    }
+
+    // --- Bungie ---
+
+    private OAuth2UserRequest bungieRequest(java.util.Map<String, Object> parameters) {
+        ClientRegistration reg = ClientRegistration.withRegistrationId("bungie")
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .clientId("12345")
+            .redirectUri("http://localhost/callback")
+            .authorizationUri("https://www.bungie.net/en/OAuth/Authorize")
+            .tokenUri("https://www.bungie.net/platform/app/oauth/token/")
+            .build();
+        OAuth2AccessToken token = new OAuth2AccessToken(
+            OAuth2AccessToken.TokenType.BEARER, "bungie-token", Instant.now(), Instant.now().plusSeconds(3600));
+        return new OAuth2UserRequest(reg, token, parameters);
+    }
+
+    @Test
+    void bungieLink_isCheckedAndLeftPending_nothingWritten() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        signedInStreamer(account);
+        when(bungieLinkProvider.getIfAvailable()).thenReturn(bungieLinks);
+        var pending = new fr.enimaloc.catapult.service.bungie.BungieLinkService.PendingLink("42", "G#0042", 3, "461",
+            Instant.now());
+        java.util.Map<String, Object> parameters = java.util.Map.of("membership_id", "42");
+        when(bungieLinks.check("bungie-token", parameters)).thenReturn(pending);
+        var web = new org.springframework.mock.web.MockHttpServletRequest();
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(web));
+        try {
+            service.loadUser(bungieRequest(parameters));
+        } finally {
+            org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+        }
+
+        assertThat(web.getAttribute(fr.enimaloc.catapult.service.bungie.BungieLinkService.PENDING_ATTRIBUTE))
+            .isSameAs(pending);
+        verify(bungieLinks, never()).complete(any(), any(), any());
+        verifyNoInteractions(oAuthTokenRepository, transactionManager);
+    }
+
+    @Test
+    void bungieLink_refusalsHaveTheirCodes() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        java.util.Map<String, Object> parameters = java.util.Map.of("membership_id", "42");
+
+        assertThat(errorCodeOf(bungieRequest(parameters))).isEqualTo("unauthorized");
+
+        signedInStreamer(account);
+        when(bungieLinkProvider.getIfAvailable()).thenReturn(null);
+        assertThat(errorCodeOf(bungieRequest(parameters))).isEqualTo("bungie_unavailable");
+
+        when(bungieLinkProvider.getIfAvailable()).thenReturn(bungieLinks);
+        when(bungieLinks.check("bungie-token", parameters)).thenThrow(
+            new fr.enimaloc.catapult.service.bungie.BungieLinkService.RefusedException(
+                fr.enimaloc.catapult.service.bungie.BungieLinkService.Refusal.MISMATCH));
+        assertThat(errorCodeOf(bungieRequest(parameters))).isEqualTo("bungie_mismatch");
+    }
+
+    // --- osu! ---
+
+    private OAuth2UserRequest osuRequest() {
+        ClientRegistration reg = ClientRegistration.withRegistrationId("osu")
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .clientId("12345")
+            .redirectUri("http://localhost/callback")
+            .authorizationUri("https://osu.ppy.sh/oauth/authorize")
+            .tokenUri("https://osu.ppy.sh/oauth/token")
+            .build();
+        OAuth2AccessToken token = new OAuth2AccessToken(
+            OAuth2AccessToken.TokenType.BEARER, "osu-token", Instant.now(), Instant.now().plusSeconds(86_400));
+        return new OAuth2UserRequest(reg, token);
+    }
+
+    @Test
+    void osuLink_isCheckedAndLeftPending_nothingWritten() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        signedInStreamer(account);
+        when(osuLinkProvider.getIfAvailable()).thenReturn(osuLinks);
+        var pending = new fr.enimaloc.catapult.service.osu.OsuLinkService.PendingLink(42L, "Inspector", "osu");
+        when(osuLinks.check("osu-token")).thenReturn(pending);
+        var web = new org.springframework.mock.web.MockHttpServletRequest();
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                new org.springframework.web.context.request.ServletRequestAttributes(web));
+        try {
+            service.loadUser(osuRequest());
+        } finally {
+            org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+        }
+
+        assertThat(web.getAttribute(fr.enimaloc.catapult.service.osu.OsuLinkService.PENDING_ATTRIBUTE))
+            .isSameAs(pending);
+        verify(osuLinks, never()).complete(any(), any(), any(), any(), any());
+        verifyNoInteractions(oAuthTokenRepository, transactionManager);
+    }
+
+    @Test
+    void osuLink_refusalsHaveTheirCodes() {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+
+        assertThat(errorCodeOf(osuRequest())).isEqualTo("unauthorized");
+
+        signedInStreamer(account);
+        when(osuLinkProvider.getIfAvailable()).thenReturn(null);
+        assertThat(errorCodeOf(osuRequest())).isEqualTo("osu_unavailable");
+
+        when(osuLinkProvider.getIfAvailable()).thenReturn(osuLinks);
+        when(osuLinks.check("osu-token")).thenThrow(
+            new fr.enimaloc.catapult.service.osu.OsuLinkService.RefusedException(
+                fr.enimaloc.catapult.service.osu.OsuLinkService.Refusal.MISMATCH));
+        assertThat(errorCodeOf(osuRequest())).isEqualTo("osu_mismatch");
     }
 }

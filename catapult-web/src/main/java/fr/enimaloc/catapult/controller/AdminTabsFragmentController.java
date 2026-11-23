@@ -355,6 +355,7 @@ public class AdminTabsFragmentController {
      * One page of the game mappings and one of the detected games still missing one, each with its own page number,
      * and what the form offers to replace IGDB's with: every CCL ({@code cclNames}, id to name) and every enabled TW
      * ({@code twLabels}, id to label, in their order), as the streamers choose from; either empty when catapult-api failed.
+     * Below them, the Battle.net game variants ({@code variants}, null when catapult-api failed).
      */
     @GetMapping("/game-mappings")
     String gameMappings(Model model, HttpServletResponse response, @RequestParam(defaultValue = "0") int page,
@@ -362,6 +363,7 @@ public class AdminTabsFragmentController {
         return guarded(model, response, () -> {
             model.addAttribute("mappings", apiService.adminGameMappings(Math.max(0, page)));
             model.addAttribute("missing", apiService.adminMissingGameMappings(Math.max(0, missingPage)));
+            model.addAttribute("variants", apiService.adminBattleNetGameVariants());
             AdminCclPage ccl = apiService.adminCcl();
             Map<String, String> cclNames = new LinkedHashMap<>();
             if (ccl != null && ccl.ccls() != null) ccl.ccls().forEach(c -> cclNames.put(c.id(), c.name()));
@@ -481,6 +483,18 @@ public class AdminTabsFragmentController {
         return guarded(model, response, () -> {
             model.addAttribute("steam", apiService.adminApiKeys(ApiKeyProvider.STEAM));
             model.addAttribute("dtdd", apiService.adminApiKeys(ApiKeyProvider.DTDD));
+            model.addAttribute("steamgriddb", apiService.adminApiKeys(ApiKeyProvider.STEAMGRIDDB));
+            model.addAttribute("itad", apiService.adminApiKeys(ApiKeyProvider.ITAD));
+            model.addAttribute("opencritic", apiService.adminApiKeys(ApiKeyProvider.OPENCRITIC));
+            model.addAttribute("retroachievements", apiService.adminApiKeys(ApiKeyProvider.RETROACHIEVEMENTS));
+            model.addAttribute("osu", apiService.adminOsuCredentials());
+            model.addAttribute("bungie", apiService.adminBungieCredentials());
+            model.addAttribute("riot", apiService.adminApiKeys(ApiKeyProvider.RIOT));
+            model.addAttribute("faceit", apiService.adminApiKeys(ApiKeyProvider.FACEIT));
+            model.addAttribute("hypixel", apiService.adminApiKeys(ApiKeyProvider.HYPIXEL));
+            model.addAttribute("clashofclans", apiService.adminApiKeys(ApiKeyProvider.CLASHOFCLANS));
+            model.addAttribute("clashroyale", apiService.adminApiKeys(ApiKeyProvider.CLASHROYALE));
+            model.addAttribute("brawlstars", apiService.adminApiKeys(ApiKeyProvider.BRAWLSTARS));
             model.addAttribute("minecraft", apiService.adminMinecraftAccounts());
             model.addAttribute("battlenet", apiService.adminBattleNetAccounts());
             model.addAttribute("ankama", apiService.adminAnkamaAccounts());

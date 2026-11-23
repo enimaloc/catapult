@@ -8,6 +8,50 @@
     <ul>
         <li>OAuth Twitch token — used to interact with the Twitch API (stream category, events)</li>
         <li>Steam ID — used to read your game library via the Steam API</li>
+        <li>speedrun.com username and API key (both optional) — used to look up your records on speedrun.com;
+            the key is stored encrypted and never shown again</li>
+        <li>RetroAchievements username and web API key (both optional) — used to read your achievements; the key
+            is stored encrypted and never shown again. Your Steam, Xbox and RetroAchievements stats are read on
+            demand and refreshed every 15 minutes at most; the last copy is kept until you unlink the platform
+            or delete your account, and may still be shown while the platform cannot be reached</li>
+        <li>Blizzard stats — the region of your Battle.net account, the list of your World of Warcraft characters
+            and your main character, kept until you unlink Battle.net or delete your account. Your World of
+            Warcraft, StarCraft II and Diablo III profiles are read on demand and refreshed every 30 minutes at
+            most; the last copy is kept until you unlink Battle.net or delete your account</li>
+        <li>FACEIT nickname (optional) — the nickname you declare and the player id FACEIT gives for it, kept until
+            you remove the nickname or delete your account. Your Counter-Strike 2 level, Elo and stats are read on
+            demand and refreshed every 10 minutes at most, your last match every 5 minutes at most; the last copy
+            is kept until you remove the nickname or delete your account, and may still be shown while FACEIT
+            cannot be reached</li>
+        <li>Bungie.net (Destiny 2) — your Bungie.net account and Destiny 2 membership ids, your Bungie Name and the
+            authorization Bungie gives when you link (its renewal token, stored encrypted, valid 90 days and renewed
+            as it is used), kept until you unlink Bungie.net or delete your account. Your Destiny 2 profile is read
+            on demand with that authorization: the profile is refreshed every 2 minutes at most, the triumph score
+            every 30 minutes at most; the last copy is kept until you unlink Bungie.net or delete your account</li>
+        <li>Riot ID (optional) — the name and tag you declare, your League of Legends server and the account id
+            Riot gives for that Riot ID, kept until you remove the Riot ID or delete your account. Your League of
+            Legends ranks and level and your Teamfight Tactics rank are read on demand and refreshed every 10
+            minutes at most, your game in progress every minute at most; the last copy is kept until you remove
+            the Riot ID or delete your account</li>
+        <li>Chess.com and Lichess usernames (both optional) — used to read your ratings, record and games in
+            progress from those sites' public profiles; Chess.com's player id and Lichess's account id are kept
+            next to them. They are read on demand and refreshed every 2 minutes at most (every 10 minutes for the
+            Chess.com ratings); the last copy is kept until you remove the name or delete your account</li>
+        <li>osu! — your osu! user id, username and default game mode and the authorization osu! gives when you link
+            (its renewal token, stored encrypted and replaced each time it is used), kept until you unlink osu! or
+            delete your account. Your osu! profile (pp, ranks, accuracy, play count and time) and latest scores are
+            read on demand with that authorization, each refreshed every 2 minutes at most; the last copy is kept
+            until you unlink osu! or delete your account</li>
+        <li>Hypixel (optional) — the Minecraft account you declare: its UUID and the name it had then, kept until
+            you remove it or delete your account. Your Hypixel profile (level, rank, karma, achievement points, last login, Bed Wars and SkyWars) is read
+            on demand and refreshed every 5 minutes at most, where you are on the server every minute at most (not
+            at all if you hide it in your Hypixel settings); the last copy is kept until you remove the account or
+            delete your account. A name you type is looked up at Mojang to find its UUID</li>
+        <li>Supercell (optional) — the player tag you declare in Clash of Clans, Clash Royale or Brawl Stars and
+            the player name the game gives for it, kept until you remove it or delete your account. Your profile in
+            that game (trophies, league or arena, town hall, victories, clan or club, heroes, deck or brawlers) is
+            read on demand and refreshed every 10 minutes at most; the last copy is kept until you remove the tag or
+            delete your account</li>
         <li>Error reports — when a page hits an error: your account id, the trail of your last actions
             (clicks, pages, requests) and a recording of the page, without what you type in fields,
             to reproduce the problem</li>
@@ -16,7 +60,8 @@
 
 <section>
     <h2>Data Transfers</h2>
-    <p>Your data is sent only to the Twitch and Steam APIs for the application to function, and error
+    <p>Your data is sent only to the Twitch and Steam APIs (and, if you set them, to speedrun.com, RetroAchievements, Riot Games, FACEIT, Chess.com, Lichess, Hypixel, Mojang and Supercell) for the
+        application to function, and error
         reports to Sentry (sentry.io), through Catapult: your browser never contacts Sentry directly.
         No other third-party sharing.</p>
 </section>

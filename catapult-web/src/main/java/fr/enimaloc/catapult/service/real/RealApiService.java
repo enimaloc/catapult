@@ -58,6 +58,14 @@ import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.BattleNetLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.admin.DtddKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.SteamGridDbKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.ItadKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.OpenCriticKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.RetroAchievementsKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.RiotKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.FaceitKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.HypixelKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.SupercellKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
@@ -69,6 +77,8 @@ import fr.enimaloc.catapult.common.dto.admin.DtddGameCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddRefetchJobDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddSearchCacheEntryDto;
 import fr.enimaloc.catapult.common.dto.admin.DtddTopicsCacheEntryDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingDto;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingRequest;
 import fr.enimaloc.catapult.common.dto.admin.GameMappingResult;
@@ -114,6 +124,15 @@ import fr.enimaloc.catapult.common.dto.channel.TitleSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsApiKeyRequest;
+import fr.enimaloc.catapult.common.dto.channel.FaceitNicknameRequest;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
+import fr.enimaloc.catapult.common.dto.channel.RiotAccountRequest;
+import fr.enimaloc.catapult.common.dto.channel.ChessUsernameRequest;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardRegionRequest;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardWowMainRequest;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenSharingRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwEnabledBody;
@@ -188,6 +207,8 @@ public class RealApiService implements ApiService {
     private static final ParameterizedTypeReference<List<IgdbGameOption>> IGDB_GAMES = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<DtddProposalDto>> DTDD_PROPOSALS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<TwDefinitionDto>> TWS = new ParameterizedTypeReference<>() {};
+    private static final ParameterizedTypeReference<List<BattleNetGameVariantDto>> BATTLENET_GAME_VARIANTS =
+            new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.chatcommand.EnabledChatCommandDto>> ENABLED_COMMANDS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<GroupSummaryDto>> GROUPS = new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<fr.enimaloc.catapult.common.dto.emergency.EmergencyStopDto>> EMERGENCY_STOPS = new ParameterizedTypeReference<>() {};
@@ -333,6 +354,150 @@ public class RealApiService implements ApiService {
     @Override
     public int deleteSteamToken(String username) {
         return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/steam-personal-token", id),
+                status -> status);
+    }
+
+    @Override
+    public int saveSpeedrunUsername(String username, String speedrunName) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/speedrun/username",
+                new SpeedrunUsernameRequest(speedrunName), id), status -> status);
+    }
+
+    @Override
+    public int deleteSpeedrunUsername(String username) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/speedrun/username", id),
+                status -> status);
+    }
+
+    @Override
+    public int saveSpeedrunApiKey(String username, String apiKey) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/speedrun/api-key",
+                new SpeedrunApiKeyRequest(apiKey), id), status -> status);
+    }
+
+    @Override
+    public int deleteSpeedrunApiKey(String username) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/speedrun/api-key", id),
+                status -> status);
+    }
+
+    @Override
+    public int saveRetroAchievementsUsername(String username, String raName) {
+        return onChannel(username, id -> client.putVoid(
+                "/api/internal/users/{userId}/settings/retroachievements/username",
+                new RetroAchievementsUsernameRequest(raName), id), status -> status);
+    }
+
+    @Override
+    public int saveRiotAccount(String username, String riotId, String platform) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/riot/account",
+                new RiotAccountRequest(riotId, platform), id), status -> status);
+    }
+
+    @Override
+    public int deleteRiotAccount(String username) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/riot/account", id),
+                status -> status);
+    }
+
+    @Override
+    public int saveFaceitNickname(String username, String nickname) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/faceit/nickname",
+                new FaceitNicknameRequest(nickname), id), status -> status);
+    }
+
+    @Override
+    public int deleteFaceitNickname(String username) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/faceit/nickname", id),
+                status -> status);
+    }
+
+    @Override
+    public int saveSupercellAccount(String username, String game, String tag) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/supercell/{game}",
+                new fr.enimaloc.catapult.common.dto.channel.SupercellAccountRequest(tag), id, game),
+                status -> status);
+    }
+
+    @Override
+    public int deleteSupercellAccount(String username, String game) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/supercell/{game}", id,
+                game), status -> status);
+    }
+
+    @Override
+    public int saveHypixelAccount(String username, String player) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/hypixel/account",
+                new fr.enimaloc.catapult.common.dto.channel.HypixelAccountRequest(player), id), status -> status);
+    }
+
+    @Override
+    public int deleteHypixelAccount(String username) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/hypixel/account", id),
+                status -> status);
+    }
+
+    @Override
+    public int deleteRetroAchievementsUsername(String username) {
+        return onChannel(username, id -> client.delete(
+                "/api/internal/users/{userId}/settings/retroachievements/username", id), status -> status);
+    }
+
+    @Override
+    public int saveRetroAchievementsApiKey(String username, String apiKey) {
+        return onChannel(username, id -> client.putVoid(
+                "/api/internal/users/{userId}/settings/retroachievements/api-key",
+                new RetroAchievementsApiKeyRequest(apiKey), id), status -> status);
+    }
+
+    @Override
+    public int deleteRetroAchievementsApiKey(String username) {
+        return onChannel(username, id -> client.delete(
+                "/api/internal/users/{userId}/settings/retroachievements/api-key", id), status -> status);
+    }
+
+    @Override
+    public int saveChessUsername(String username, String site, String name) {
+        ChessUsernameRequest body = new ChessUsernameRequest(name);
+        return onChannel(username, id -> "lichess".equals(site)
+                ? client.putVoid("/api/internal/users/{userId}/settings/chess/lichess", body, id)
+                : client.putVoid("/api/internal/users/{userId}/settings/chess/chesscom", body, id), status -> status);
+    }
+
+    @Override
+    public int deleteChessUsername(String username, String site) {
+        return onChannel(username, id -> "lichess".equals(site)
+                ? client.delete("/api/internal/users/{userId}/settings/chess/lichess", id)
+                : client.delete("/api/internal/users/{userId}/settings/chess/chesscom", id), status -> status);
+    }
+
+    @Override
+    public int saveBlizzardRegion(String username, String region) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/blizzard/region",
+                new BlizzardRegionRequest(region), id), status -> status);
+    }
+
+    @Override
+    public int saveBlizzardWowMain(String username, String region, long characterId) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/blizzard/wow-main",
+                new BlizzardWowMainRequest(region, characterId), id), status -> status);
+    }
+
+    @Override
+    public int deleteBlizzardWowCharacters(String username) {
+        return onChannel(username, id -> client.delete(
+                "/api/internal/users/{userId}/settings/blizzard/wow-characters", id), status -> status);
+    }
+
+    @Override
+    public int deleteBungieLink(String username) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/bungie", id),
+                status -> status);
+    }
+
+    @Override
+    public int deleteOsuLink(String username) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/osu", id),
                 status -> status);
     }
 
@@ -1139,6 +1304,31 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public List<BattleNetGameVariantDto> adminBattleNetGameVariants() {
+        return client.get("/api/internal/admin/battlenet-game-variants", BATTLENET_GAME_VARIANTS);
+    }
+
+    @Override
+    public ApiClient.Result<BattleNetGameVariantDto> adminCreateBattleNetGameVariant(
+            BattleNetGameVariantRequest request) {
+        return client.call(HttpMethod.POST, "/api/internal/admin/battlenet-game-variants", request,
+                BattleNetGameVariantDto.class);
+    }
+
+    @Override
+    public ApiClient.Result<BattleNetGameVariantDto> adminUpdateBattleNetGameVariant(
+            UUID id, BattleNetGameVariantRequest request) {
+        return client.call(HttpMethod.PUT, "/api/internal/admin/battlenet-game-variants/{id}", request,
+                BattleNetGameVariantDto.class, id);
+    }
+
+    @Override
+    public ApiClient.Result<Void> adminDeleteBattleNetGameVariant(UUID id) {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/battlenet-game-variants/{id}", null, Void.class,
+                id);
+    }
+
+    @Override
     public DtddCachesSummaryDto adminDtddCaches() {
         return client.get("/api/internal/admin/dtdd-caches", DtddCachesSummaryDto.class);
     }
@@ -1442,6 +1632,39 @@ public class RealApiService implements ApiService {
                 DtddKeysPageData page = client.get("/api/internal/admin/dtdd-keys", DtddKeysPageData.class);
                 yield page == null ? null : ApiKeysPageDto.of(page);
             }
+            case STEAMGRIDDB -> {
+                SteamGridDbKeysPageData page = client.get("/api/internal/admin/steamgriddb-keys", SteamGridDbKeysPageData.class);
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
+            case ITAD -> {
+                ItadKeysPageData page = client.get("/api/internal/admin/itad-keys", ItadKeysPageData.class);
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
+            case OPENCRITIC -> {
+                OpenCriticKeysPageData page = client.get("/api/internal/admin/opencritic-keys", OpenCriticKeysPageData.class);
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
+            case RETROACHIEVEMENTS -> {
+                RetroAchievementsKeysPageData page = client.get("/api/internal/admin/retroachievements-keys", RetroAchievementsKeysPageData.class);
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
+            case RIOT -> {
+                RiotKeysPageData page = client.get("/api/internal/admin/riot-keys", RiotKeysPageData.class);
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
+            case FACEIT -> {
+                FaceitKeysPageData page = client.get("/api/internal/admin/faceit-keys", FaceitKeysPageData.class);
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
+            case HYPIXEL -> {
+                HypixelKeysPageData page = client.get("/api/internal/admin/hypixel-keys", HypixelKeysPageData.class);
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
+            case CLASHOFCLANS, CLASHROYALE, BRAWLSTARS -> {
+                SupercellKeysPageData page = client.get("/api/internal/admin/supercell-keys/{game}/keys",
+                        SupercellKeysPageData.class, supercellGame(provider));
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
         };
     }
 
@@ -1451,6 +1674,15 @@ public class RealApiService implements ApiService {
         ApiClient.Result<Void> result = switch (provider) {
             case STEAM -> client.call(HttpMethod.POST, "/api/internal/admin/steam-keys", body, Void.class);
             case DTDD -> client.call(HttpMethod.POST, "/api/internal/admin/dtdd-keys", body, Void.class);
+            case STEAMGRIDDB -> client.call(HttpMethod.POST, "/api/internal/admin/steamgriddb-keys", body, Void.class);
+            case ITAD -> client.call(HttpMethod.POST, "/api/internal/admin/itad-keys", body, Void.class);
+            case OPENCRITIC -> client.call(HttpMethod.POST, "/api/internal/admin/opencritic-keys", body, Void.class);
+            case RETROACHIEVEMENTS -> client.call(HttpMethod.POST, "/api/internal/admin/retroachievements-keys", body, Void.class);
+            case RIOT -> client.call(HttpMethod.POST, "/api/internal/admin/riot-keys", body, Void.class);
+            case FACEIT -> client.call(HttpMethod.POST, "/api/internal/admin/faceit-keys", body, Void.class);
+            case HYPIXEL -> client.call(HttpMethod.POST, "/api/internal/admin/hypixel-keys", body, Void.class);
+            case CLASHOFCLANS, CLASHROYALE, BRAWLSTARS -> client.call(HttpMethod.POST,
+                    "/api/internal/admin/supercell-keys/{game}/keys", body, Void.class, supercellGame(provider));
         };
         return result.status();
     }
@@ -1460,6 +1692,16 @@ public class RealApiService implements ApiService {
         ApiClient.Result<Void> result = switch (provider) {
             case STEAM -> client.call(HttpMethod.DELETE, "/api/internal/admin/steam-keys/{keyId}", null, Void.class, keyId);
             case DTDD -> client.call(HttpMethod.DELETE, "/api/internal/admin/dtdd-keys/{keyId}", null, Void.class, keyId);
+            case STEAMGRIDDB -> client.call(HttpMethod.DELETE, "/api/internal/admin/steamgriddb-keys/{keyId}", null, Void.class, keyId);
+            case ITAD -> client.call(HttpMethod.DELETE, "/api/internal/admin/itad-keys/{keyId}", null, Void.class, keyId);
+            case OPENCRITIC -> client.call(HttpMethod.DELETE, "/api/internal/admin/opencritic-keys/{keyId}", null, Void.class, keyId);
+            case RETROACHIEVEMENTS -> client.call(HttpMethod.DELETE, "/api/internal/admin/retroachievements-keys/{keyId}", null, Void.class, keyId);
+            case RIOT -> client.call(HttpMethod.DELETE, "/api/internal/admin/riot-keys/{keyId}", null, Void.class, keyId);
+            case FACEIT -> client.call(HttpMethod.DELETE, "/api/internal/admin/faceit-keys/{keyId}", null, Void.class, keyId);
+            case HYPIXEL -> client.call(HttpMethod.DELETE, "/api/internal/admin/hypixel-keys/{keyId}", null, Void.class, keyId);
+            case CLASHOFCLANS, CLASHROYALE, BRAWLSTARS -> client.call(HttpMethod.DELETE,
+                    "/api/internal/admin/supercell-keys/{game}/keys/{keyId}", null, Void.class, supercellGame(provider),
+                    keyId);
         };
         return result.status();
     }
@@ -1469,8 +1711,62 @@ public class RealApiService implements ApiService {
         ApiClient.Result<Void> result = switch (provider) {
             case STEAM -> client.call(HttpMethod.POST, "/api/internal/admin/steam-keys/refresh", null, Void.class);
             case DTDD -> client.call(HttpMethod.POST, "/api/internal/admin/dtdd-keys/refresh", null, Void.class);
+            case STEAMGRIDDB -> client.call(HttpMethod.POST, "/api/internal/admin/steamgriddb-keys/refresh", null, Void.class);
+            case ITAD -> client.call(HttpMethod.POST, "/api/internal/admin/itad-keys/refresh", null, Void.class);
+            case OPENCRITIC -> client.call(HttpMethod.POST, "/api/internal/admin/opencritic-keys/refresh", null, Void.class);
+            case RETROACHIEVEMENTS -> client.call(HttpMethod.POST, "/api/internal/admin/retroachievements-keys/refresh", null, Void.class);
+            case RIOT -> client.call(HttpMethod.POST, "/api/internal/admin/riot-keys/refresh", null, Void.class);
+            case FACEIT -> client.call(HttpMethod.POST, "/api/internal/admin/faceit-keys/refresh", null, Void.class);
+            case HYPIXEL -> client.call(HttpMethod.POST, "/api/internal/admin/hypixel-keys/refresh", null, Void.class);
+            case CLASHOFCLANS, CLASHROYALE, BRAWLSTARS -> client.call(HttpMethod.POST,
+                    "/api/internal/admin/supercell-keys/{game}/keys/refresh", null, Void.class, supercellGame(provider));
         };
         return result.status();
+    }
+
+    /**
+     * The catapult-api game segment of a Supercell key pool: {@code clash-of-clans} for
+     * {@code supercell-keys/clash-of-clans/keys}.
+     */
+    static String supercellGame(ApiKeyProvider provider) {
+        String path = provider.apiPath();
+        return path.substring(path.indexOf('/') + 1, path.lastIndexOf('/'));
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData adminBungieCredentials() {
+        return client.get("/api/internal/admin/bungie-credentials",
+                fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData.class);
+    }
+
+    @Override
+    public int adminSaveBungieCredentials(String clientId, String clientSecret, String apiKey) {
+        return client.call(HttpMethod.PUT, "/api/internal/admin/bungie-credentials",
+                new fr.enimaloc.catapult.common.dto.admin.BungieCredentialsRequest(clientId, clientSecret, apiKey),
+                Void.class).status();
+    }
+
+    @Override
+    public int adminDeleteBungieCredentials() {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/bungie-credentials", null, Void.class).status();
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData adminOsuCredentials() {
+        return client.get("/api/internal/admin/osu-credentials",
+                fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData.class);
+    }
+
+    @Override
+    public int adminSaveOsuCredentials(String clientId, String clientSecret) {
+        return client.call(HttpMethod.PUT, "/api/internal/admin/osu-credentials",
+                new fr.enimaloc.catapult.common.dto.admin.OsuCredentialsRequest(clientId, clientSecret),
+                Void.class).status();
+    }
+
+    @Override
+    public int adminDeleteOsuCredentials() {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/osu-credentials", null, Void.class).status();
     }
 
     @Override

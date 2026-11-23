@@ -58,7 +58,7 @@ class GameInfoAssemblerLinksTest {
         assembler = new GameInfoAssembler(widgetTokenService, gameStateService, gameBindingRepository, igdbService,
                 igdbGameDetailsService, steamStoreService, null, twLabelService, null, devBackdoorResolver,
                 mock(MessageSource.class), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                new PublicBaseUrl(BASE));
+                new PublicBaseUrl(BASE), Optional.empty());
 
         user = new UserAccount();
         user.setId(UUID.randomUUID());

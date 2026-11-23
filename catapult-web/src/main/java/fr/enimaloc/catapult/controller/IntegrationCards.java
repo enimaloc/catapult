@@ -3,9 +3,19 @@ package fr.enimaloc.catapult.controller;
 import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.AnkamaData;
 import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
+import fr.enimaloc.catapult.common.dto.channel.FaceitData;
+import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
+import fr.enimaloc.catapult.common.dto.channel.HypixelData;
+import fr.enimaloc.catapult.common.dto.channel.SupercellData;
+import fr.enimaloc.catapult.common.dto.channel.RiotData;
+import fr.enimaloc.catapult.common.dto.channel.OsuAccountData;
 import fr.enimaloc.catapult.common.dto.channel.EpicData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
+import fr.enimaloc.catapult.common.dto.channel.ChessData;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.XboxData;
@@ -23,11 +33,15 @@ import fr.enimaloc.catapult.dto.integration.IntegrationNode.Switch;
 import fr.enimaloc.catapult.dto.integration.IntegrationNode.Text;
 import fr.enimaloc.catapult.dto.integration.Message;
 import fr.enimaloc.catapult.dto.integration.SpaState;
+import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
+import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
+import fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static fr.enimaloc.catapult.dto.integration.Message.key;
@@ -45,7 +59,25 @@ public final class IntegrationCards {
     private static final Message CONNECTED = key(PREFIX + "connected");
     private static final Message NOT_CONNECTED = key(PREFIX + "not_connected");
 
+    /**
+     * The cards that only feed the member's personal stats on the API (v3), shown on the channel's API tab rather than
+     * on Integrations: the detection and presence services (Steam, Xbox, Battle.net, Epic, Ankama, Minecraft, OBS…)
+     * stay there. A card named here before it exists simply lands on the API tab once it does.
+     */
+    public static final Set<String> API_TAB = Set.of("speedrun", "retroachievements", "blizzard-stats", "bungie", "riot",
+            "faceit", "chess", "osu", "hypixel", "supercell");
+
     private IntegrationCards() {
+    }
+
+    /** The cards of the Integrations tab: every one but {@link #API_TAB}'s, in their order. */
+    public static List<IntegrationDto> integrationsTab(List<IntegrationDto> cards) {
+        return cards.stream().filter(card -> !API_TAB.contains(card.id())).toList();
+    }
+
+    /** The cards of the API tab: {@link #API_TAB}'s, in their order. */
+    public static List<IntegrationDto> apiTab(List<IntegrationDto> cards) {
+        return cards.stream().filter(card -> API_TAB.contains(card.id())).toList();
     }
 
     public static List<IntegrationDto> of(ChannelPageData ch, Map<String, List<TwitchatEventActionDto>> twitchatEvents,
@@ -70,6 +102,37 @@ public final class IntegrationCards {
         if (ch.epic() != null) {
             cards.add(epic(ch.epic()));
         }
+        if (ch.speedrun() != null) {
+            cards.add(speedrun(ch.speedrun()));
+        }
+        if (ch.retroAchievements() != null) {
+            cards.add(retroAchievements(ch.retroAchievements()));
+        }
+        if (ch.blizzardStats() != null && offered(ch.blizzardStats().available(), ch.blizzardStats().linked())) {
+            cards.add(blizzardStats(ch.blizzardStats()));
+        }
+        if (ch.bungie() != null && offered(ch.bungie().available(), ch.bungie().linked())) {
+            cards.add(bungie(ch.bungie()));
+        }
+        if (ch.hypixel() != null && offered(ch.hypixel().available(), saved(ch.hypixel().uuid()))) {
+            cards.add(hypixel(ch.hypixel()));
+        }
+        if (ch.supercell() != null && Stream.of(ch.supercell().clashOfClans(), ch.supercell().clashRoyale(),
+                ch.supercell().brawlStars()).anyMatch(IntegrationCards::offered)) {
+            cards.add(supercell(ch.supercell()));
+        }
+        if (ch.riot() != null && offered(ch.riot().available(), saved(ch.riot().riotId()))) {
+            cards.add(riot(ch.riot()));
+        }
+        if (ch.faceit() != null && offered(ch.faceit().available(), saved(ch.faceit().nickname()))) {
+            cards.add(faceit(ch.faceit()));
+        }
+        if (ch.chess() != null) {
+            cards.add(chess(ch.chess()));
+        }
+        if (ch.osu() != null && offered(ch.osu().available(), ch.osu().linked())) {
+            cards.add(osu(ch.osu()));
+        }
         if (ch.obs() != null) {
             cards.add(obs(ch.obs()));
         }
@@ -79,6 +142,22 @@ public final class IntegrationCards {
         // The grid's cards first, the wide ones below them: the page reads in the order it shows (stable sort).
         cards.sort(Comparator.comparing(IntegrationDto::wide));
         return cards;
+    }
+
+    /**
+     * Whether an API tab card is shown: its service is usable on this instance (a key, an application), or the member
+     * already saved something there, which they must still be able to remove. An unusable service is not offered.
+     */
+    static boolean offered(boolean available, boolean saved) {
+        return available || saved;
+    }
+
+    private static boolean offered(SupercellData.Game game) {
+        return game != null && offered(game.available(), saved(game.tag()));
+    }
+
+    private static boolean saved(String value) {
+        return value != null && !value.isBlank();
     }
 
     /** A card of the grid: it never shows more than two buttons at once. */
@@ -332,6 +411,435 @@ public final class IntegrationCards {
 
     private static SpaState ankamaState(String flag, String status, List<String> statuses) {
         return SpaState.flag(flag, statuses.contains(status), "AnkamaLinkEvent.status=" + String.join("/", statuses));
+    }
+
+    // Speedrun.com: not a link but two optional settings, the name the member declares and a personal API key. The
+    // account used (the key's owner, else the Twitch-linked profile, else the declared name) shows as a sentence per
+    // source, its name a part of its own so that SpeedrunAccountChangedEvent replaces it in place. Wide: two forms.
+    // The key is never in the page: only whether one is saved, so that its field gives way to the delete button.
+
+    private static final String SPEEDRUN_EVENT = "SpeedrunAccountChangedEvent";
+
+    static IntegrationDto speedrun(SpeedrunData speedrun) {
+        boolean hasKey = speedrun.hasApiKey();
+        boolean hasName = speedrun.declaredUsername() != null && !speedrun.declaredUsername().isBlank();
+        SpaState hasNameState = SpaState.flag("speedrunHasName", hasName, SPEEDRUN_EVENT + ".declaredUsername");
+        SpaState hasKeyState = SpaState.flag("speedrunHasKey", hasKey, SPEEDRUN_EVENT + ".hasApiKey");
+        SpaState noKeyState = SpaState.flag("speedrunNoKey", !hasKey, SPEEDRUN_EVENT + ".!hasApiKey");
+        String resolvedName = speedrun.resolvedName() == null ? "" : speedrun.resolvedName();
+
+        return wideCard("speedrun",
+                new Container(Attrs.id("speedrun-account-body"), Container.Kind.DIV, List.of(
+                        speedrunVia("speedrunViaKey", "api_key", "speedrun.via_key", speedrun, resolvedName),
+                        speedrunVia("speedrunViaTwitch", "twitch", "speedrun.via_twitch", speedrun, resolvedName),
+                        speedrunVia("speedrunViaDeclared", "declared", "speedrun.via_declared", speedrun, resolvedName),
+                        new Text(Attrs.cls("speedrun-none").withState(SpaState.flag("speedrunNoAccount",
+                                speedrun.resolvedSource() == null, SPEEDRUN_EVENT + ".!resolvedSource")),
+                                false, key(PREFIX + "speedrun.none")))),
+                new Text(Attrs.cls("speedrun-key-invalid").withState(SpaState.flag("speedrunKeyInvalid",
+                        speedrun.keyInvalid(), SPEEDRUN_EVENT + ".keyInvalid")), true,
+                        key(PREFIX + "speedrun.key.invalid")),
+
+                new Input(Attrs.id("speedrun-username-input").withState(SpaState.sync("value",
+                        SPEEDRUN_EVENT + ".declaredUsername")), "text", key(PREFIX + "speedrun.username.placeholder"),
+                        null, speedrun.declaredUsername(), null, null),
+                new Container(Attrs.id("speedrun-username-actions").withClass("card-actions"),
+                        Container.Kind.SEGMENTED_GROUP, List.of(
+                        segmented(Attrs.id("speedrun-username-save-btn"), key(PREFIX + "speedrun.username.save")),
+                        segmented(Attrs.id("speedrun-username-delete-btn").withState(hasNameState),
+                                key(PREFIX + "speedrun.username.delete")))),
+
+                new Text(Attrs.cls("speedrun-key-saved").withState(hasKeyState), false,
+                        key(PREFIX + "speedrun.key.saved")),
+                new Input(Attrs.id("speedrun-key-input").withState(noKeyState), "password",
+                        key(PREFIX + "speedrun.key.placeholder"), null, null, null, null, "new-password"),
+                new Container(Attrs.id("speedrun-key-actions").withClass("card-actions"),
+                        Container.Kind.SEGMENTED_GROUP, List.of(
+                        segmented(Attrs.id("speedrun-key-save-btn").withState(noKeyState),
+                                key(PREFIX + "speedrun.key.save")),
+                        segmented(Attrs.id("speedrun-key-delete-btn").withState(hasKeyState),
+                                key(PREFIX + "speedrun.key.delete")))),
+
+                new Text(Attrs.cls("speedrun-help"), true, key(PREFIX + "speedrun.help")));
+    }
+
+    /** "Account used: NAME (via ...)", shown while the account is {@code source}'s. */
+    private static Container speedrunVia(String flag, String source, String via, SpeedrunData speedrun,
+                                         String resolvedName) {
+        SpaState shown = SpaState.flag(flag, source.equals(speedrun.resolvedSource()),
+                SPEEDRUN_EVENT + ".resolvedSource=" + source);
+        return new Container(Attrs.cls("speedrun-account").withState(shown), Container.Kind.DIV, List.of(
+                new Text(Attrs.NONE, false, key(PREFIX + "speedrun.account_used")),
+                new Chip(Attrs.cls("speedrun-account-name").withState(
+                        SpaState.sync("textContent", SPEEDRUN_EVENT + ".resolvedName")), Message.literal(resolvedName)),
+                new Text(Attrs.NONE, false, key(PREFIX + via))));
+    }
+
+    // RetroAchievements: two optional settings like speedrun.com's, the name the member declares and a personal web API
+    // key (their own quota; it does not prove the account). The account shows as a chip whose name is a part of its
+    // own so that RetroAchievementsAccountChangedEvent replaces it in place. Wide: two forms. The key is never in
+    // the page: only whether one is saved, so that its field gives way to the delete button.
+
+    private static final String RA_EVENT = "RetroAchievementsAccountChangedEvent";
+
+    static IntegrationDto retroAchievements(RetroAchievementsData ra) {
+        boolean hasKey = ra.hasApiKey();
+        boolean hasName = ra.username() != null && !ra.username().isBlank();
+        SpaState hasNameState = SpaState.flag("raHasName", hasName, RA_EVENT + ".declaredUsername");
+        SpaState hasKeyState = SpaState.flag("raHasKey", hasKey, RA_EVENT + ".hasApiKey");
+        SpaState noKeyState = SpaState.flag("raNoKey", !hasKey, RA_EVENT + ".!hasApiKey");
+        // The shared key is what answers a member without a key of their own: without it, they are asked for theirs.
+        SpaState noPoolState = SpaState.flag("raNoPool", !ra.poolAvailable(), RA_EVENT + ".!poolAvailable")
+                .and("raNoKeyOfTheirOwn", !hasKey, RA_EVENT + ".!hasApiKey");
+
+        return wideCard("retroachievements",
+                new Container(Attrs.cls("retroachievements-account").withState(hasNameState), Container.Kind.DIV,
+                        List.of(new Text(Attrs.NONE, false, key(PREFIX + "retroachievements.account")),
+                                new Chip(Attrs.cls("retroachievements-account-name").withState(
+                                        SpaState.sync("textContent", RA_EVENT + ".declaredUsername")),
+                                        Message.literal(hasName ? ra.username() : "")))),
+                new Text(Attrs.cls("retroachievements-none").withState(SpaState.flag("raNoAccount", !hasName,
+                        RA_EVENT + ".!declaredUsername")), false, key(PREFIX + "retroachievements.none")),
+                new Text(Attrs.cls("retroachievements-key-invalid").withState(SpaState.flag("raKeyInvalid",
+                        ra.keyInvalid(), RA_EVENT + ".keyInvalid")), true,
+                        key(PREFIX + "retroachievements.key.invalid")),
+                new Text(Attrs.cls("retroachievements-no-pool").withState(noPoolState), true,
+                        key(PREFIX + "retroachievements.no_pool")),
+
+                new Input(Attrs.id("retroachievements-username-input").withState(SpaState.sync("value",
+                        RA_EVENT + ".declaredUsername")), "text",
+                        key(PREFIX + "retroachievements.username.placeholder"), null, ra.username(), null, null),
+                new Container(Attrs.id("retroachievements-username-actions").withClass("card-actions"),
+                        Container.Kind.SEGMENTED_GROUP, List.of(
+                        segmented(Attrs.id("retroachievements-username-save-btn"),
+                                key(PREFIX + "retroachievements.username.save")),
+                        segmented(Attrs.id("retroachievements-username-delete-btn").withState(hasNameState),
+                                key(PREFIX + "retroachievements.username.delete")))),
+
+                new Text(Attrs.cls("retroachievements-key-saved").withState(hasKeyState), false,
+                        key(PREFIX + "retroachievements.key.saved")),
+                new Input(Attrs.id("retroachievements-key-input").withState(noKeyState), "password",
+                        key(PREFIX + "retroachievements.key.placeholder"), null, null, null, null, "new-password"),
+                new Container(Attrs.id("retroachievements-key-actions").withClass("card-actions"),
+                        Container.Kind.SEGMENTED_GROUP, List.of(
+                        segmented(Attrs.id("retroachievements-key-save-btn").withState(noKeyState),
+                                key(PREFIX + "retroachievements.key.save")),
+                        segmented(Attrs.id("retroachievements-key-delete-btn").withState(hasKeyState),
+                                key(PREFIX + "retroachievements.key.delete")))),
+
+                new Text(Attrs.cls("retroachievements-help"), true, key(PREFIX + "retroachievements.help")));
+    }
+
+    // Chess: the Chess.com and the Lichess names the member declares, each checked with its site on saving. Each
+    // account shows as a chip whose name is a part of its own so that ChessAccountChangedEvent replaces it in place.
+    // Wide: two forms.
+
+    private static final String CHESS_EVENT = "ChessAccountChangedEvent";
+
+    static IntegrationDto chess(ChessData chess) {
+        return wideCard("chess",
+                chessSite("chesscom", chess.chesscomUsername(), "chesscomUsername"),
+                chessSite("lichess", chess.lichessUsername(), "lichessUsername"),
+                new Text(Attrs.cls("chess-help"), true, key(PREFIX + "chess.help")));
+    }
+
+    /** One site's account chip (or "none"), name field and its save / remove buttons. */
+    private static Container chessSite(String site, String name, String field) {
+        boolean has = name != null && !name.isBlank();
+        String flag = "chess" + Character.toUpperCase(site.charAt(0)) + site.substring(1);
+        SpaState hasState = SpaState.flag(flag + "HasName", has, CHESS_EVENT + "." + field);
+        return new Container(Attrs.cls("chess-site").withClass("chess-" + site), Container.Kind.DIV, List.of(
+                new Container(Attrs.cls("chess-" + site + "-account").withState(hasState), Container.Kind.DIV,
+                        List.of(new Text(Attrs.NONE, false, key(PREFIX + "chess." + site + ".account")),
+                                new Chip(Attrs.cls("chess-" + site + "-account-name").withState(
+                                        SpaState.sync("textContent", CHESS_EVENT + "." + field)),
+                                        Message.literal(has ? name : "")))),
+                new Text(Attrs.cls("chess-" + site + "-none").withState(SpaState.flag(flag + "NoName", !has,
+                        CHESS_EVENT + ".!" + field)), false, key(PREFIX + "chess." + site + ".none")),
+                new Input(Attrs.id("chess-" + site + "-username-input").withState(SpaState.sync("value",
+                        CHESS_EVENT + "." + field)), "text", key(PREFIX + "chess." + site + ".placeholder"), null,
+                        name, null, null),
+                new Container(Attrs.id("chess-" + site + "-actions").withClass("card-actions"),
+                        Container.Kind.SEGMENTED_GROUP, List.of(
+                        segmented(Attrs.id("chess-" + site + "-save-btn"), key(PREFIX + "chess.save")),
+                        segmented(Attrs.id("chess-" + site + "-delete-btn").withState(hasState),
+                                key(PREFIX + "chess.delete"))))));
+    }
+
+    // Blizzard stats: the settings of the owner's Blizzard stats (the region of their Battle.net account, the imported
+    // World of Warcraft characters and the one that is their main). It needs the Battle.net link: without one the card
+    // only says so. Importing leaves for Blizzard's login (catapult-api's /oauth2/authorization/battlenet-stats), which
+    // sends the member back to this tab; it is not offered when the instance has no Blizzard API set up. The imported
+    // list is read once, by the page: BlizzardAccountChangedEvent flips what shows and the values picked, and an import
+    // reloads the tab. Wide: two selects and their buttons. Never a token, never an internal id.
+
+    private static final String BLIZZARD_EVENT = "BlizzardAccountChangedEvent";
+    private static final String BLIZZARD_PREFIX = PREFIX + "blizzard-stats.";
+
+    static IntegrationDto blizzardStats(BlizzardStatsData blizzard) {
+        boolean imported = blizzard.wowImported();
+        SpaState linkedState = SpaState.flag("blizzardLinked", blizzard.linked(), BLIZZARD_EVENT + ".linked");
+        SpaState importedState = SpaState.flag("blizzardImported", imported, BLIZZARD_EVENT + ".wowImported");
+        // The import needs the Blizzard API: without it the login would fail, so its buttons stay out.
+        SpaState importState = SpaState.flag("blizzardCanImport", blizzard.available(), BLIZZARD_EVENT + ".available")
+                .and("blizzardNotImported", !imported, BLIZZARD_EVENT + ".!wowImported");
+        SpaState reimportState = SpaState.flag("blizzardCanReimport", blizzard.available(),
+                BLIZZARD_EVENT + ".available").and("blizzardWasImported", imported, BLIZZARD_EVENT + ".wowImported");
+        List<Select.Option> regions = Stream.of("eu", "us", "kr", "tw")
+                .map(region -> new Select.Option(region, literal(region.toUpperCase(java.util.Locale.ROOT)))).toList();
+        List<Select.Option> characters = blizzard.characters().stream()
+                .map(character -> new Select.Option(character.key(), literal(character.label()))).toList();
+
+        return wideCard("blizzard-stats",
+                new Text(Attrs.cls("blizzard-stats-unlinked").withState(SpaState.flag("blizzardUnlinked",
+                        !blizzard.linked(), BLIZZARD_EVENT + ".!linked")), true, key(BLIZZARD_PREFIX + "unlinked")),
+                new Container(Attrs.id("blizzard-stats-body").withState(linkedState), Container.Kind.DIV, List.of(
+                        new Select(Attrs.id("blizzard-region-select").withState(
+                                SpaState.sync("value", BLIZZARD_EVENT + ".region")),
+                                key(BLIZZARD_PREFIX + "region"), blizzard.region() == null ? "" : blizzard.region(),
+                                regions, null),
+                        new Container(Attrs.cls("blizzard-stats-imported").withState(importedState),
+                                Container.Kind.DIV, List.of(
+                                new Text(Attrs.NONE, false, key(BLIZZARD_PREFIX + "imported")),
+                                new Chip(Attrs.cls("blizzard-stats-imported-on").withState(
+                                        SpaState.sync("textContent", BLIZZARD_EVENT + ".importedOn")),
+                                        literal(BlizzardAccountChangedEvent.importedOn(blizzard.wowImportedAt()))))),
+                        new Select(Attrs.id("blizzard-main-select").withState(
+                                SpaState.flag("blizzardHasCharacters", !characters.isEmpty(),
+                                        BLIZZARD_EVENT + ".hasCharacters")
+                                        .andSync("value", BLIZZARD_EVENT + ".wowMainKey")),
+                                key(BLIZZARD_PREFIX + "main"),
+                                blizzard.wowMainKey() == null ? "" : blizzard.wowMainKey(), characters, null),
+                        new Text(Attrs.cls("blizzard-stats-unavailable").withState(SpaState.flag("blizzardUnavailable",
+                                !blizzard.available(), BLIZZARD_EVENT + ".!available")), true,
+                                key(BLIZZARD_PREFIX + "unavailable")),
+                        new Container(Attrs.id("blizzard-stats-actions").withClass("card-actions"),
+                                Container.Kind.DIV, List.of(
+                                new Button(Attrs.id("blizzard-import-btn").withState(importState),
+                                        Button.Kind.FILLED, key(BLIZZARD_PREFIX + "import")),
+                                new Button(Attrs.id("blizzard-reimport-btn").withState(reimportState),
+                                        Button.Kind.TEXT, key(BLIZZARD_PREFIX + "reimport")),
+                                new Button(Attrs.id("blizzard-forget-btn").withState(importedState),
+                                        Button.Kind.TEXT, key(BLIZZARD_PREFIX + "forget")))),
+                        new Text(Attrs.cls("blizzard-stats-help"), true, key(BLIZZARD_PREFIX + "help")))));
+    }
+
+    // Hypixel: the Minecraft account the member declares (a name, looked up at Mojang, or a UUID), checked with Hypixel
+    // before anything is kept. The declared one shows as a chip that HypixelAccountChangedEvent replaces in place.
+    // Without a key in the shared pool the card says the stats are off on this instance (a save would be refused).
+    // No secret is ever held for a member.
+
+    // Supercell: one player tag per game (Clash of Clans, Clash Royale, Brawl Stars), each checked with that game's API
+    // before it is kept, each with its own field and buttons. The declared player shows as a chip that
+    // SupercellAccountChangedEvent replaces in place. A game without a key in the shared pool says its stats are off on
+    // this instance (a save would be refused). No secret is ever held for a member.
+
+    private static final String SUPERCELL_EVENT = "SupercellAccountChangedEvent";
+    private static final String SUPERCELL_PREFIX = PREFIX + "supercell.";
+    /** The games of the card: the route segment and the event's field prefix. */
+    static final List<List<String>> SUPERCELL_GAMES = List.of(List.of("clash-of-clans", "clashOfClans"),
+            List.of("clash-royale", "clashRoyale"), List.of("brawl-stars", "brawlStars"));
+
+    static IntegrationDto supercell(SupercellData supercell) {
+        List<IntegrationNode> nodes = new java.util.ArrayList<>();
+        for (List<String> game : SUPERCELL_GAMES) {
+            String route = game.get(0);
+            String field = game.get(1);
+            SupercellData.Game data = switch (route) {
+                case "clash-of-clans" -> supercell.clashOfClans();
+                case "clash-royale" -> supercell.clashRoyale();
+                default -> supercell.brawlStars();
+            };
+            if (offered(data)) {
+                nodes.add(supercellGame(route, field, data));
+            }
+        }
+        nodes.add(new Text(Attrs.cls("supercell-help"), true, key(SUPERCELL_PREFIX + "help")));
+        return wideCard("supercell", nodes.toArray(IntegrationNode[]::new));
+    }
+
+    private static IntegrationNode supercellGame(String route, String field, SupercellData.Game data) {
+        boolean declared = data.tag() != null && !data.tag().isBlank();
+        String id = "supercell-" + route;
+        SpaState declaredState = SpaState.flag(field + "Declared", declared, SUPERCELL_EVENT + "." + field + "Tag");
+        return new Container(Attrs.cls("supercell-game").withClass(id), Container.Kind.DIV, List.of(
+                new Text(Attrs.cls("supercell-game-title"), false, key(SUPERCELL_PREFIX + route)),
+                new Container(Attrs.cls("supercell-account").withState(declaredState), Container.Kind.DIV, List.of(
+                        new Text(Attrs.NONE, false, key(SUPERCELL_PREFIX + "account")),
+                        new Chip(Attrs.cls("supercell-account-name").withState(
+                                SpaState.sync("textContent", SUPERCELL_EVENT + "." + field + "Player")),
+                                Message.literal(fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent
+                                        .player(data))))),
+                new Text(Attrs.cls("supercell-none").withState(SpaState.flag(field + "None", !declared,
+                        SUPERCELL_EVENT + ".!" + field + "Tag")), false, key(SUPERCELL_PREFIX + "none")),
+                new Text(Attrs.cls("supercell-unavailable").withState(SpaState.flag(field + "Unavailable",
+                        !data.available(), SUPERCELL_EVENT + ".!" + field + "Available")), true,
+                        key(SUPERCELL_PREFIX + "unavailable")),
+                new Input(Attrs.id(id + "-input"), "text", key(SUPERCELL_PREFIX + "tag.placeholder"), null, null,
+                        null, null, "off"),
+                new Container(Attrs.id(id + "-actions").withClass("card-actions"), Container.Kind.SEGMENTED_GROUP,
+                        List.of(segmented(Attrs.id(id + "-save-btn"), key(SUPERCELL_PREFIX + "save")),
+                                segmented(Attrs.id(id + "-delete-btn").withState(declaredState),
+                                        key(SUPERCELL_PREFIX + "delete"))))));
+    }
+
+    private static final String HYPIXEL_EVENT = "HypixelAccountChangedEvent";
+    private static final String HYPIXEL_PREFIX = PREFIX + "hypixel.";
+
+    static IntegrationDto hypixel(HypixelData hypixel) {
+        boolean declared = hypixel.uuid() != null && !hypixel.uuid().isBlank();
+        SpaState declaredState = SpaState.flag("hypixelDeclared", declared, HYPIXEL_EVENT + ".uuid");
+        return wideCard("hypixel",
+                new Container(Attrs.cls("hypixel-account").withState(declaredState), Container.Kind.DIV, List.of(
+                        new Text(Attrs.NONE, false, key(HYPIXEL_PREFIX + "account")),
+                        new Chip(Attrs.cls("hypixel-account-name").withState(
+                                SpaState.sync("textContent", HYPIXEL_EVENT + ".name")),
+                                Message.literal(declared && hypixel.name() != null ? hypixel.name() : "")))),
+                new Text(Attrs.cls("hypixel-none").withState(SpaState.flag("hypixelNone", !declared,
+                        HYPIXEL_EVENT + ".!uuid")), false, key(HYPIXEL_PREFIX + "none")),
+                new Text(Attrs.cls("hypixel-unavailable").withState(SpaState.flag("hypixelUnavailable",
+                        !hypixel.available(), HYPIXEL_EVENT + ".!available")), true, key(HYPIXEL_PREFIX + "unavailable")),
+                new Input(Attrs.id("hypixel-player-input"), "text", key(HYPIXEL_PREFIX + "player.placeholder"), null,
+                        null, null, null, "off"),
+                new Container(Attrs.id("hypixel-actions").withClass("card-actions"), Container.Kind.SEGMENTED_GROUP,
+                        List.of(segmented(Attrs.id("hypixel-save-btn"), key(HYPIXEL_PREFIX + "save")),
+                                segmented(Attrs.id("hypixel-delete-btn").withState(declaredState),
+                                        key(HYPIXEL_PREFIX + "delete")))),
+                new Text(Attrs.cls("hypixel-help"), true, key(HYPIXEL_PREFIX + "help")));
+    }
+
+    // Bungie: the owner's Bungie.net link (Destiny 2 stats). Linking leaves for Bungie's login (catapult-api's
+    // /oauth2/authorization/bungie), which sends the member back to this tab; it is only offered while the instance
+    // has a Bungie application set (otherwise the login does not exist). A link Bungie refused since asks to link
+    // again. BungieAccountChangedEvent flips everything. Never a token, never an internal id.
+
+    private static final String BUNGIE_EVENT = "BungieAccountChangedEvent";
+    private static final String BUNGIE_PREFIX = PREFIX + "bungie.";
+
+    static IntegrationDto bungie(BungieAccountData bungie) {
+        BungieAccountChangedEvent now = BungieAccountChangedEvent.of(null, bungie);
+        return card("bungie",
+                new Chip(Attrs.cls("bungie-connected-chip").withState(SpaState.flag("bungieUsable", now.usable(),
+                        BUNGIE_EVENT + ".usable")), CONNECTED),
+                new Chip(Attrs.cls("bungie-not-connected-chip").withState(SpaState.flag("bungieNotUsable",
+                        !now.usable(), BUNGIE_EVENT + ".!usable")), NOT_CONNECTED),
+                new Chip(Attrs.cls("bungie-account").withState(SpaState.flag("bungieNamed", now.usable(),
+                        BUNGIE_EVENT + ".usable").andSync("textContent", BUNGIE_EVENT + ".account")),
+                        literal(now.account())),
+                new Text(Attrs.cls("bungie-invalid").withState(SpaState.flag("bungieInvalid", now.invalid(),
+                        BUNGIE_EVENT + ".invalid")), true, key(BUNGIE_PREFIX + "invalid")),
+                new Text(Attrs.cls("bungie-no-profile").withState(SpaState.flag("bungieNoProfile", now.noProfile(),
+                        BUNGIE_EVENT + ".noProfile")), true, key(BUNGIE_PREFIX + "no_profile")),
+                new Text(Attrs.cls("bungie-unavailable").withState(SpaState.flag("bungieUnavailable",
+                        !now.available(), BUNGIE_EVENT + ".!available")), true, key(BUNGIE_PREFIX + "unavailable")),
+                new Container(Attrs.id("bungie-link-actions").withClass("card-actions"), Container.Kind.DIV, List.of(
+                        new Button(Attrs.id("bungie-connect-btn").withState(SpaState.flag("bungieCanLink",
+                                now.canLink(), BUNGIE_EVENT + ".canLink")), Button.Kind.FILLED,
+                                key(BUNGIE_PREFIX + "connect")),
+                        new Button(Attrs.id("bungie-disconnect-btn").withState(SpaState.flag("bungieLinked",
+                                now.linked(), BUNGIE_EVENT + ".linked")), Button.Kind.TEXT,
+                                key(BUNGIE_PREFIX + "disconnect")))),
+                new Text(Attrs.cls("bungie-help"), true, key(BUNGIE_PREFIX + "help")));
+    }
+
+    // Riot: the Riot ID the member declares (gameName#tagLine) and the League of Legends platform it plays on, saved
+    // together; Riot checks the Riot ID before anything is kept. The declared one shows as a chip that
+    // RiotAccountChangedEvent replaces in place. Without a key in the shared pool the card says the stats are off on
+    // this instance (a save would be refused). Wide: a form. No secret is ever held for a member.
+
+    private static final String RIOT_EVENT = "RiotAccountChangedEvent";
+    private static final String RIOT_PREFIX = PREFIX + "riot.";
+    public static final List<String> RIOT_PLATFORMS = List.of("euw1", "eun1", "tr1", "ru", "me1", "na1", "br1", "la1",
+            "la2", "kr", "jp1", "oc1", "ph2", "sg2", "th2", "tw2", "vn2");
+
+    static IntegrationDto riot(RiotData riot) {
+        boolean hasId = riot.riotId() != null && !riot.riotId().isBlank();
+        SpaState hasIdState = SpaState.flag("riotHasId", hasId, RIOT_EVENT + ".riotId");
+        List<Select.Option> platforms = RIOT_PLATFORMS.stream()
+                .map(p -> new Select.Option(p, literal(p.toUpperCase(java.util.Locale.ROOT)))).toList();
+        return wideCard("riot",
+                new Container(Attrs.cls("riot-account").withState(hasIdState), Container.Kind.DIV, List.of(
+                        new Text(Attrs.NONE, false, key(RIOT_PREFIX + "account")),
+                        new Chip(Attrs.cls("riot-account-name").withState(
+                                SpaState.sync("textContent", RIOT_EVENT + ".riotId")),
+                                Message.literal(hasId ? riot.riotId() : "")))),
+                new Text(Attrs.cls("riot-none").withState(SpaState.flag("riotNoId", !hasId,
+                        RIOT_EVENT + ".!riotId")), false, key(RIOT_PREFIX + "none")),
+                new Text(Attrs.cls("riot-unavailable").withState(SpaState.flag("riotUnavailable",
+                        !riot.available(), RIOT_EVENT + ".!available")), true, key(RIOT_PREFIX + "unavailable")),
+                new Input(Attrs.id("riot-id-input").withState(SpaState.sync("value", RIOT_EVENT + ".riotId")),
+                        "text", key(RIOT_PREFIX + "id.placeholder"), null, riot.riotId(), null, null, "off"),
+                new Select(Attrs.id("riot-platform-select").withState(
+                        SpaState.sync("value", RIOT_EVENT + ".platform")),
+                        key(RIOT_PREFIX + "platform"), riot.platform() == null ? "euw1" : riot.platform(),
+                        platforms, null),
+                new Container(Attrs.id("riot-actions").withClass("card-actions"), Container.Kind.SEGMENTED_GROUP,
+                        List.of(segmented(Attrs.id("riot-save-btn"), key(RIOT_PREFIX + "save")),
+                                segmented(Attrs.id("riot-delete-btn").withState(hasIdState),
+                                        key(RIOT_PREFIX + "delete")))),
+                new Text(Attrs.cls("riot-help"), true, key(RIOT_PREFIX + "help")));
+    }
+
+    // FACEIT: the nickname the member declares; FACEIT checks it before anything is kept. The declared one shows as a
+    // chip that FaceitAccountChangedEvent replaces in place. Without a key in the shared pool the card says the stats
+    // are off on this instance (a save would be refused). Wide: a form. No secret is ever held for a member.
+
+    private static final String FACEIT_EVENT = "FaceitAccountChangedEvent";
+    private static final String FACEIT_PREFIX = PREFIX + "faceit.";
+
+    static IntegrationDto faceit(FaceitData faceit) {
+        boolean hasName = faceit.nickname() != null && !faceit.nickname().isBlank();
+        SpaState hasNameState = SpaState.flag("faceitHasName", hasName, FACEIT_EVENT + ".nickname");
+        return wideCard("faceit",
+                new Container(Attrs.cls("faceit-account").withState(hasNameState), Container.Kind.DIV, List.of(
+                        new Text(Attrs.NONE, false, key(FACEIT_PREFIX + "account")),
+                        new Chip(Attrs.cls("faceit-account-name").withState(
+                                SpaState.sync("textContent", FACEIT_EVENT + ".nickname")),
+                                Message.literal(hasName ? faceit.nickname() : "")))),
+                new Text(Attrs.cls("faceit-none").withState(SpaState.flag("faceitNoName", !hasName,
+                        FACEIT_EVENT + ".!nickname")), false, key(FACEIT_PREFIX + "none")),
+                new Text(Attrs.cls("faceit-unavailable").withState(SpaState.flag("faceitUnavailable",
+                        !faceit.available(), FACEIT_EVENT + ".!available")), true, key(FACEIT_PREFIX + "unavailable")),
+                new Input(Attrs.id("faceit-nickname-input").withState(SpaState.sync("value",
+                        FACEIT_EVENT + ".nickname")), "text", key(FACEIT_PREFIX + "nickname.placeholder"), null,
+                        faceit.nickname(), null, null, "off"),
+                new Container(Attrs.id("faceit-actions").withClass("card-actions"), Container.Kind.SEGMENTED_GROUP,
+                        List.of(segmented(Attrs.id("faceit-save-btn"), key(FACEIT_PREFIX + "save")),
+                                segmented(Attrs.id("faceit-delete-btn").withState(hasNameState),
+                                        key(FACEIT_PREFIX + "delete")))),
+                new Text(Attrs.cls("faceit-help"), true, key(FACEIT_PREFIX + "help")));
+    }
+
+    // osu!: the owner's osu! link (profile and latest scores). Linking leaves for osu!'s login (catapult-api's
+    // /oauth2/authorization/osu), which sends the member back to this tab; it is only offered while the instance has an
+    // osu! application set (otherwise the login does not exist). A link osu! refused since asks to link again.
+    // OsuAccountChangedEvent flips everything. Never a token, never an internal id.
+
+    private static final String OSU_EVENT = "OsuAccountChangedEvent";
+    private static final String OSU_PREFIX = PREFIX + "osu.";
+
+    static IntegrationDto osu(OsuAccountData osu) {
+        OsuAccountChangedEvent now = OsuAccountChangedEvent.of(null, osu);
+        return card("osu",
+                new Chip(Attrs.cls("osu-connected-chip").withState(SpaState.flag("osuUsable", now.usable(),
+                        OSU_EVENT + ".usable")), CONNECTED),
+                new Chip(Attrs.cls("osu-not-connected-chip").withState(SpaState.flag("osuNotUsable",
+                        !now.usable(), OSU_EVENT + ".!usable")), NOT_CONNECTED),
+                new Chip(Attrs.cls("osu-account").withState(SpaState.flag("osuNamed", now.usable(),
+                        OSU_EVENT + ".usable").andSync("textContent", OSU_EVENT + ".account")),
+                        literal(now.account())),
+                new Text(Attrs.cls("osu-invalid").withState(SpaState.flag("osuInvalid", now.invalid(),
+                        OSU_EVENT + ".invalid")), true, key(OSU_PREFIX + "invalid")),
+                new Text(Attrs.cls("osu-unavailable").withState(SpaState.flag("osuUnavailable",
+                        !now.available(), OSU_EVENT + ".!available")), true, key(OSU_PREFIX + "unavailable")),
+                new Container(Attrs.id("osu-link-actions").withClass("card-actions"), Container.Kind.DIV, List.of(
+                        new Button(Attrs.id("osu-connect-btn").withState(SpaState.flag("osuCanLink",
+                                now.canLink(), OSU_EVENT + ".canLink")), Button.Kind.FILLED,
+                                key(OSU_PREFIX + "connect")),
+                        new Button(Attrs.id("osu-disconnect-btn").withState(SpaState.flag("osuLinked",
+                                now.linked(), OSU_EVENT + ".linked")), Button.Kind.TEXT,
+                                key(OSU_PREFIX + "disconnect")))),
+                new Text(Attrs.cls("osu-help"), true, key(OSU_PREFIX + "help")));
     }
 
     // Epic: one sub-view and button per status, driven by the status field of EpicLinkEvent, which carries NONE too.

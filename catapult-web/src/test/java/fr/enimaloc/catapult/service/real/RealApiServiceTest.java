@@ -795,6 +795,133 @@ class RealApiServiceTest {
     }
 
     @Test
+    void speedrunUsername_isSavedAndRemovedOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/speedrun/username", "{\"username\":\"Linkus7\"}");
+        expectDelete(channel("enimaloc") + "/settings/speedrun/username");
+
+        assertThat(service.saveSpeedrunUsername("enimaloc", "Linkus7")).isEqualTo(204);
+        assertThat(service.deleteSpeedrunUsername("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void speedrunApiKey_isSavedAndRemovedOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/speedrun/api-key", "{\"apiKey\":\"abc123\"}");
+        expectDelete(channel("enimaloc") + "/settings/speedrun/api-key");
+
+        assertThat(service.saveSpeedrunApiKey("enimaloc", "abc123")).isEqualTo(204);
+        assertThat(service.deleteSpeedrunApiKey("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void retroAchievementsUsername_isSavedAndRemovedOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/retroachievements/username", "{\"username\":\"Bob\"}");
+        expectDelete(channel("enimaloc") + "/settings/retroachievements/username");
+
+        assertThat(service.saveRetroAchievementsUsername("enimaloc", "Bob")).isEqualTo(204);
+        assertThat(service.deleteRetroAchievementsUsername("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void retroAchievementsApiKey_isSavedAndRemovedOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/retroachievements/api-key", "{\"apiKey\":\"abc123\"}");
+        expectDelete(channel("enimaloc") + "/settings/retroachievements/api-key");
+
+        assertThat(service.saveRetroAchievementsApiKey("enimaloc", "abc123")).isEqualTo(204);
+        assertThat(service.deleteRetroAchievementsApiKey("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void chessNames_areSavedAndRemovedOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/chess/lichess", "{\"username\":\"DrNykterstein\"}");
+        expectDelete(channel("enimaloc") + "/settings/chess/chesscom");
+
+        assertThat(service.saveChessUsername("enimaloc", "lichess", "DrNykterstein")).isEqualTo(204);
+        assertThat(service.deleteChessUsername("enimaloc", "chesscom")).isEqualTo(204);
+    }
+
+    @Test
+    void supercellTag_isSavedAndForgottenOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/supercell/clash-royale", "{\"tag\":\"#2PP\"}");
+        expectDelete(channel("enimaloc") + "/settings/supercell/clash-royale");
+
+        assertThat(service.saveSupercellAccount("enimaloc", "clash-royale", "#2PP")).isEqualTo(204);
+        assertThat(service.deleteSupercellAccount("enimaloc", "clash-royale")).isEqualTo(204);
+    }
+
+    @Test
+    void hypixelAccount_isSavedAndForgottenOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/hypixel/account", "{\"player\":\"Notch\"}");
+        expectDelete(channel("enimaloc") + "/settings/hypixel/account");
+
+        assertThat(service.saveHypixelAccount("enimaloc", "Notch")).isEqualTo(204);
+        assertThat(service.deleteHypixelAccount("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void blizzardSettings_areSavedAndForgottenOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/blizzard/region", "{\"region\":\"us\"}");
+        expectPut(channel("enimaloc") + "/settings/blizzard/wow-main", "{\"region\":\"eu\",\"characterId\":1001}");
+        expectDelete(channel("enimaloc") + "/settings/blizzard/wow-characters");
+
+        assertThat(service.saveBlizzardRegion("enimaloc", "us")).isEqualTo(204);
+        assertThat(service.saveBlizzardWowMain("enimaloc", "eu", 1001L)).isEqualTo(204);
+        assertThat(service.deleteBlizzardWowCharacters("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void osuLink_isDeletedOnTheChannel() {
+        expectDelete(channel("enimaloc") + "/settings/osu");
+
+        assertThat(service.deleteOsuLink("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void bungieLink_isDeletedOnTheChannel() {
+        expectDelete(channel("enimaloc") + "/settings/bungie");
+
+        assertThat(service.deleteBungieLink("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
+    void blizzardRefusals_keepTheirStatus() {
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/blizzard/region")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/blizzard/wow-main")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.NOT_FOUND));
+
+        assertThat(service.saveBlizzardRegion("enimaloc", "xx")).isEqualTo(400);
+        assertThat(service.saveBlizzardWowMain("enimaloc", "eu", 9L)).isEqualTo(404);
+    }
+
+    @Test
+    void retroAchievementsRefusals_keepTheirStatus() {
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/retroachievements/api-key")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/retroachievements/username")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThat(service.saveRetroAchievementsApiKey("enimaloc", "bad")).isEqualTo(400);
+        assertThat(service.saveRetroAchievementsUsername("enimaloc", "n1")).isEqualTo(503);
+    }
+
+    @Test
+    void speedrunRefusals_keepTheirStatus() {
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/speedrun/api-key")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/speedrun/username")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThat(service.saveSpeedrunApiKey("enimaloc", "bad")).isEqualTo(400);
+        assertThat(service.saveSpeedrunUsername("enimaloc", "n1")).isEqualTo(503);
+    }
+
+    @Test
     void refreshSteamProfileCache() {
         expectPost(channel("enimaloc") + "/steam-profile/refresh");
         service.refreshSteamProfileCache("enimaloc");
@@ -1976,6 +2103,39 @@ class RealApiServiceTest {
     }
 
     @Test
+    void bungieCredentials_readSetAndRemove() {
+        respond(HttpMethod.GET, "/api/internal/admin/bungie-credentials",
+                "{\"configured\":true,\"clientId\":\"12345\",\"apiKeyMasked\":\"abcd…wxyz\",\"updatedAt\":null}");
+        expect(HttpMethod.PUT, "/api/internal/admin/bungie-credentials")
+                .andExpect(content().json("{\"clientId\":\"12345\",\"clientSecret\":\"s\",\"apiKey\":\"\"}", true))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.DELETE, "/api/internal/admin/bungie-credentials").andRespond(withNoContent());
+
+        var page = service.adminBungieCredentials();
+        assertThat(page.configured()).isTrue();
+        assertThat(page.clientId()).isEqualTo("12345");
+        assertThat(page.apiKeyMasked()).isEqualTo("abcd…wxyz");
+        assertThat(service.adminSaveBungieCredentials("12345", "s", "")).isEqualTo(400);
+        assertThat(service.adminDeleteBungieCredentials()).isEqualTo(204);
+    }
+
+    @Test
+    void osuCredentials_readSetAndRemove() {
+        respond(HttpMethod.GET, "/api/internal/admin/osu-credentials",
+                "{\"configured\":true,\"clientId\":\"12345\",\"updatedAt\":null}");
+        expect(HttpMethod.PUT, "/api/internal/admin/osu-credentials")
+                .andExpect(content().json("{\"clientId\":\"12345\",\"clientSecret\":\"s\"}", true))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.DELETE, "/api/internal/admin/osu-credentials").andRespond(withNoContent());
+
+        var page = service.adminOsuCredentials();
+        assertThat(page.configured()).isTrue();
+        assertThat(page.clientId()).isEqualTo("12345");
+        assertThat(service.adminSaveOsuCredentials("12345", "s")).isEqualTo(400);
+        assertThat(service.adminDeleteOsuCredentials()).isEqualTo(204);
+    }
+
+    @Test
     void apiKeyActions_reachEachProvidersRoute() {
         expect(HttpMethod.POST, "/api/internal/admin/dtdd-keys")
                 .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
@@ -1985,6 +2145,90 @@ class RealApiServiceTest {
         assertThat(service.adminAddApiKey(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.DTDD, "k")).isEqualTo(204);
         assertThat(service.adminDeleteApiKey(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAM, "k1")).isEqualTo(204);
         assertThat(service.adminRefreshApiKeys(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAM)).isEqualTo(204);
+    }
+
+    @Test
+    void supercellKeys_areReadAndManagedThroughTheirGamesRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.CLASHROYALE;
+        respond(HttpMethod.GET, "/api/internal/admin/supercell-keys/clash-royale/keys",
+                "{\"keys\":[],\"supercellEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/supercell-keys/clash-royale/keys")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/supercell-keys/clash-royale/keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/supercell-keys/clash-royale/keys/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
+    }
+
+    @Test
+    void supercellGame_isTheGameSegmentOfItsPool() {
+        assertThat(RealApiService.supercellGame(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.CLASHOFCLANS))
+                .isEqualTo("clash-of-clans");
+        assertThat(RealApiService.supercellGame(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.BRAWLSTARS))
+                .isEqualTo("brawl-stars");
+    }
+
+    @Test
+    void itadKeys_areReadAndManagedThroughTheirRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.ITAD;
+        respond(HttpMethod.GET, "/api/internal/admin/itad-keys", "{\"keys\":[],\"itadEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/itad-keys")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/itad-keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/itad-keys/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
+    }
+
+    @Test
+    void openCriticKeys_areReadAndManagedThroughTheirRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.OPENCRITIC;
+        respond(HttpMethod.GET, "/api/internal/admin/opencritic-keys", "{\"keys\":[],\"opencriticEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/opencritic-keys")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/opencritic-keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/opencritic-keys/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
+    }
+
+    @Test
+    void retroAchievementsKeys_areReadAndManagedThroughTheirRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.RETROACHIEVEMENTS;
+        respond(HttpMethod.GET, "/api/internal/admin/retroachievements-keys", "{\"keys\":[],\"retroachievementsEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/retroachievements-keys")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/retroachievements-keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/retroachievements-keys/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
+    }
+
+    @Test
+    void steamGridDbKeys_areReadAndManagedThroughTheirRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAMGRIDDB;
+        respond(HttpMethod.GET, "/api/internal/admin/steamgriddb-keys", "{\"keys\":[],\"steamgriddbEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/steamgriddb-keys")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/steamgriddb-keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/steamgriddb-keys/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
     }
 
     @Test
@@ -2276,6 +2520,35 @@ class RealApiServiceTest {
             assertThat(d.sortOrder()).isEqualTo(7);
         });
         assertThat(service.adminTw("a/b é").description()).isEqualTo("d");
+    }
+
+    @Test
+    void adminBattleNetGameVariants_listCreateUpdateAndDelete() {
+        UUID id = UUID.fromString("00000000-0000-0000-0000-0000000000f1");
+        String variant = "{\"id\":\"" + id + "\",\"fourcc\":\"WoW\",\"variantKey\":\"Forever\","
+                + "\"sourceId\":\"WoW:Forever\",\"matchType\":\"PREFIX\",\"patterns\":[\"Forever - \"],"
+                + "\"displayName\":\"World of Warcraft: Forever\",\"enabled\":true,\"updatedAt\":null,"
+                + "\"updatedBy\":\"alice\"}";
+        String body = "{\"fourcc\":\"WoW\",\"variantKey\":\"Forever\",\"matchType\":\"PREFIX\","
+                + "\"patterns\":[\"Forever - \"],\"displayName\":\"World of Warcraft: Forever\",\"enabled\":true}";
+        var request = new fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantRequest("WoW", "Forever", "PREFIX",
+                java.util.List.of("Forever - "), "World of Warcraft: Forever", true);
+        respond(HttpMethod.GET, "/api/internal/admin/battlenet-game-variants", "[" + variant + "]");
+        expect(HttpMethod.POST, "/api/internal/admin/battlenet-game-variants")
+                .andExpect(content().json(body, org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withStatus(HttpStatus.CREATED).contentType(MediaType.APPLICATION_JSON).body(variant));
+        expect(HttpMethod.PUT, "/api/internal/admin/battlenet-game-variants/" + id)
+                .andExpect(content().json(body, org.springframework.test.json.JsonCompareMode.STRICT))
+                .andRespond(withSuccess(variant, MediaType.APPLICATION_JSON));
+        expect(HttpMethod.DELETE, "/api/internal/admin/battlenet-game-variants/" + id).andRespond(withNoContent());
+
+        assertThat(service.adminBattleNetGameVariants()).singleElement()
+                .satisfies(v -> assertThat(v.patterns()).containsExactly("Forever - "));
+        var created = service.adminCreateBattleNetGameVariant(request);
+        assertThat(created.status()).isEqualTo(201);
+        assertThat(created.body().sourceId()).isEqualTo("WoW:Forever");
+        assertThat(service.adminUpdateBattleNetGameVariant(id, request).status()).isEqualTo(200);
+        assertThat(service.adminDeleteBattleNetGameVariant(id).status()).isEqualTo(204);
     }
 
     @Test
@@ -2672,5 +2945,62 @@ class RealApiServiceTest {
         assertThat(refused.status()).isEqualTo(409);
         assertThat(refused.body()).isNull();
         assertThat(refused.error()).isEqualTo("A call is already running on this bot");
+    }
+
+    @Test
+    void riotKeys_areReadAndManagedThroughTheirRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.RIOT;
+        respond(HttpMethod.GET, "/api/internal/admin/riot-keys", "{\"keys\":[],\"riotEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/riot-keys")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/riot-keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/riot-keys/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
+    }
+
+    @Test
+    void riotAccount_isSavedAndRemovedOnTheChannel_andRefusalsKeepTheirStatus() {
+        expectPut(channel("enimaloc") + "/settings/riot/account",
+                "{\"riotId\":\"Catapult#EUW\",\"platform\":\"euw1\"}");
+        expectDelete(channel("enimaloc") + "/settings/riot/account");
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/riot/account")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThat(service.saveRiotAccount("enimaloc", "Catapult#EUW", "euw1")).isEqualTo(204);
+        assertThat(service.deleteRiotAccount("enimaloc")).isEqualTo(204);
+        assertThat(service.saveRiotAccount("enimaloc", "Down#EUW", "euw1")).isEqualTo(503);
+    }
+
+    @Test
+    void faceitKeys_areReadAndManagedThroughTheirRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.FACEIT;
+        respond(HttpMethod.GET, "/api/internal/admin/faceit-keys", "{\"keys\":[],\"faceitEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/faceit-keys")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/faceit-keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/faceit-keys/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
+    }
+
+    @Test
+    void faceitNickname_isSavedAndRemovedOnTheChannel_andRefusalsKeepTheirStatus() {
+        expectPut(channel("enimaloc") + "/settings/faceit/nickname", "{\"nickname\":\"Catapult\"}");
+        expectDelete(channel("enimaloc") + "/settings/faceit/nickname");
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/faceit/nickname")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThat(service.saveFaceitNickname("enimaloc", "Catapult")).isEqualTo(204);
+        assertThat(service.deleteFaceitNickname("enimaloc")).isEqualTo(204);
+        assertThat(service.saveFaceitNickname("enimaloc", "Down")).isEqualTo(503);
     }
 }

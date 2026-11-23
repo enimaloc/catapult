@@ -21,6 +21,17 @@ public class AdminEventPublisher {
 
     public static final String PROVIDER_STEAM = "steam";
     public static final String PROVIDER_DTDD = "dtdd";
+    public static final String PROVIDER_STEAMGRIDDB = "steamgriddb";
+    public static final String PROVIDER_ITAD = "itad";
+    public static final String PROVIDER_OPENCRITIC = "opencritic";
+    public static final String PROVIDER_RETROACHIEVEMENTS = "retroachievements";
+    public static final String PROVIDER_RIOT = "riot";
+    public static final String PROVIDER_FACEIT = "faceit";
+    public static final String PROVIDER_HYPIXEL = "hypixel";
+    /** Supercell: one provider per game, named like catapult-web's admin Keys cards. */
+    public static final String PROVIDER_CLASHOFCLANS = "clashofclans";
+    public static final String PROVIDER_CLASHROYALE = "clashroyale";
+    public static final String PROVIDER_BRAWLSTARS = "brawlstars";
 
     private final RedisEventPublisher redisPublisher;
 

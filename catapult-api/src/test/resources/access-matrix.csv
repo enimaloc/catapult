@@ -200,6 +200,31 @@ POST,/api/internal/users/{userId}/title/preview,,"{""template"":""Live""}",401,4
 PUT,/api/internal/users/{userId}/settings/steam-personal-token,,"{""token"":""matrix"",""shared"":false}",401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/settings/steam-personal-token,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/steam-personal-token/sharing,,"{""shared"":false}",401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/speedrun/username,,"{""username"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/speedrun/username,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/speedrun/api-key,,"{""apiKey"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/speedrun/api-key,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/retroachievements/username,,"{""username"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/retroachievements/username,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/retroachievements/api-key,,"{""apiKey"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/retroachievements/api-key,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/blizzard/region,,"{""region"":""eu""}",401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/blizzard/wow-main,,"{""region"":""eu"",""characterId"":1}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/blizzard/wow-characters,,,401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/bungie,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/riot/account,,"{""riotId"":""matrix#EUW"",""platform"":""euw1""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/riot/account,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/faceit/nickname,,"{""nickname"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/faceit/nickname,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/chess/chesscom,,"{""username"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/chess/chesscom,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/chess/lichess,,"{""username"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/chess/lichess,,,401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/osu,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/hypixel/account,,"{""player"":""!""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/hypixel/account,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/supercell/{game},game=clash-of-clans,"{""tag"":""#2PP""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/supercell/{game},game=clash-of-clans,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/settings/twitchat,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat,,"{""enabled"":false}",401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat/branch,,,401,401,403,403,PASS,403,401
@@ -248,6 +273,44 @@ GET,/api/internal/admin/dtdd-keys,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/dtdd-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/dtdd-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/dtdd-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/steamgriddb-keys,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/steamgriddb-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/steamgriddb-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/steamgriddb-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/itad-keys,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/itad-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/itad-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/itad-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/retroachievements-keys,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/retroachievements-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/retroachievements-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/retroachievements-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/bungie-credentials,,,401,PASS,403,403,403,PASS,401
+PUT,/api/internal/admin/bungie-credentials,,"{""clientId"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/bungie-credentials,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/riot-keys,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/riot-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/riot-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/riot-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/faceit-keys,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/faceit-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/faceit-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/faceit-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/osu-credentials,,,401,PASS,403,403,403,PASS,401
+PUT,/api/internal/admin/osu-credentials,,"{""clientId"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/osu-credentials,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/hypixel-keys,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/hypixel-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/hypixel-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/hypixel-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/supercell-keys/{game}/keys,game=clash-of-clans,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/supercell-keys/{game}/keys,game=clash-of-clans,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/supercell-keys/{game}/keys/{keyId},game=clash-of-clans;keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/supercell-keys/{game}/keys/refresh,game=clash-of-clans,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/opencritic-keys,,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/opencritic-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/opencritic-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/opencritic-keys/refresh,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/dtdd-caches,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/dtdd-caches/refetch-all,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/dtdd-caches/refetch-all,,,401,PASS,403,403,403,PASS,401
@@ -350,6 +413,12 @@ PATCH,/api/internal/admin/battlenet-accounts/{id},,,401,PASS,403,403,403,PASS,40
 POST,/api/internal/admin/battlenet-accounts/{id}/code,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/battlenet-accounts/{id}/reauth,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/battlenet-accounts/{id}/bgs-call,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/battlenet-game-variants,,,401,PASS,403,403,403,PASS,401
+# handler reads the JWT itself: 401 without one
+POST,/api/internal/admin/battlenet-game-variants,,"{""enabled"":false}",401,401,403,403,403,PASS,401
+DELETE,/api/internal/admin/battlenet-game-variants/{id},,,401,PASS,403,403,403,PASS,401
+# handler reads the JWT itself: 401 without one
+PUT,/api/internal/admin/battlenet-game-variants/{id},,"{""enabled"":false}",401,401,403,403,403,PASS,401
 GET,/api/internal/admin/ankama-accounts,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/ankama-accounts/login,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/ankama-accounts/login/{loginId}/complete,,,401,PASS,403,403,403,PASS,401
@@ -399,24 +468,24 @@ POST,/api/internal/admin/tws/rebuild/cancel,,,401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/tws/{id},,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/tws/{id},,,401,PASS,403,403,403,PASS,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-PATCH,/api/internal/admin/tws/{id},,,401,ERROR,403,403,403,ERROR,401
+PATCH,/api/internal/admin/tws/{id},,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/tws/{id}/dtdd-topics,,,401,PASS,403,403,403,PASS,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-PUT,/api/internal/admin/tws/{id}/dtdd-topics,,,401,ERROR,403,403,403,ERROR,401
+PUT,/api/internal/admin/tws/{id}/dtdd-topics,,,401,PASS,403,403,403,PASS,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-PUT,/api/internal/admin/tws/{id}/igdb-descriptors,,,401,ERROR,403,403,403,ERROR,401
+PUT,/api/internal/admin/tws/{id}/igdb-descriptors,,,401,PASS,403,403,403,PASS,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-PUT,/api/internal/admin/tws/{id}/steam-content-ids,,,401,ERROR,403,403,403,ERROR,401
+PUT,/api/internal/admin/tws/{id}/steam-content-ids,,,401,PASS,403,403,403,PASS,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-GET,/api/internal/admin/tws/{id}/steam-keywords,,,401,ERROR,403,403,403,ERROR,401
+GET,/api/internal/admin/tws/{id}/steam-keywords,,,401,PASS,403,403,403,PASS,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-POST,/api/internal/admin/tws/{id}/steam-keywords,,,401,ERROR,403,403,403,ERROR,401
+POST,/api/internal/admin/tws/{id}/steam-keywords,,,401,PASS,403,403,403,PASS,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-PUT,/api/internal/admin/tws/{id}/steam-keywords,,,401,ERROR,403,403,403,ERROR,401
+PUT,/api/internal/admin/tws/{id}/steam-keywords,,,401,PASS,403,403,403,PASS,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-POST,/api/internal/admin/tws/{id}/steam-keywords/test,,,401,ERROR,403,403,403,ERROR,401
+POST,/api/internal/admin/tws/{id}/steam-keywords/test,,,401,PASS,403,403,403,PASS,401
 # ERROR: the dead id is no TW, and the handler throws IllegalArgumentException for it (test artefact)
-DELETE,/api/internal/admin/tws/{id}/steam-keywords/{keyword},,,401,ERROR,403,403,403,ERROR,401
+DELETE,/api/internal/admin/tws/{id}/steam-keywords/{keyword},,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/well-known-files,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/well-known-files,,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/well-known-files/iana,,,401,PASS,403,403,403,PASS,401
@@ -468,3 +537,37 @@ POST,/oauth2/mock/login/{id},unmapped,,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 # non-api
 GET,/oauth2/authorization/twitch,,,PASS,PASS,PASS,PASS,PASS,PASS,PASS
 GET,/swagger-ui.html,,,PASS,PASS,PASS,PASS,PASS,PASS,PASS
+# public enrichment detail, version 3 and later (a request naming no version is served version 2, where they do not
+# exist)
+GET,/api/games/hltb/{igdbId},igdbId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/protondb/{appId},appId=990000;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/steamdeck/{appId},appId=990000;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/steamgriddb/{sgdbGameId},sgdbGameId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/pcgamingwiki/{pageId},pageId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/prices/{itadId},itadId=018d937f-590c-70fa-bd4f-b95ee2c2e2f1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/opencritic/{ocId},ocId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/twitch/{twitchGameId},twitchGameId=1;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/speedrun/{srcGameId},srcGameId=o1y9j9v6;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/blizzard/hearthstone/deck/{code},code=AAECAR8GxwPJBLsFmQfZB_gIDI0B2AGoArUDhwSSBe0G6wfbCe0JgQr-DAA;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/blizzard/wow/token/{region},region=eu;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+# trailer.mp4 (version 3): public per platform, the current game's by personal token
+GET,/api/games/steam/{appId}/trailer.mp4,appId=990000;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+HEAD,/api/games/steam/{appId}/trailer.mp4,appId=990000;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/games/xbox/{productId}/trailer.mp4,productId=9NBLGGH4R315;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+HEAD,/api/games/xbox/{productId}/trailer.mp4,productId=9NBLGGH4R315;?version=3,,PASS,PASS,PASS,PASS,PASS,PASS,401
+GET,/api/me/game/trailer.mp4,?version=3,,401,401,401,401,401,401,PASS
+HEAD,/api/me/game/trailer.mp4,?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/speedrun,?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats,?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/steam/{appId},appId=440;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/xbox/{titleId},titleId=1144039928;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/retroachievements/{gameId},gameId=228;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/blizzard/{game},game=wow;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/bungie/{game},game=destiny2;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/riot/{game},game=lol;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/faceit/{game},game=cs2;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/chess,?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/osu/{game},game=osu;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/hypixel,?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/supercell/{game},game=clash-of-clans;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/retroachievements,?version=3,,401,401,401,401,401,401,PASS

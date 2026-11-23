@@ -478,6 +478,154 @@ class MockApiServiceTest {
     }
 
     @Test
+    void speedrunAccount_followsTheSettingsAndTellsThePage() {
+        assertThat(data.speedrunData().resolvedSource()).isNull();
+
+        service.saveSpeedrunUsername(username, "Linkus7");
+        assertThat(data.speedrunData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.SpeedrunData("Linkus7",
+                false, false, null, "Linkus7", "https://www.speedrun.com/users/Linkus7", "declared"));
+
+        service.saveSpeedrunApiKey(username, "a-secret-key");
+        assertThat(data.speedrunData().resolvedSource()).isEqualTo("api_key");
+        assertThat(data.speedrunData().hasApiKey()).isTrue();
+
+        service.deleteSpeedrunApiKey(username);
+        service.deleteSpeedrunUsername(username);
+        assertThat(data.speedrunData().resolvedSource()).isNull();
+        assertThat(data.speedrunData().declaredUsername()).isNull();
+
+        assertThat(events).hasSize(4).allSatisfy(event ->
+                assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent.class));
+        assertThat(events.toString()).doesNotContain("a-secret-key");
+        assertThat(events.getLast()).isEqualTo(new fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent(
+                username, null, false, false, null, null, null, null));
+    }
+
+    @Test
+    void osuLink_isUnlinkedAndTellsThePage() {
+        assertThat(data.osuData().linked()).isTrue();
+
+        assertThat(service.deleteOsuLink(username)).isEqualTo(204);
+
+        assertThat(data.osuData()).isEqualTo(fr.enimaloc.catapult.common.dto.channel.OsuAccountData.unlinked(true));
+        assertThat(events.getLast()).isEqualTo(new fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent(username,
+                false, false, "", false, true, true));
+    }
+
+    @Test
+    void bungieLink_isUnlinkedAndTellsThePage() {
+        assertThat(data.bungieData().linked()).isTrue();
+
+        assertThat(service.deleteBungieLink(username)).isEqualTo(204);
+
+        assertThat(data.bungieData()).isEqualTo(fr.enimaloc.catapult.common.dto.channel.BungieAccountData.unlinked(true));
+        assertThat(events.getLast()).isEqualTo(new fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent(username,
+                false, false, "", false, false, true, true));
+    }
+
+    @Test
+    void chessAccounts_followTheSettingsAndTellThePage() {
+        assertThat(data.chessData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.ChessData(null, null));
+
+        assertThat(service.saveChessUsername(username, "chesscom", " Hikaru ")).isEqualTo(204);
+        assertThat(service.saveChessUsername(username, "lichess", "DrNykterstein")).isEqualTo(204);
+        assertThat(service.saveChessUsername(username, "lichess", "gone")).isEqualTo(400);
+        assertThat(data.chessData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.ChessData("hikaru", "DrNykterstein"));
+
+        assertThat(service.deleteChessUsername(username, "chesscom")).isEqualTo(204);
+        assertThat(data.chessData().chesscomUsername()).isNull();
+        assertThat(data.chessData().lichessUsername()).isEqualTo("DrNykterstein");
+
+        assertThat(events).hasSize(3).allSatisfy(event -> assertThat(event)
+                .isInstanceOf(fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent.class));
+        assertThat(events.getLast()).isEqualTo(new fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent(
+                username, null, "DrNykterstein"));
+    }
+
+    @Test
+    void blizzardSettings_followTheChoicesAndTellThePage() {
+        assertThat(data.blizzardStatsData().region()).isEqualTo("eu");
+        assertThat(data.blizzardStatsData().characters()).hasSize(2);
+        assertThat(data.blizzardStatsData().characters()).extracting(c -> c.label())
+                .containsExactly("Thrall — Draenor (80, Shaman)", "Jaina — Archimonde (70, Mage)");
+
+        assertThat(service.saveBlizzardRegion(username, "us")).isEqualTo(204);
+        assertThat(service.saveBlizzardRegion(username, "xx")).isEqualTo(400);
+        assertThat(data.blizzardStatsData().region()).isEqualTo("us");
+
+        assertThat(service.saveBlizzardWowMain(username, "eu", 1002)).isEqualTo(204);
+        assertThat(service.saveBlizzardWowMain(username, "eu", 5)).isEqualTo(400);
+        assertThat(data.blizzardStatsData().wowMainKey()).isEqualTo("eu:1002");
+
+        assertThat(service.deleteBlizzardWowCharacters(username)).isEqualTo(204);
+        assertThat(data.blizzardStatsData().wowImported()).isFalse();
+        assertThat(data.blizzardStatsData().characters()).isEmpty();
+        assertThat(data.blizzardStatsData().wowMainKey()).isNull();
+
+        assertThat(events).hasSize(3).allSatisfy(event -> assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent.class));
+        assertThat(events.getLast()).isEqualTo(new fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent(username, false, "us", false, false, null, "", true));
+    }
+
+    @Test
+    void retroAchievementsAccount_followsTheSettingsAndTellsThePage() {
+        assertThat(data.retroAchievementsData().username()).isNull();
+        assertThat(data.retroAchievementsData().poolAvailable()).isTrue();
+
+        service.saveRetroAchievementsUsername(username, "Bob");
+        assertThat(data.retroAchievementsData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData("Bob",
+                "https://retroachievements.org/user/Bob", false, false, true));
+
+        service.saveRetroAchievementsApiKey(username, "a-secret-key");
+        assertThat(data.retroAchievementsData().hasApiKey()).isTrue();
+
+        service.deleteRetroAchievementsApiKey(username);
+        service.deleteRetroAchievementsUsername(username);
+        assertThat(data.retroAchievementsData().username()).isNull();
+        assertThat(data.retroAchievementsData().hasApiKey()).isFalse();
+
+        assertThat(events).hasSize(4).allSatisfy(event -> assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent.class));
+        assertThat(events.toString()).doesNotContain("a-secret-key");
+        assertThat(events.getLast()).isEqualTo(new fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent(username, null, null, false, false, true));
+    }
+
+    @Test
+    void hypixelAccount_isSavedByNameOrUuid_refusedWhenMalformed_andForgotten() {
+        assertThat(service.saveHypixelAccount(username, "not a name!")).isEqualTo(400);
+        assertThat(service.saveHypixelAccount(username, "ghost")).isEqualTo(400);
+
+        assertThat(service.saveHypixelAccount(username, "Notch")).isEqualTo(204);
+        assertThat(data.hypixelData().name()).isEqualTo("Notch");
+        assertThat(data.hypixelData().uuid()).hasSize(32);
+
+        assertThat(service.saveHypixelAccount(username, "069A79F4-44E9-4726-A5BE-FCA90E38AAF5")).isEqualTo(204);
+        assertThat(data.hypixelData().uuid()).isEqualTo("069a79f444e94726a5befca90e38aaf5");
+
+        assertThat(service.deleteHypixelAccount(username)).isEqualTo(204);
+        assertThat(data.hypixelData().uuid()).isNull();
+
+        assertThat(events).hasSize(3).allSatisfy(event ->
+                assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.hypixel.HypixelAccountChangedEvent.class));
+    }
+
+    @Test
+    void supercellTag_isNormalized_refusedWhenMalformedOrUnknown_andForgotten() {
+        assertThat(service.saveSupercellAccount(username, "clash-of-clans", "#ABC")).isEqualTo(400);
+        assertThat(service.saveSupercellAccount(username, "clash-of-clans", "#000")).isEqualTo(400);
+        assertThat(service.saveSupercellAccount(username, "clash-of-clans", null)).isEqualTo(400);
+        assertThat(service.saveSupercellAccount(username, "hay-day", "#2PP")).isEqualTo(400);
+        assertThat(service.deleteSupercellAccount(username, "hay-day")).isEqualTo(400);
+
+        assertThat(service.saveSupercellAccount(username, "clash-of-clans", " 2p o ")).isEqualTo(204);
+        assertThat(data.supercellData().clashOfClans()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.SupercellData.Game("#2P0", "Chief 2P0", true));
+        assertThat(data.supercellData().brawlStars().available()).isFalse();
+
+        assertThat(service.deleteSupercellAccount(username, "clash-of-clans")).isEqualTo(204);
+        assertThat(data.supercellData().clashOfClans().tag()).isNull();
+
+        assertThat(events).hasSize(2).allSatisfy(event -> assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent.class));
+    }
+
+    @Test
     void ankamaStatus_isTheMockLink() {
         assertThat(service.ankamaStatus(username)).isEqualTo(data.getAnkamaLink());
     }
@@ -1470,5 +1618,56 @@ class MockApiServiceTest {
                 null, null, null, "0xBCA72135", 1, "0800", true));
         assertThat(raw.body().replyText()).isNull();
         assertThat(raw.body().replyHex()).isNotEmpty();
+    }
+
+    @Test
+    void battleNetGameVariants_goThroughTheStore() {
+        var request = new fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantRequest("WoW", "Classic", "CONTAINS",
+                java.util.List.of("Classic"), "WoW Classic", false);
+
+        var created = service.adminCreateBattleNetGameVariant(request);
+        assertThat(created.status()).isEqualTo(201);
+        assertThat(created.body().updatedBy()).isEqualTo("admin");
+        assertThat(service.adminUpdateBattleNetGameVariant(created.body().id(), request).status()).isEqualTo(200);
+        assertThat(service.adminBattleNetGameVariants()).hasSize(2);
+        assertThat(service.adminDeleteBattleNetGameVariant(created.body().id()).status()).isEqualTo(204);
+        assertThat(service.adminBattleNetGameVariants()).hasSize(1);
+    }
+
+    @Test
+    void riotAccount_followsTheSettingsAndTellsThePage() {
+        assertThat(data.riotData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.RiotData(null, null, true));
+
+        assertThat(service.saveRiotAccount(username, "Catapult#EUW", "na1")).isEqualTo(204);
+        assertThat(data.riotData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.RiotData("Catapult#EUW",
+                "na1", true));
+        assertThat(service.saveRiotAccount(username, "Ghost#0000", "euw1")).isEqualTo(400);
+        assertThat(service.saveRiotAccount(username, "Catapult", "euw1")).isEqualTo(400);
+        assertThat(service.saveRiotAccount(username, "Catapult#EUW", "mars")).isEqualTo(400);
+        assertThat(service.saveRiotAccount(username, "Catapult#EUWEST", "euw1")).isEqualTo(400);
+        assertThat(service.saveRiotAccount(username, null, "euw1")).isEqualTo(400);
+
+        assertThat(service.deleteRiotAccount(username)).isEqualTo(204);
+        assertThat(data.riotData().riotId()).isNull();
+        assertThat(events).hasSize(2).allSatisfy(event ->
+                assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent.class));
+    }
+
+    @Test
+    void faceitNickname_followsTheSettingsAndTellsThePage() {
+        assertThat(data.faceitData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.FaceitData(null, null, true));
+
+        assertThat(service.saveFaceitNickname(username, " Catapult ")).isEqualTo(204);
+        assertThat(data.faceitData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.FaceitData("Catapult",
+                "https://www.faceit.com/en/players/Catapult", true));
+        assertThat(service.saveFaceitNickname(username, "Ghost")).isEqualTo(400);
+        assertThat(service.saveFaceitNickname(username, "x")).isEqualTo(400);
+        assertThat(service.saveFaceitNickname(username, "has space")).isEqualTo(400);
+        assertThat(service.saveFaceitNickname(username, null)).isEqualTo(400);
+
+        assertThat(service.deleteFaceitNickname(username)).isEqualTo(204);
+        assertThat(data.faceitData().nickname()).isNull();
+        assertThat(events).hasSize(2).allSatisfy(event ->
+                assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent.class));
     }
 }

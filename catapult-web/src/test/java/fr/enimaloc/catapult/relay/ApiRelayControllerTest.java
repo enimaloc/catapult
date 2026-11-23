@@ -140,7 +140,7 @@ class ApiRelayControllerTest {
         MockHttpSession session = new MockHttpSession();
         session.setAttribute(ApiClient.SESSION_JWT_KEY, "session-jwt");
 
-        for (String provider : List.of("battlenet", "xbox", "steam")) {
+        for (String provider : List.of("battlenet", "battlenet-stats", "xbox", "steam")) {
             mvc.perform(get("/oauth2/authorization/" + provider).session(session)
                             .header("Authorization", "Bearer forged"))
                     .andExpect(status().isOk());
@@ -229,13 +229,35 @@ class ApiRelayControllerTest {
         mvc.perform(get("/api/me/drops?categoryId=7").header("Authorization", "Bearer catr_TOKEN"))
                 .andExpect(status().isOk()).andExpect(content().string("[]"));
         assertThat(RECEIVED.get().uri()).isEqualTo("/api/me/drops?categoryId=7");
+
+        answer = exchange -> respond(exchange, 200, "{\"account\":null}",
+                Map.of("Content-Type", List.of("application/json")));
+        mvc.perform(get("/api/me/speedrun").header("Authorization", "Bearer catr_TOKEN"))
+                .andExpect(status().isOk()).andExpect(content().string("{\"account\":null}"));
+        assertThat(RECEIVED.get().uri()).isEqualTo("/api/me/speedrun");
+
+        answer = exchange -> respond(exchange, 200, "{\"inGame\":false}",
+                Map.of("Content-Type", List.of("application/json")));
+        mvc.perform(get("/api/me/stats").header("Authorization", "Bearer catr_TOKEN"))
+                .andExpect(status().isOk()).andExpect(content().string("{\"inGame\":false}"));
+        assertThat(RECEIVED.get().uri()).isEqualTo("/api/me/stats");
+
+        answer = exchange -> respond(exchange, 200, "{\"status\":\"ok\"}",
+                Map.of("Content-Type", List.of("application/json")));
+        mvc.perform(get("/api/me/stats/steam/440?lang=fr").header("Authorization", "Bearer catr_TOKEN"))
+                .andExpect(status().isOk()).andExpect(content().string("{\"status\":\"ok\"}"));
+        assertThat(RECEIVED.get().uri()).isEqualTo("/api/me/stats/steam/440?lang=fr");
     }
 
     /** The public API by resource, the read-only token in the query included: relayed as sent. */
     @Test
     void relaysThePublicApiByResource() throws Exception {
         for (String path : List.of("/api/me/game", "/api/me/game/summary", "/api/me/bindings/x1",
-                "/api/games/igdb/1", "/api/games/steam/2", "/api/games/xbox/9N", "/api/games/dtdd/3")) {
+                "/api/games/igdb/1", "/api/games/steam/2", "/api/games/xbox/9N", "/api/games/dtdd/3",
+                "/api/me/stats/blizzard/wow", "/api/me/stats/bungie/destiny2", "/api/me/stats/chess",
+                "/api/games/blizzard/wow/token/eu",
+                "/api/me/stats/blizzard/wow", "/api/me/stats/bungie/destiny2", "/api/me/stats/osu/osu", "/api/games/blizzard/wow/token/eu",
+                "/api/games/blizzard/hearthstone/deck/AAECAR8GxwPJBLsF")) {
             mvc.perform(get(path).queryParam("token", "catr_READ")).andExpect(status().isOk());
             assertThat(RECEIVED.get().uri()).isEqualTo(path + "?token=catr_READ");
         }

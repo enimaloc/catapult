@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.HashMap;
 import fr.enimaloc.catapult.common.dto.channel.DropDto;
+import fr.enimaloc.catapult.common.dto.channel.ChessData;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
@@ -17,6 +18,15 @@ import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
+import fr.enimaloc.catapult.common.dto.channel.FaceitData;
+import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
+import fr.enimaloc.catapult.common.dto.channel.OsuAccountData;
+import fr.enimaloc.catapult.common.dto.channel.HypixelData;
+import fr.enimaloc.catapult.common.dto.channel.SupercellData;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
+import fr.enimaloc.catapult.common.dto.channel.RiotData;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.channel.XboxData;
@@ -71,6 +81,7 @@ public class MockData {
     private static final String MOCK_ANKAMA_TAG = "MockStreamer#1234";
     private static final String MOCK_BOT_ANKAMA_TAG = "CatapultBot#4242";
     private static final EpicLinkStateResponse EPIC_UNLINKED = new EpicLinkStateResponse("NONE", null, null);
+    private static final String MOCK_SPEEDRUN_KEY_OWNER = "MockRunner";
     private static final String MOCK_EPIC_NAME = "MockStreamer";
     private static final String MOCK_BOT_EPIC_NAME = "CatapultBot";
     private static final String MOCK_BATTLE_TAG = "MockStreamer#1234";
@@ -122,6 +133,38 @@ public class MockData {
     private AnkamaLinkStateResponse ankamaLink = ANKAMA_UNLINKED;
     /** Epic is offered to every mock session too, with the same presets. */
     private EpicLinkStateResponse epicLink = EPIC_UNLINKED;
+    /** The speedrun.com card is offered to every mock session: the name declared, whether a key is saved. */
+    private String speedrunUsername;
+    private boolean speedrunKeySaved;
+    /** The RetroAchievements card is offered to every mock session too; the mock has a shared key. */
+    /** The FACEIT nickname the mock session declared. */
+    private String faceitNickname;
+    private String retroAchievementsUsername;
+    private boolean retroAchievementsKeySaved;
+    /** The Riot ID the mock session declared ({@code gameName#tagLine}), and its platform. */
+    private String riotId;
+    private String riotPlatform;
+    /** The chess card too: the Chess.com and the Lichess names declared. */
+    private String chesscomUsername;
+    private String lichessUsername;
+    /** The Blizzard card too: a region and two imported World of Warcraft characters, the first the main. */
+    static final List<String> BLIZZARD_REGIONS = List.of("eu", "us", "kr", "tw");
+    private static final List<BlizzardStatsData.WowCharacterOption> MOCK_WOW_CHARACTERS = List.of(
+            new BlizzardStatsData.WowCharacterOption("eu:1001", "Thrall — Draenor (80, Shaman)"),
+            new BlizzardStatsData.WowCharacterOption("eu:1002", "Jaina — Archimonde (70, Mage)"));
+    private String blizzardRegion = "eu";
+    private List<BlizzardStatsData.WowCharacterOption> blizzardCharacters = MOCK_WOW_CHARACTERS;
+    private String blizzardWowMain = "eu:1001";
+    /** The Bungie card too: linked to a Steam Destiny 2 profile. */
+    private boolean bungieLinked = true;
+    /** The osu! card too: linked. */
+    private boolean osuLinked = true;
+    /** The Minecraft account the mock session declared for Hypixel (name, UUID). */
+    private String hypixelName;
+    private String hypixelUuid;
+    /** The Supercell games of the card, and the player tag the mock session declared in each. */
+    static final List<String> SUPERCELL_GAMES = List.of("clash-of-clans", "clash-royale", "brawl-stars");
+    private final java.util.Map<String, String> supercellTags = new java.util.concurrent.ConcurrentHashMap<>();
     private ObsData obsData;
     private String obsPassword;
     private String twitchatBranch = TwitchatData.AUTO;
@@ -367,7 +410,9 @@ public class MockData {
                 obsData == null ? null : TwitchatData.of(twitchatBranch),
                 username.equals(channelDto.twitchUsername()) ? customBindings.state() : null,
                 // drops: the mock has no experiments, they are offered
-                drops(), ankamaData(), epicData());
+                drops(), ankamaData(), epicData(), speedrunData(), retroAchievementsData(), blizzardStatsData(),
+                bungieData(),
+                riotData(), faceitData(), chessData(), osuData(), hypixelData(), supercellData());
     }
 
     /** The mock's one running drops campaign, on the first binding's category. */
@@ -391,6 +436,182 @@ public class MockData {
 
     private AnkamaData ankamaData() {
         return new AnkamaData(ankamaLink.status(), ankamaLink.nameTag(), ankamaLink.serviceAccountTag());
+    }
+
+    /** The account used: the saved key's owner, else the declared name; the mock never finds a Twitch one. */
+    public SpeedrunData speedrunData() {
+        String source = speedrunKeySaved ? "api_key" : speedrunUsername != null ? "declared" : null;
+        String name = speedrunKeySaved ? MOCK_SPEEDRUN_KEY_OWNER : speedrunUsername;
+        return new SpeedrunData(speedrunUsername, speedrunKeySaved, false, speedrunKeySaved ? name : null, name,
+                name == null ? null : "https://www.speedrun.com/users/" + name, source);
+    }
+
+    public void saveSpeedrunUsername(String name) {
+        speedrunUsername = name;
+    }
+
+    public void deleteSpeedrunUsername() {
+        speedrunUsername = null;
+    }
+
+    public void saveSpeedrunKey() {
+        speedrunKeySaved = true;
+    }
+
+    public void deleteSpeedrunKey() {
+        speedrunKeySaved = false;
+    }
+
+    public BlizzardStatsData blizzardStatsData() {
+        return new BlizzardStatsData(!List.of("NONE", "REMOVED").contains(battleNetLink.status()), blizzardRegion,
+                !blizzardCharacters.isEmpty(), blizzardCharacters, blizzardWowMain, true,
+                blizzardCharacters.isEmpty() ? null : java.time.Instant.parse("2026-11-20T10:00:00Z"));
+    }
+
+    /** The Hypixel card: the mock has a key in its pool, so the card is usable. */
+    public HypixelData hypixelData() {
+        return new HypixelData(hypixelName, hypixelUuid, true);
+    }
+
+    public void saveHypixelAccount(String name, String uuid) {
+        this.hypixelName = name;
+        this.hypixelUuid = uuid;
+    }
+
+    /**
+     * The Supercell card: like its Keys tab, the mock has a key for Clash of Clans only, so the two other games show
+     * their stats as off. A declared player is named after its tag.
+     */
+    public SupercellData supercellData() {
+        return new SupercellData(supercellGame("clash-of-clans", true), supercellGame("clash-royale", false),
+                supercellGame("brawl-stars", false));
+    }
+
+    private SupercellData.Game supercellGame(String game, boolean available) {
+        String tag = supercellTags.get(game);
+        return new SupercellData.Game(tag, tag == null ? null : "Chief " + tag.substring(1), available);
+    }
+
+    public void saveSupercellAccount(String game, String tag) {
+        supercellTags.put(game, tag);
+    }
+
+    public void deleteSupercellAccount(String game) {
+        supercellTags.remove(game);
+    }
+
+    public void deleteHypixelAccount() {
+        hypixelName = null;
+        hypixelUuid = null;
+    }
+
+    public BungieAccountData bungieData() {
+        return bungieLinked ? new BungieAccountData(true, "Simulated#0042", "steam", false, true,
+                java.time.Instant.parse("2026-11-20T10:00:00Z")) : BungieAccountData.unlinked(true);
+    }
+
+    public void unlinkBungie() {
+        bungieLinked = false;
+    }
+
+    public OsuAccountData osuData() {
+        return osuLinked ? new OsuAccountData(true, "Simulated", false, true,
+                java.time.Instant.parse("2026-11-20T10:00:00Z")) : OsuAccountData.unlinked(true);
+    }
+
+    public void unlinkOsu() {
+        osuLinked = false;
+    }
+
+    public void saveBlizzardRegion(String region) {
+        blizzardRegion = region;
+    }
+
+    /** Picks {@code key} as the main; false when it is not one of the imported characters. */
+    public boolean saveBlizzardWowMain(String key) {
+        if (blizzardCharacters.stream().noneMatch(c -> c.key().equals(key))) {
+            return false;
+        }
+        blizzardWowMain = key;
+        return true;
+    }
+
+    public void deleteBlizzardWowCharacters() {
+        blizzardCharacters = List.of();
+        blizzardWowMain = null;
+    }
+
+    /** The Riot card: the mock has a key in its pool, so the card is usable. */
+    public RiotData riotData() {
+        return new RiotData(riotId, riotId == null ? null : riotPlatform, true);
+    }
+
+    public void saveRiotAccount(String riotId, String platform) {
+        this.riotId = riotId;
+        this.riotPlatform = platform;
+    }
+
+    public void deleteRiotAccount() {
+        riotId = null;
+        riotPlatform = null;
+    }
+
+    /** The FACEIT card: the mock has a key in its pool, so the card is usable. */
+    public FaceitData faceitData() {
+        return new FaceitData(faceitNickname,
+                faceitNickname == null ? null : "https://www.faceit.com/en/players/" + faceitNickname, true);
+    }
+
+    public void saveFaceitNickname(String nickname) {
+        this.faceitNickname = nickname;
+    }
+
+    public void deleteFaceitNickname() {
+        faceitNickname = null;
+    }
+
+    public ChessData chessData() {
+        return new ChessData(chesscomUsername, lichessUsername);
+    }
+
+    /** Declares {@code name} on {@code site} ({@code chesscom}, lowercased as Chess.com does, or {@code lichess}). */
+    public void saveChessUsername(String site, String name) {
+        if ("chesscom".equals(site)) {
+            chesscomUsername = name.toLowerCase(java.util.Locale.ROOT);
+        } else {
+            lichessUsername = name;
+        }
+    }
+
+    public void deleteChessUsername(String site) {
+        if ("chesscom".equals(site)) {
+            chesscomUsername = null;
+        } else {
+            lichessUsername = null;
+        }
+    }
+
+    public RetroAchievementsData retroAchievementsData() {
+        return new RetroAchievementsData(retroAchievementsUsername,
+                retroAchievementsUsername == null ? null
+                        : "https://retroachievements.org/user/" + retroAchievementsUsername,
+                retroAchievementsKeySaved, false, true);
+    }
+
+    public void saveRetroAchievementsUsername(String name) {
+        retroAchievementsUsername = name;
+    }
+
+    public void deleteRetroAchievementsUsername() {
+        retroAchievementsUsername = null;
+    }
+
+    public void saveRetroAchievementsKey() {
+        retroAchievementsKeySaved = true;
+    }
+
+    public void deleteRetroAchievementsKey() {
+        retroAchievementsKeySaved = false;
     }
 
     private EpicData epicData() {

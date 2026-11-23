@@ -13,6 +13,14 @@ import fr.enimaloc.catapult.common.dto.channel.NoGameSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.ObsSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.RaidSettingsRequest;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsApiKeyRequest;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
+import fr.enimaloc.catapult.api.error.ApiProblem;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardRegionRequest;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardWowMainRequest;
+import fr.enimaloc.catapult.common.dto.channel.ChessUsernameRequest;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenSharingRequest;
 import fr.enimaloc.catapult.common.dto.channel.TitleSettingsRequest;
@@ -37,6 +45,16 @@ import fr.enimaloc.catapult.service.title.StreamTitleService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventActionService;
 import fr.enimaloc.catapult.service.notification.TwitchatEventDispatcher;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
+import fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService;
+import fr.enimaloc.catapult.common.error.ErrorCode;
+import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService;
+import fr.enimaloc.catapult.service.riot.RiotAccountService;
+import fr.enimaloc.catapult.common.dto.channel.RiotAccountRequest;
+import fr.enimaloc.catapult.service.faceit.FaceitAccountService;
+import fr.enimaloc.catapult.common.dto.channel.FaceitNicknameRequest;
+import fr.enimaloc.catapult.service.chess.ChessAccountService;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
+import fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService;
 import fr.enimaloc.catapult.service.steam.SteamPersonalTokenService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,6 +75,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -84,6 +103,17 @@ public class ApiChannelActionsController {
     private final TwitchatEventDispatcher twitchatEventDispatcher;
     private final EmergencyViews emergencyViews;
     private final EmergencyStopService emergencyStopService;
+    private final SpeedrunAccountService speedrunAccountService;
+    private final RetroAchievementsAccountService retroAchievementsAccountService;
+    /** Absent unless {@code battlenet.enabled}: the Blizzard routes are then a 404. */
+    private final Optional<BlizzardAccountService> blizzardAccountService;
+    private final fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinkService;
+    private final RiotAccountService riotAccountService;
+    private final FaceitAccountService faceitAccountService;
+    private final ChessAccountService chessAccountService;
+    private final fr.enimaloc.catapult.service.osu.OsuLinkService osuLinkService;
+    private final fr.enimaloc.catapult.service.hypixel.HypixelAccountService hypixelAccountService;
+    private final fr.enimaloc.catapult.service.supercell.SupercellAccountService supercellAccountService;
 
 
     // ── Binding actions ───────────────────────────────────────────────────────
@@ -371,6 +401,286 @@ public class ApiChannelActionsController {
             @PathVariable UUID userId) {
 
         steamTokenService.delete(userResolver.user(userId));
+    }
+
+    /** 400 when speedrun.com does not know the name, 503 when it cannot be asked. */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/speedrun/username")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveSpeedrunUsername(
+            @PathVariable UUID userId,
+            @RequestBody SpeedrunUsernameRequest body) {
+
+        speedrunAccountService.saveUsername(userResolver.user(userId), body.username());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/speedrun/username")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSpeedrunUsername(
+            @PathVariable UUID userId) {
+
+        speedrunAccountService.deleteUsername(userResolver.user(userId));
+    }
+
+    /** The key is in the body only; 400 when speedrun.com refuses it, 503 when it cannot be asked. */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/speedrun/api-key")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveSpeedrunApiKey(
+            @PathVariable UUID userId,
+            @RequestBody SpeedrunApiKeyRequest body) {
+
+        speedrunAccountService.saveApiKey(userResolver.user(userId), body.apiKey());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/speedrun/api-key")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSpeedrunApiKey(
+            @PathVariable UUID userId) {
+
+        speedrunAccountService.deleteApiKey(userResolver.user(userId));
+    }
+
+    /** 400 for an unknown region, 404 without a Battle.net link (or without Battle.net on this instance). */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/blizzard/region")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveBlizzardRegion(
+            @PathVariable UUID userId,
+            @RequestBody BlizzardRegionRequest body) {
+
+        blizzard().setRegion(userResolver.user(userId), body.region());
+    }
+
+    /** 400 when the region is unknown or the character is not one of the imported ones. */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/blizzard/wow-main")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveBlizzardWowMain(
+            @PathVariable UUID userId,
+            @RequestBody BlizzardWowMainRequest body) {
+
+        BlizzardRegion region = BlizzardRegion.parse(body.region())
+                .orElseThrow(() -> new ApiProblem(ErrorCode.BAD_REQUEST, "Unknown Blizzard region"));
+        blizzard().setWowMain(userResolver.user(userId), region, body.characterId());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/blizzard/wow-characters")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteBlizzardWowCharacters(
+            @PathVariable UUID userId) {
+
+        blizzard().deleteWowCharacters(userResolver.user(userId));
+    }
+
+    /** Unlinks the owner's Bungie.net account (nothing linked: nothing to do), and forgets their cached stats. */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/bungie")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteBungieLink(
+            @PathVariable UUID userId) {
+
+        bungieLinkService.unlink(userResolver.user(userId));
+    }
+
+    /** Unlinks the owner's osu! account (nothing linked: nothing to do), and forgets their cached stats. */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/osu")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteOsuLink(
+            @PathVariable UUID userId) {
+
+        osuLinkService.unlink(userResolver.user(userId));
+    }
+
+    /**
+     * 400 for a malformed entry, an unknown Minecraft name or an account that never joined Hypixel; 429 when the
+     * member's refreshes are spent (the check calls Hypixel); 503 when Hypixel or Mojang cannot be asked (down, or
+     * the source off: no key in the pool).
+     */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/hypixel/account")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveHypixelAccount(
+            @PathVariable UUID userId,
+            @RequestBody fr.enimaloc.catapult.common.dto.channel.HypixelAccountRequest body) {
+
+        hypixelAccountService.save(userResolver.user(userId), body == null ? null : body.player());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/hypixel/account")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteHypixelAccount(
+            @PathVariable UUID userId) {
+
+        hypixelAccountService.delete(userResolver.user(userId));
+    }
+
+    /**
+     * {@code game}: clash-of-clans, clash-royale or brawl-stars. 400 for an unknown game, a malformed tag or a tag no
+     * player has in that game; 429 when the member's refreshes are spent (the check calls Supercell); 503 when
+     * Supercell cannot be asked (down, or the source off: no key of that game in the pool).
+     */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/supercell/{game}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveSupercellAccount(
+            @PathVariable UUID userId,
+            @PathVariable String game,
+            @RequestBody fr.enimaloc.catapult.common.dto.channel.SupercellAccountRequest body) {
+
+        supercellAccountService.save(userResolver.user(userId), game, body == null ? null : body.tag());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/supercell/{game}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSupercellAccount(
+            @PathVariable UUID userId,
+            @PathVariable String game) {
+
+        supercellAccountService.delete(userResolver.user(userId), game);
+    }
+
+    private BlizzardAccountService blizzard() {
+        return blizzardAccountService.orElseThrow(
+                () -> new ApiProblem(ErrorCode.NOT_FOUND, "Blizzard settings are not available"));
+    }
+
+    /**
+     * 400 for a malformed Riot ID, an unknown platform or a Riot ID Riot does not know; 503 when Riot cannot be asked
+     * (down, the source off, or no key of the pool for the platform).
+     */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/riot/account")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveRiotAccount(
+            @PathVariable UUID userId,
+            @RequestBody RiotAccountRequest body) {
+
+        riotAccountService.save(userResolver.user(userId), body.riotId(), body.platform());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/riot/account")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRiotAccount(
+            @PathVariable UUID userId) {
+
+        riotAccountService.delete(userResolver.user(userId));
+    }
+
+    /**
+     * 400 for a malformed nickname or one FACEIT does not know; 503 when FACEIT cannot be asked (down, the source
+     * off, or no key in the pool).
+     */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/faceit/nickname")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveFaceitNickname(
+            @PathVariable UUID userId,
+            @RequestBody FaceitNicknameRequest body) {
+
+        faceitAccountService.save(userResolver.user(userId), body.nickname());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/faceit/nickname")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteFaceitNickname(
+            @PathVariable UUID userId) {
+
+        faceitAccountService.delete(userResolver.user(userId));
+    }
+
+    /** 400 when RetroAchievements does not know the name, 503 when it cannot be asked (or no key can ask it). */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/retroachievements/username")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveRetroAchievementsUsername(
+            @PathVariable UUID userId,
+            @RequestBody RetroAchievementsUsernameRequest body) {
+
+        retroAchievementsAccountService.saveUsername(userResolver.user(userId), body.username());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/retroachievements/username")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRetroAchievementsUsername(
+            @PathVariable UUID userId) {
+
+        retroAchievementsAccountService.deleteUsername(userResolver.user(userId));
+    }
+
+    /** The key is in the body only; 400 when RetroAchievements refuses it or no name is declared, 503 when down. */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/retroachievements/api-key")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveRetroAchievementsApiKey(
+            @PathVariable UUID userId,
+            @RequestBody RetroAchievementsApiKeyRequest body) {
+
+        retroAchievementsAccountService.saveApiKey(userResolver.user(userId), body.apiKey());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/retroachievements/api-key")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRetroAchievementsApiKey(
+            @PathVariable UUID userId) {
+
+        retroAchievementsAccountService.deleteApiKey(userResolver.user(userId));
+    }
+
+    /**
+     * 400 when Chess.com does not know the name (or the account is closed), 429 when the member's refreshes
+     * are spent, 503 when it cannot be asked.
+     */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/chess/chesscom")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveChesscomUsername(
+            @PathVariable UUID userId,
+            @RequestBody ChessUsernameRequest body) {
+
+        chessAccountService.saveChesscom(userResolver.user(userId), body.username());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/chess/chesscom")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteChesscomUsername(
+            @PathVariable UUID userId) {
+
+        chessAccountService.deleteChesscom(userResolver.user(userId));
+    }
+
+    /**
+     * 400 when Lichess does not know the name (or the account is closed), 429 when the member's refreshes
+     * are spent, 503 when it cannot be asked.
+     */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/chess/lichess")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveLichessUsername(
+            @PathVariable UUID userId,
+            @RequestBody ChessUsernameRequest body) {
+
+        chessAccountService.saveLichess(userResolver.user(userId), body.username());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/chess/lichess")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteLichessUsername(
+            @PathVariable UUID userId) {
+
+        chessAccountService.deleteLichess(userResolver.user(userId));
     }
 
     @PreAuthorize("@authz.ownsChannel(#userId)")

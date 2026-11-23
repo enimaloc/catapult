@@ -61,6 +61,25 @@ class IntegrationCardsLayoutTest {
                 new IntegrationNode.Text(Attrs.NONE, false, null)).wide()).isTrue();
     }
 
+    /** The cards that only feed the API's personal stats go to the API tab, the detection ones stay on Integrations. */
+    @Test
+    void theCards_areSplitBetweenTheIntegrationsAndTheApiTabs_inTheirOrder() {
+        List<IntegrationDto> cards = List.of(IntegrationCards.twitch(), card("speedrun"), card("xbox"),
+                card("retroachievements"), card("blizzard-stats"), card("bungie"), card("riot"), card("faceit"),
+                card("chess"), card("osu"), card("hypixel"), card("supercell"), card("steam"), card("battlenet"), card("epic"),
+                card("ankama"), card("minecraft"), card("obs"), card("twitchat"));
+
+        assertThat(IntegrationCards.integrationsTab(cards)).extracting(IntegrationDto::id).containsExactly(
+                "twitch", "xbox", "steam", "battlenet", "epic", "ankama", "minecraft", "obs", "twitchat");
+        assertThat(IntegrationCards.apiTab(cards)).extracting(IntegrationDto::id).containsExactly(
+                "speedrun", "retroachievements", "blizzard-stats", "bungie", "riot", "faceit", "chess", "osu",
+                "hypixel", "supercell");
+    }
+
+    private static IntegrationDto card(String id) {
+        return new IntegrationDto(id, null, List.of(), false);
+    }
+
     /** Every grid card's linking button looks the same: a filled one. */
     @Test
     void linkingButtons_areFilled() {

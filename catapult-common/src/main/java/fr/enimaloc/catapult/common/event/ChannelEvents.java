@@ -4,6 +4,16 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingScheduleDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingCurrentDto;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
+import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
+import fr.enimaloc.catapult.common.dto.channel.RiotData;
+import fr.enimaloc.catapult.common.dto.channel.FaceitData;
+import fr.enimaloc.catapult.common.dto.channel.ChessData;
+import fr.enimaloc.catapult.common.dto.channel.OsuAccountData;
+import fr.enimaloc.catapult.common.dto.channel.HypixelData;
+import fr.enimaloc.catapult.common.dto.channel.SupercellData;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 
 import java.util.List;
 import java.util.Map;
@@ -38,6 +48,16 @@ public final class ChannelEvents {
     public static final String BATTLENET_LINK_CHANGED = "battlenet.link.changed";
     public static final String ANKAMA_LINK_CHANGED = "ankama.link.changed";
     public static final String EPIC_LINK_CHANGED = "epic.link.changed";
+    public static final String SPEEDRUN_ACCOUNT_CHANGED = "speedrun.account.changed";
+    public static final String RETROACHIEVEMENTS_ACCOUNT_CHANGED = "retroachievements.account.changed";
+    public static final String BLIZZARD_ACCOUNT_CHANGED = "blizzard.account.changed";
+    public static final String BUNGIE_ACCOUNT_CHANGED = "bungie.account.changed";
+    public static final String RIOT_ACCOUNT_CHANGED = "riot.account.changed";
+    public static final String FACEIT_ACCOUNT_CHANGED = "faceit.account.changed";
+    public static final String CHESS_ACCOUNT_CHANGED = "chess.account.changed";
+    public static final String OSU_ACCOUNT_CHANGED = "osu.account.changed";
+    public static final String HYPIXEL_ACCOUNT_CHANGED = "hypixel.account.changed";
+    public static final String SUPERCELL_ACCOUNT_CHANGED = "supercell.account.changed";
     public static final String CUSTOM_BINDING_CHANGED = "custom.binding.changed";
     public static final String CUSTOM_BINDINGS_UPDATED = "custom.bindings.updated";
 
@@ -114,6 +134,43 @@ public final class ChannelEvents {
      */
     public record EpicLinkChanged(String channelId, String channelLogin, String status, String displayName,
                                   String serviceAccountName) {}
+
+    /**
+     * The owner's speedrun.com settings changed: {@code account} is how the settings card stands now. It carries
+     * names only, never the personal API key.
+     */
+    public record SpeedrunAccountChanged(String channelId, String channelLogin, SpeedrunData account) {}
+
+    /**
+     * The owner's Blizzard settings changed: {@code account} is how the settings card stands now (names only, no
+     * token is ever held).
+     */
+    public record BlizzardAccountChanged(String channelId, String channelLogin, BlizzardStatsData account) {}
+
+    /** The owner's Bungie.net link changed: {@code account} is how the card stands now (names only, never a token). */
+    public record BungieAccountChanged(String channelId, String channelLogin, BungieAccountData account) {}
+    /** The owner's Riot settings changed: {@code account} is how the settings card stands now (no secret). */
+    public record RiotAccountChanged(String channelId, String channelLogin, RiotData account) {}
+    /** The owner's FACEIT settings changed: {@code account} is how the settings card stands now (no secret). */
+    public record FaceitAccountChanged(String channelId, String channelLogin, FaceitData account) {}
+
+    /** The owner's osu! link changed: {@code account} is how the card stands now (names only, never a token). */
+    public record OsuAccountChanged(String channelId, String channelLogin, OsuAccountData account) {}
+
+    /** The owner's Hypixel settings changed: {@code account} is how the settings card stands now (no secret). */
+    public record HypixelAccountChanged(String channelId, String channelLogin, HypixelData account) {}
+    /** The owner's Supercell settings changed: {@code account} is how the settings card stands now (no secret). */
+    public record SupercellAccountChanged(String channelId, String channelLogin, SupercellData account) {}
+
+    /**
+     * The owner's RetroAchievements settings changed: {@code account} is how the settings card stands now. It
+     * carries the name only, never the personal API key.
+     */
+    public record RetroAchievementsAccountChanged(String channelId, String channelLogin,
+                                                  RetroAchievementsData account) {}
+
+    /** The owner's chess accounts changed: {@code account} is how the settings card stands now (names only). */
+    public record ChessAccountChanged(String channelId, String channelLogin, ChessData account) {}
 
     /**
      * New notifications wait to be sent to these members' Twitchat: whichever catapult-web instance holds one

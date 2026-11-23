@@ -23,6 +23,16 @@ import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
+import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
+import fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent;
+import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
+import fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent;
+import fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent;
+import fr.enimaloc.catapult.event.hypixel.HypixelAccountChangedEvent;
+import fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent;
+import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
+import fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent;
+import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
 import fr.enimaloc.catapult.event.steam.SteamConnectionStateEvent;
@@ -91,6 +101,36 @@ public final class ChannelState {
             EpicData link = ch.epic();
             events.add(new EpicLinkEvent(login, link.status() == null ? "NONE" : link.status(), link.displayName(),
                     link.serviceAccountName()));
+        }
+        if (ch.speedrun() != null) {
+            events.add(SpeedrunAccountChangedEvent.of(login, ch.speedrun()));
+        }
+        if (ch.retroAchievements() != null) {
+            events.add(RetroAchievementsAccountChangedEvent.of(login, ch.retroAchievements()));
+        }
+        if (ch.blizzardStats() != null) {
+            events.add(BlizzardAccountChangedEvent.of(login, ch.blizzardStats()));
+        }
+        if (ch.bungie() != null) {
+            events.add(BungieAccountChangedEvent.of(login, ch.bungie()));
+        }
+        if (ch.hypixel() != null) {
+            events.add(HypixelAccountChangedEvent.of(login, ch.hypixel()));
+        }
+        if (ch.supercell() != null) {
+            events.add(SupercellAccountChangedEvent.of(login, ch.supercell()));
+        }
+        if (ch.riot() != null) {
+            events.add(RiotAccountChangedEvent.of(login, ch.riot()));
+        }
+        if (ch.faceit() != null) {
+            events.add(FaceitAccountChangedEvent.of(login, ch.faceit()));
+        }
+        if (ch.chess() != null) {
+            events.add(ChessAccountChangedEvent.of(login, ch.chess()));
+        }
+        if (ch.osu() != null) {
+            events.add(OsuAccountChangedEvent.of(login, ch.osu()));
         }
         CustomBindingsStateDto custom = ch.customBindings();
         if (custom != null) {

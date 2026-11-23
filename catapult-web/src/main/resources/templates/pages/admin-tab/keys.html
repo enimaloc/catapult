@@ -1,10 +1,22 @@
 <!--/*@thymesVar id="steam" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
 <!--/*@thymesVar id="dtdd" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*@thymesVar id="steamgriddb" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*@thymesVar id="retroachievements" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*@thymesVar id="itad" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*@thymesVar id="opencritic" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*@thymesVar id="osu" type="fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData"*/-->
+<!--/*@thymesVar id="bungie" type="fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData"*/-->
+<!--/*@thymesVar id="riot" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*@thymesVar id="faceit" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*@thymesVar id="hypixel" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*@thymesVar id="clashofclans" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*@thymesVar id="clashroyale" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
+<!--/*@thymesVar id="brawlstars" type="fr.enimaloc.catapult.common.dto.admin.ApiKeysPageDto"*/-->
 <!--/*@thymesVar id="minecraft" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.AccountDto>"*/-->
 <!--/*@thymesVar id="ankama" type="java.util.List<fr.enimaloc.catapult.common.dto.admin.AnkamaAccountDto>"*/-->
 <!--/*@thymesVar id="epic" type="fr.enimaloc.catapult.common.dto.admin.EpicAccountsDto"*/-->
 <!--/*
-  The shared API keys: one card for Steam and one for DTDD (a disabled provider shows only its note; an enabled one
+  The shared API keys: one card for Steam, DTDD, SteamGridDB, IsThereAnyDeal, OpenCritic, RetroAchievements, Riot, FACEIT, Hypixel and each Supercell game (a disabled provider shows only its note; an enabled one
   the add field, Refresh and the keys, masked only: the raw key is never rendered, each with what it was used for),
   then the Minecraft, Battle.net, Ankama and Epic service accounts cards, then the rate limits learned from the platforms' 429s
   (rate-limits.html).
@@ -20,8 +32,8 @@
         <h2 th:text="#{admin.tab.keys}">Keys</h2>
     </div>
 
-    <th:block th:each="provider : ${ {'steam', 'dtdd'} }">
-        <th:block th:with="keys=${provider == 'steam' ? steam : dtdd}">
+    <th:block th:each="provider : ${ {'steam', 'dtdd', 'steamgriddb', 'itad', 'opencritic', 'retroachievements', 'riot', 'faceit', 'hypixel', 'clashofclans', 'clashroyale', 'brawlstars'} }">
+        <th:block th:with="keys=${provider == 'steam' ? steam : (provider == 'dtdd' ? dtdd : (provider == 'steamgriddb' ? steamgriddb : (provider == 'itad' ? itad : (provider == 'opencritic' ? opencritic : (provider == 'retroachievements' ? retroachievements : (provider == 'riot' ? riot : (provider == 'faceit' ? faceit : (provider == 'hypixel' ? hypixel : (provider == 'clashofclans' ? clashofclans : (provider == 'clashroyale' ? clashroyale : brawlstars))))))))))}">
             <th:block th:if="${keys == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
 
             <mdui-card th:if="${keys != null}" class="admin-keys-card" variant="outlined"
@@ -87,6 +99,58 @@
             </mdui-card>
         </th:block>
     </th:block>
+
+    <!--/*
+      The Bungie.net application (Destiny 2): its OAuth client id (public), its secret and the API key bound to it. The
+      secret is never rendered, the key only masked; a blank secret or key keeps the one set. Without it the Bungie
+      source and login are off. Driven by admin-keys.js (.admin-bungie-save, .admin-bungie-delete).
+    */-->
+    <th:block th:if="${bungie == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <mdui-card th:if="${bungie != null}" class="admin-keys-card admin-bungie" variant="outlined"
+               th:attr="data-label-invalid=#{admin.keys.bungie.invalid},data-label-saved=#{admin.keys.bungie.saved},
+                        data-label-removed=#{admin.keys.bungie.removed}">
+        <div class="admin-keys-head">
+            <h3 th:text="#{admin.keys.bungie.title}">Bungie.net application</h3>
+        </div>
+        <p class="admin-cell-muted" th:text="${bungie.configured()} ? #{admin.keys.bungie.set(${bungie.clientId()}, ${bungie.apiKeyMasked()})} : #{admin.keys.bungie.none}">None.</p>
+        <div class="admin-keys-add">
+            <mdui-text-field name="clientId" variant="outlined" required autocomplete="off"
+                             th:attr="label=#{admin.keys.bungie.client-id},value=${bungie.clientId()}"></mdui-text-field>
+            <mdui-text-field name="clientSecret" type="password" variant="outlined" autocomplete="off"
+                             th:attr="label=#{admin.keys.bungie.client-secret}"></mdui-text-field>
+            <mdui-text-field name="apiKey" type="password" variant="outlined" autocomplete="off"
+                             th:attr="label=#{admin.keys.bungie.api-key}"></mdui-text-field>
+            <mdui-button variant="filled" icon="save" class="admin-bungie-save" th:text="#{admin.keys.bungie.save}">Save</mdui-button>
+            <mdui-button th:if="${bungie.configured()}" variant="text" icon="delete" class="admin-bungie-delete"
+                         th:attr="data-confirm=#{admin.keys.bungie.delete-confirm}" th:text="#{admin.keys.bungie.delete}">Remove</mdui-button>
+        </div>
+        <p class="admin-cell-muted" th:text="#{admin.keys.bungie.help}">Help.</p>
+    </mdui-card>
+
+    <!--/*
+      The osu! OAuth application: its client id (public) and its secret. The secret is never rendered; a blank secret
+      keeps the one set (same client id only). Without it the osu! source and login are off. Driven by admin-keys.js
+      (.admin-osu-save, .admin-osu-delete).
+    */-->
+    <th:block th:if="${osu == null}"><th:block th:replace="~{pages/admin-tab/common :: unavailable}"></th:block></th:block>
+    <mdui-card th:if="${osu != null}" class="admin-keys-card admin-osu" variant="outlined"
+               th:attr="data-label-invalid=#{admin.keys.osu.invalid},data-label-saved=#{admin.keys.osu.saved},
+                        data-label-removed=#{admin.keys.osu.removed}">
+        <div class="admin-keys-head">
+            <h3 th:text="#{admin.keys.osu.title}">osu! application</h3>
+        </div>
+        <p class="admin-cell-muted" th:text="${osu.configured()} ? #{admin.keys.osu.set(${osu.clientId()})} : #{admin.keys.osu.none}">None.</p>
+        <div class="admin-keys-add">
+            <mdui-text-field name="clientId" variant="outlined" required autocomplete="off"
+                             th:attr="label=#{admin.keys.osu.client-id},value=${osu.clientId()}"></mdui-text-field>
+            <mdui-text-field name="clientSecret" type="password" variant="outlined" autocomplete="off"
+                             th:attr="label=#{admin.keys.osu.client-secret}"></mdui-text-field>
+            <mdui-button variant="filled" icon="save" class="admin-osu-save" th:text="#{admin.keys.osu.save}">Save</mdui-button>
+            <mdui-button th:if="${osu.configured()}" variant="text" icon="delete" class="admin-osu-delete"
+                         th:attr="data-confirm=#{admin.keys.osu.delete-confirm}" th:text="#{admin.keys.osu.delete}">Remove</mdui-button>
+        </div>
+        <p class="admin-cell-muted" th:text="#{admin.keys.osu.help}">Help.</p>
+    </mdui-card>
 
     <!--/*
       The Minecraft service accounts: each one's state chips and actions (re-authenticate when disabled, reset the

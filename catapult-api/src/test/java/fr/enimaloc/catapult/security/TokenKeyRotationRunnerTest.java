@@ -46,6 +46,9 @@ class TokenKeyRotationRunnerTest {
     @BeforeEach
     void clean() {
         jdbc.update("DELETE FROM oauth_token");
+        // Not tied to an account (one application row): left over, it would be seen by every other test
+        jdbc.update("DELETE FROM bungie_app_credentials");
+        jdbc.update("DELETE FROM osu_app_credentials");
         jdbc.update("DELETE FROM user_account");
     }
 
@@ -80,6 +83,35 @@ class TokenKeyRotationRunnerTest {
         Map<String, Object> token = jdbc.queryForMap("SELECT access_token, refresh_token FROM oauth_token");
         assertThat(current.decrypt((String) token.get("access_token"))).isEqualTo("access");
         assertThat(current.decrypt((String) token.get("refresh_token"))).isEqualTo("refresh");
+    }
+
+    @Test
+    void aSpeedrunKey_movesToTheCurrentKey() {
+        assertThat(TokenKeyRotationRunner.SECRETS)
+                .contains(new TokenKeyRotationRunner.Secret("speedrun_account", "user_id", "api_key_enc"));
+        UUID user = user(null);
+        jdbc.update("INSERT INTO speedrun_account (user_id, api_key_enc, updated_at) VALUES (?, ?, now())",
+                user, old.encrypt("speedrun-key"));
+
+        runner.run(null);
+
+        String key = jdbc.queryForObject("SELECT api_key_enc FROM speedrun_account WHERE user_id = ?", String.class, user);
+        assertThat(current.decrypt(key)).isEqualTo("speedrun-key");
+    }
+
+    @Test
+    void aRetroAchievementsKey_movesToTheCurrentKey() {
+        assertThat(TokenKeyRotationRunner.SECRETS)
+                .contains(new TokenKeyRotationRunner.Secret("retroachievements_account", "user_id", "api_key_enc"));
+        UUID user = user(null);
+        jdbc.update("INSERT INTO retroachievements_account (user_id, username, user_ulid, api_key_enc, updated_at)"
+                + " VALUES (?, 'Scott', 'U1', ?, now())", user, old.encrypt("ra-key"));
+
+        runner.run(null);
+
+        String key = jdbc.queryForObject("SELECT api_key_enc FROM retroachievements_account WHERE user_id = ?",
+                String.class, user);
+        assertThat(current.decrypt(key)).isEqualTo("ra-key");
     }
 
     @Test
@@ -129,5 +161,47 @@ class TokenKeyRotationRunnerTest {
         new TokenKeyRotationRunner(current, untouched).run(null);
 
         verifyNoInteractions(untouched);
+    }
+
+    @Test
+    void theBungieSecrets_moveToTheCurrentKey() {
+        assertThat(TokenKeyRotationRunner.SECRETS).contains(
+                new TokenKeyRotationRunner.Secret("bungie_app_credentials", "id", "client_secret_enc"),
+                new TokenKeyRotationRunner.Secret("bungie_app_credentials", "id", "api_key_enc"),
+                new TokenKeyRotationRunner.Secret("bungie_account", "user_id", "refresh_token_enc"));
+        UUID user = user(null);
+        jdbc.update("INSERT INTO bungie_app_credentials (id, client_id, client_secret_enc, api_key_enc, updated_at)"
+                + " VALUES (1, '12345', ?, ?, now())", old.encrypt("client-secret"), old.encrypt("api-key"));
+        jdbc.update("INSERT INTO bungie_account (user_id, membership_id, refresh_token_enc, linked_at, updated_at)"
+                + " VALUES (?, '42', ?, now(), now())", user, old.encrypt("bungie-refresh"));
+
+        runner.run(null);
+
+        Map<String, Object> app = jdbc.queryForMap("SELECT client_secret_enc, api_key_enc FROM bungie_app_credentials");
+        assertThat(current.decrypt((String) app.get("client_secret_enc"))).isEqualTo("client-secret");
+        assertThat(current.decrypt((String) app.get("api_key_enc"))).isEqualTo("api-key");
+        String refresh = jdbc.queryForObject("SELECT refresh_token_enc FROM bungie_account WHERE user_id = ?",
+                String.class, user);
+        assertThat(current.decrypt(refresh)).isEqualTo("bungie-refresh");
+    }
+
+    @Test
+    void theOsuSecrets_moveToTheCurrentKey() {
+        assertThat(TokenKeyRotationRunner.SECRETS).contains(
+                new TokenKeyRotationRunner.Secret("osu_app_credentials", "id", "client_secret_enc"),
+                new TokenKeyRotationRunner.Secret("osu_account", "user_id", "refresh_token_enc"));
+        UUID user = user(null);
+        jdbc.update("INSERT INTO osu_app_credentials (id, client_id, client_secret_enc, updated_at)"
+                + " VALUES (1, '12345', ?, now())", old.encrypt("client-secret"));
+        jdbc.update("INSERT INTO osu_account (user_id, osu_user_id, refresh_token_enc, linked_at, updated_at)"
+                + " VALUES (?, 42, ?, now(), now())", user, old.encrypt("osu-refresh"));
+
+        runner.run(null);
+
+        String secret = jdbc.queryForObject("SELECT client_secret_enc FROM osu_app_credentials", String.class);
+        assertThat(current.decrypt(secret)).isEqualTo("client-secret");
+        String refresh = jdbc.queryForObject("SELECT refresh_token_enc FROM osu_account WHERE user_id = ?",
+                String.class, user);
+        assertThat(current.decrypt(refresh)).isEqualTo("osu-refresh");
     }
 }

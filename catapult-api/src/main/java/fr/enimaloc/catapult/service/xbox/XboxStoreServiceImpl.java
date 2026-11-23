@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.xbox;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import fr.enimaloc.catapult.service.link.ExternalLinks;
@@ -37,6 +38,7 @@ public class XboxStoreServiceImpl implements XboxStoreService {
                 DisplayCatalogResponse response = restClient.get()
                         .uri(DISPLAY_CATALOG_URL + "{productId}?market={market}&languages={languages}"
                                 + "&fieldsTemplate=Details", productId, market, languageTag)
+                        .header("User-Agent", EnrichmentUserAgent.VALUE)
                         .retrieve()
                         .body(DisplayCatalogResponse.class);
                 if (response == null || response.product() == null) {

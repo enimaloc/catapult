@@ -1,5 +1,11 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.Locale;
+import java.util.Set;
+
 /** Shared constants for the v2 user-facing API — split out so response DTOs in their own files can build "more" links without depending on UserApiV2Controller itself. */
 public final class ApiV2 {
 
@@ -10,6 +16,13 @@ public final class ApiV2 {
     // untouched (existing pasted-URL consumers can't attach headers), so it isn't part of this
     // versioning scheme at all — it's a separate, unversioned controller by design.
     static final String VERSION = "2";
+
+    // Version 3: only the responses that change in it get a mapping of their own at this version.
+    static final String VERSION_3 = "3";
+
+    // Baseline mapping of every route that did not change since version 2: it answers version 2 and any later one
+    // (Spring picks a fixed "3" mapping over it for a version 3 request, the higher version winning).
+    static final String BASELINE = VERSION + "+";
 
     // Request header carrying the version (see ApiVersioningConfig). Public: the CORS of the public routes
     // (ApiSecurityConfig) allows it.
@@ -30,11 +43,51 @@ public final class ApiV2 {
     static final String ME_GAME_PATH = "/api/me/game";
     static final String ME_CUSTOM_BINDINGS_PATH = "/api/me/custom-bindings";
     static final String ME_DROPS_PATH = "/api/me/drops";
+    static final String ME_SPEEDRUN_PATH = "/api/me/speedrun";
+    static final String ME_STATS_PATH = "/api/me/stats";
 
     // The widget token of the dev backdoor (DevBackdoorResolver) that names no real game, and the
     // example the legacy routes' "uuid" path parameter documents. LegacyRoutesGate does not read it:
     // it recognizes any backdoor uuid by DevBackdoorResolver.isBackdoor.
     static final String GENERIC_UUID_EXAMPLE = "00000000-0000-0000-0001-000000000190";
+
+    // Shapes of the platform ids the public routes that may call a third party accept (@Pattern on the path
+    // variable): a malformed id is a 400 before any cache read, upstream call or database write.
+    static final String IGDB_ID = "\\d{1,19}";
+    static final String STEAM_APP_ID = "\\d{1,10}";
+    static final String XBOX_TITLE_ID = "\\d{1,10}";
+    static final String RA_GAME_ID = "\\d{1,9}";
+    static final String XBOX_PRODUCT_ID = "[A-Za-z0-9]{12}";
+    static final String ITAD_ID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}";
+    static final String OPENCRITIC_ID = "\\d{1,10}";
+    static final String TWITCH_GAME_ID = "\\d{1,19}";
+    static final String SPEEDRUN_GAME_ID = "[A-Za-z0-9]{1,16}";
+    static final String BLIZZARD_GAME = "wow|sc2|d3";
+    static final String BLIZZARD_REGION = "eu|us|kr|tw";
+    static final String FACEIT_GAME = "cs2";
+    static final String HEARTHSTONE_DECK_CODE = "[A-Za-z0-9+=_-]{8,200}";
+    static final String BUNGIE_GAME = "destiny2";
+    static final String RIOT_GAME = "lol|tft";
+    static final String OSU_GAME = "osu";
+    static final String SUPERCELL_GAME = "clash-of-clans|clash-royale|brawl-stars";
+
+    // Shapes of the optional "country" and "language" query parameters of the enrichment routes.
+    static final String COUNTRY = "[A-Za-z]{2}";
+    static final String LANGUAGE = "[A-Za-z]{2}";
+
+    private static final String DEFAULT_COUNTRY = "FR";
+
+    /** The upper-cased ISO 3166 country code; "FR" when absent; a 400 when it is not a known country. */
+    static String country(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return DEFAULT_COUNTRY;
+        }
+        String code = raw.strip().toUpperCase(Locale.ROOT);
+        if (!Set.of(Locale.getISOCountries()).contains(code)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown country code");
+        }
+        return code;
+    }
 
     private ApiV2() {}
 }

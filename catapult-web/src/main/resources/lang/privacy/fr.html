@@ -8,6 +8,58 @@
     <ul>
         <li>Token OAuth Twitch</li>
         <li>Steam ID</li>
+        <li>Nom d'utilisateur et clé d'API speedrun.com (facultatifs), pour retrouver vos records sur
+            speedrun.com ; la clé est stockée chiffrée et jamais réaffichée</li>
+        <li>Nom d'utilisateur et clé d'API web RetroAchievements (facultatifs), pour lire vos succès ; la clé est
+            stockée chiffrée et jamais réaffichée. Vos statistiques Steam, Xbox et RetroAchievements sont lues à
+            la demande et rafraîchies toutes les 15 minutes au plus ; la dernière copie est gardée jusqu'à la
+            déliaison de la plateforme ou la suppression de votre compte, et peut encore être affichée quand la
+            plateforme est injoignable</li>
+        <li>Stats Blizzard : la région de votre compte Battle.net, la liste de vos personnages World of Warcraft et
+            votre personnage principal, gardés jusqu'à la déliaison de Battle.net ou la suppression de votre
+            compte. Vos profils World of Warcraft, StarCraft II et Diablo III sont lus à la demande et rafraîchis
+            toutes les 30 minutes au plus ; la dernière copie est gardée jusqu'à la déliaison de Battle.net ou
+            la suppression de votre compte</li>
+        <li>Pseudo FACEIT (facultatif) : le pseudo que vous déclarez et l'identifiant de joueur que FACEIT donne
+            pour ce pseudo, gardés jusqu'à ce que vous retiriez le pseudo ou supprimiez votre compte. Votre niveau,
+            votre Elo et vos statistiques Counter-Strike 2 sont lus à la demande et rafraîchis toutes les 10
+            minutes au plus, votre dernier match toutes les 5 minutes au plus ; la dernière copie est gardée
+            jusqu'au retrait du pseudo ou la suppression de votre compte, et peut encore être affichée quand
+            FACEIT est injoignable</li>
+        <li>Bungie.net (Destiny 2) : les identifiants de votre compte Bungie.net et de votre profil Destiny 2, votre
+            Bungie Name et l'autorisation que Bungie donne à la liaison (son jeton de renouvellement, chiffré, valable
+            90 jours et renouvelé à l'usage), gardés jusqu'à la déliaison de Bungie.net ou la suppression de votre
+            compte. Votre profil Destiny 2 est lu à la demande avec cette autorisation : le profil est rafraîchi
+            toutes les 2 minutes au plus, le score de triomphe toutes les 30 minutes au plus ; la dernière copie est
+            gardée jusqu'à la déliaison de Bungie.net ou la suppression de votre compte</li>
+        <li>Riot ID (facultatif) : le nom et le tag que vous déclarez, votre serveur League of Legends et
+            l'identifiant de compte que Riot donne pour ce Riot ID, gardés jusqu'à ce que vous retiriez le Riot ID
+            ou supprimiez votre compte. Vos rangs et votre niveau League of Legends et votre rang Teamfight
+            Tactics sont lus à la demande et rafraîchis toutes les 10 minutes au plus, votre partie en cours
+            toutes les minutes au plus ; la dernière copie est gardée jusqu'au retrait du Riot ID ou la
+            suppression de votre compte</li>
+        <li>Noms d'utilisateur Chess.com et Lichess (facultatifs), pour lire vos cotes, votre bilan et vos
+            parties en cours sur les profils publics de ces sites ; l'identifiant de joueur Chess.com et
+            l'identifiant de compte Lichess sont gardés à côté. Ils sont lus à la demande et rafraîchis toutes
+            les 2 minutes au plus (toutes les 10 minutes pour les cotes Chess.com) ; la dernière copie est gardée
+            jusqu'au retrait du nom ou la suppression de votre compte</li>
+        <li>osu! : votre identifiant osu!, votre pseudo et votre mode de jeu par défaut, et l'autorisation qu'osu!
+            donne à la liaison (son jeton de renouvellement, chiffré et remplacé à chaque usage), gardés jusqu'à la
+            déliaison d'osu! ou la suppression de votre compte. Votre profil osu! (pp, rangs, précision, nombre et
+            temps de parties) et vos derniers scores sont lus à la demande avec cette autorisation, chacun rafraîchi
+            toutes les 2 minutes au plus ; la dernière copie est gardée jusqu'à la déliaison d'osu! ou la suppression
+            de votre compte</li>
+        <li>Hypixel (facultatif) : le compte Minecraft que vous déclarez, son UUID et le pseudo qu'il avait alors,
+            gardés jusqu'à ce que vous le retiriez ou supprimiez votre compte. Votre profil Hypixel (niveau, rang, karma,
+            points de hauts faits, dernière connexion, Bed Wars et SkyWars) est lu à la demande et rafraîchi toutes les 5 minutes au plus, l'endroit où vous
+            êtes sur le serveur toutes les minutes au plus (jamais si vous le cachez dans vos réglages Hypixel) ; la
+            dernière copie est gardée jusqu'au retrait du compte ou la suppression de votre compte. Un pseudo saisi
+            est cherché chez Mojang pour trouver son UUID</li>
+        <li>Supercell (facultatif) : le tag de joueur que vous déclarez dans Clash of Clans, Clash Royale ou Brawl
+            Stars et le nom de joueur que le jeu donne pour lui, gardés jusqu'à ce que vous le retiriez ou
+            supprimiez votre compte. Votre profil dans ce jeu (trophées, ligue ou arène, hôtel de ville, victoires,
+            clan ou club, héros, deck ou brawlers) est lu à la demande et rafraîchi toutes les 10 minutes au plus ;
+            la dernière copie est gardée jusqu'au retrait du tag ou la suppression de votre compte</li>
         <li>Rapports d'erreur : quand une page rencontre une erreur, l'identifiant de votre compte, le
             déroulé des dernières actions (clics, pages, requêtes) et un enregistrement de la page,
             sans ce que vous tapez dans les champs, pour reproduire le problème</li>
@@ -16,8 +68,11 @@
 
 <section>
     <h2>Transferts de données</h2>
-    <p>Les rapports d'erreur sont envoyés à Sentry (sentry.io), en passant par Catapult : votre
-        navigateur ne contacte jamais Sentry directement. Aucun autre transfert à des tiers.</p>
+    <p>Votre nom d'utilisateur et votre clé speedrun.com, si vous les renseignez, ne sont transmis qu'à
+        speedrun.com. Votre nom d'utilisateur et votre clé RetroAchievements ne sont transmis qu'à
+        RetroAchievements. Votre Riot ID n'est transmis qu'à Riot Games. Votre pseudo FACEIT n'est transmis qu'à FACEIT. Vos noms Chess.com et Lichess ne sont transmis qu'à Chess.com et à Lichess. Votre compte Minecraft n'est transmis qu'à Hypixel (et votre pseudo à Mojang). Vos tags de joueur Supercell ne sont transmis qu'à Supercell. Les rapports d'erreur sont envoyés à Sentry (sentry.io), en passant par
+        Catapult : votre navigateur ne contacte jamais Sentry directement. Aucun autre transfert à des
+        tiers.</p>
 </section>
 
 <section>

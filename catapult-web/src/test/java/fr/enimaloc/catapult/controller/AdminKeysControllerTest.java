@@ -22,7 +22,8 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = AdminKeysController.class)
+@WebMvcTest(controllers = {AdminKeysController.class, AdminBungieCredentialsController.class,
+        AdminOsuCredentialsController.class})
 @Import({WebSecurityConfig.class, ModelFiller.class})
 class AdminKeysControllerTest {
     static final String STEAM = "/admin/keys/steam";
@@ -98,5 +99,67 @@ class AdminKeysControllerTest {
         mvc.perform(post(STEAM + "/add").sessionAttr(ApiClient.SESSION_JWT_KEY, "jwt")
                 .contentType(MediaType.APPLICATION_JSON).content("{\"apiKey\":\"k\"}")).andExpect(status().isForbidden());
         verify(apiService, never()).adminAddApiKey(any(), any());
+    }
+
+    @Test
+    void bungie_relaysTrimmedValues_andItsStatus() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminSaveBungieCredentials("12345", "secret", "")).thenReturn(400);
+        when(apiService.adminDeleteBungieCredentials()).thenReturn(204);
+
+        mvc.perform(admin(post("/admin/bungie-credentials/save"),
+                "{\"clientId\":\" 12345 \",\"clientSecret\":\" secret \"}")).andExpect(status().isBadRequest());
+        mvc.perform(admin(post("/admin/bungie-credentials/delete"), "{}")).andExpect(status().isNoContent());
+        mvc.perform(admin(post("/admin/bungie-credentials/save"), "{\"clientId\":\" \"}"))
+                .andExpect(status().isBadRequest());
+        verify(apiService).adminSaveBungieCredentials("12345", "secret", "");
+    }
+
+    @Test
+    void bungie_visitorIs401_memberIs403() throws Exception {
+        mvc.perform(post("/admin/bungie-credentials/delete").with(csrf())).andExpect(status().isUnauthorized());
+        when(apiService.isAdmin()).thenReturn(false);
+        mvc.perform(admin(post("/admin/bungie-credentials/save"), "{\"clientId\":\"1\"}"))
+                .andExpect(status().isForbidden());
+        verify(apiService, never()).adminSaveBungieCredentials(any(), any(), any());
+        verify(apiService, never()).adminDeleteBungieCredentials();
+    }
+
+    @Test
+    void bungie_saveBody_neverShowsTheSecrets() {
+        org.assertj.core.api.Assertions.assertThat(
+                new AdminBungieCredentialsController.SaveBody("1", "secret-value", "key-value").toString())
+                .doesNotContain("secret-value").doesNotContain("key-value");
+    }
+
+    @Test
+    void osu_relaysTrimmedValues_andItsStatus() throws Exception {
+        when(apiService.isAdmin()).thenReturn(true);
+        when(apiService.adminSaveOsuCredentials("12345", "secret")).thenReturn(400);
+        when(apiService.adminDeleteOsuCredentials()).thenReturn(204);
+
+        mvc.perform(admin(post("/admin/osu-credentials/save"),
+                "{\"clientId\":\" 12345 \",\"clientSecret\":\" secret \"}")).andExpect(status().isBadRequest());
+        mvc.perform(admin(post("/admin/osu-credentials/delete"), "{}")).andExpect(status().isNoContent());
+        mvc.perform(admin(post("/admin/osu-credentials/save"), "{\"clientId\":\" \"}"))
+                .andExpect(status().isBadRequest());
+        verify(apiService).adminSaveOsuCredentials("12345", "secret");
+    }
+
+    @Test
+    void osu_visitorIs401_memberIs403() throws Exception {
+        mvc.perform(post("/admin/osu-credentials/delete").with(csrf())).andExpect(status().isUnauthorized());
+        when(apiService.isAdmin()).thenReturn(false);
+        mvc.perform(admin(post("/admin/osu-credentials/save"), "{\"clientId\":\"1\"}"))
+                .andExpect(status().isForbidden());
+        verify(apiService, never()).adminSaveOsuCredentials(any(), any());
+        verify(apiService, never()).adminDeleteOsuCredentials();
+    }
+
+    @Test
+    void osu_saveBody_neverShowsTheSecret() {
+        org.assertj.core.api.Assertions.assertThat(
+                new AdminOsuCredentialsController.SaveBody("1", "secret-value").toString())
+                .doesNotContain("secret-value");
     }
 }

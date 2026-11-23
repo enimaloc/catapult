@@ -5,9 +5,9 @@
  * field. One card per token, each parameterized by its base URL (catapult-web's relay of the token's internal routes:
  * GET status, POST regenerate, POST {base}/delete) and its elements' id prefix:
  *
- * - #channel-api-token-card (Account tab, while custom bindings are open to the channel): the full token,
+ * - #channel-api-token-card (API tab, while custom bindings are open to the channel): the full token,
  *   /me/api-token, a curl example activating a custom binding;
- * - #channel-read-token-card (Account tab): the read-only token, /me/api-token/read, the chat bots' summary link;
+ * - #channel-read-token-card (API tab): the read-only token, /me/api-token/read, the chat bots' summary link;
  * - #api-docs-read-token and #api-docs-full-token (the API docs page's keys card, /docs/api): the same two tokens,
  *   the full one only while custom bindings are open to the member.
  *

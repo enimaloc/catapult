@@ -5,6 +5,16 @@ import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.binding.CustomBindingsUpdatedEvent;
 import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
+import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
+import fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent;
+import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
+import fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent;
+import fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent;
+import fr.enimaloc.catapult.event.hypixel.HypixelAccountChangedEvent;
+import fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent;
+import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
+import fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent;
+import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.service.ApiService;
 import fr.enimaloc.catapult.service.http.ApiClient;
 import jakarta.servlet.http.HttpServletRequest;
@@ -100,10 +110,21 @@ public class ChannelEventStreamController {
     /**
      * {@code event} as a moderator's stream gets it: without the custom bindings, which catapult-api shows the
      * owner alone (their page has no list to update). Null when they get nothing at
-     * all: the Battle.net, Ankama and Epic links, whose names and card are the owner's alone.
+     * all: the Battle.net, Ankama and Epic links and the speedrun.com, RetroAchievements, Blizzard, Bungie, Riot, FACEIT, chess, osu!, Hypixel and Supercell accounts, whose names and
+     * card are the owner's alone.
      */
     static ChannelUpdatedEvent forModerators(ChannelUpdatedEvent event) {
-        if (event instanceof BattleNetLinkEvent || event instanceof AnkamaLinkEvent || event instanceof EpicLinkEvent) {
+        if (event instanceof BattleNetLinkEvent || event instanceof AnkamaLinkEvent || event instanceof EpicLinkEvent
+                || event instanceof SpeedrunAccountChangedEvent
+                || event instanceof RetroAchievementsAccountChangedEvent
+                || event instanceof BlizzardAccountChangedEvent
+                || event instanceof BungieAccountChangedEvent
+                || event instanceof RiotAccountChangedEvent
+                || event instanceof FaceitAccountChangedEvent
+                || event instanceof ChessAccountChangedEvent
+                || event instanceof OsuAccountChangedEvent
+                || event instanceof HypixelAccountChangedEvent
+                || event instanceof SupercellAccountChangedEvent) {
             return null;
         }
         return event instanceof CustomBindingsUpdatedEvent updated ? new CustomBindingsUpdatedEvent(updated.username())

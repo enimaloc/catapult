@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.api.connect;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentCache;
 import fr.enimaloc.catapult.service.debug.DebugRecording;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.SteamLinkedEvent;
@@ -50,6 +51,7 @@ class ApiSteamConnectControllerTest {
     private final UserAccountRepository accounts = mock(UserAccountRepository.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final ChannelEventPublisher channelEvents = mock(ChannelEventPublisher.class);
+    private final EnrichmentCache enrichmentCache = mock(EnrichmentCache.class);
     private MockRestServiceServer steam;
     private ApiSteamConnectController controller;
     private UserAccount account;
@@ -59,7 +61,7 @@ class ApiSteamConnectControllerTest {
         RestClient.Builder builder = RestClient.builder();
         steam = MockRestServiceServer.bindTo(builder).build();
         SteamOpenIdLinkService links = new SteamOpenIdLinkService(accounts, events, channelEvents, builder.build(),
-                DebugRecording.OFF);
+                DebugRecording.OFF, enrichmentCache);
         ReflectionTestUtils.setField(links, "apiBaseUrl", "http://api.test");
         controller = new ApiSteamConnectController(links);
         ReflectionTestUtils.setField(controller, "webBaseUrl", "http://web.test");
@@ -196,5 +198,6 @@ class ApiSteamConnectControllerTest {
         assertThat(account.getSteamId()).isNull();
         verify(accounts).save(account);
         verify(channelEvents).connectionChanged(account.getId(), new ProviderConnectionsDto("STEAM", false, null));
+        verify(enrichmentCache).evictUser(account.getId());
     }
 }

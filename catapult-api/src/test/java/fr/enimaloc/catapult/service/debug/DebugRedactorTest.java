@@ -27,6 +27,23 @@ class DebugRedactorTest {
     }
 
     @Test
+    void raKeyParamIsMasked() {
+        assertThat(redactor.url(URI.create("https://retroachievements.org/API/API_GetUserProfile.php?u=bob&y=SECRET"),
+                false)).isEqualTo("https://retroachievements.org/API/API_GetUserProfile.php?u=bob&y=[masqué]");
+        assertThat(redactor.url(URI.create("https://x.test/a?ay=1"), false)).isEqualTo("https://x.test/a?ay=1");
+        assertThat(redactor.query("u=bob&y=SECRET", false)).isEqualTo("u=bob&y=[masqué]");
+        assertThat(redactor.text("GET https://retroachievements.org/API/API_GetUserProfile.php?u=bob&y=SECRET failed",
+                false)).isEqualTo("GET https://retroachievements.org/API/API_GetUserProfile.php?u=bob&y=[masqué] failed");
+        assertThat(redactor.text("point x=1 y=2", false)).isEqualTo("point x=1 y=2");
+    }
+
+    @Test
+    void yIsNotMaskedInJsonBodies() {
+        assertThat(redactor.body(b("{\"x\":1,\"y\":2}"), org.springframework.http.MediaType.APPLICATION_JSON, false))
+                .isEqualTo("{\"x\":1,\"y\":2}");
+    }
+
+    @Test
     void queryKey_isMasked() {
         assertThat(redactor.url(URI.create("https://x.test/a?key=ABC&steamids=1"), false))
                 .isEqualTo("https://x.test/a?key=[masqué]&steamids=1");
@@ -211,6 +228,18 @@ class DebugRedactorTest {
     }
 
     @Test
+    void hypixel_apiKeyHeader_isMasked_asHeaderAndInFreeText() {
+        String key = "12345678-abcd-4ef0-9abc-0123456789ab";
+        assertThat(redactor.headers(header("API-Key", key), false)).isEqualTo("API-Key: [masqué]");
+        assertThat(redactor.headers(header("api-key", key), false)).isEqualTo("api-key: [masqué]");
+        assertThat(redactor.text("request headers:\nAPI-Key: " + key + "\nAccept: */*", false))
+                .isEqualTo("request headers:\nAPI-Key: [masqué]\nAccept: */*");
+        assertThat(redactor.text("{\"API-Key\":\"" + key + "\"}", false)).doesNotContain(key);
+        assertThat(redactor.text("GET https://api.hypixel.net/v2/player?uuid=069a&key=" + key, false))
+                .doesNotContain(key).contains("uuid=069a");
+    }
+
+    @Test
     void anyNameCarryingACredential_isMasked_byRule() {
         assertThat(json("{\"client_assertion_secret\":\"a\",\"sessionTicket\":\"b\",\"x_signature\":\"c\","
                 + "\"new_password\":\"d\",\"tokenType\":\"JWT\"}"))
@@ -254,5 +283,85 @@ class DebugRedactorTest {
         assertThat(redactor.text("HTTP status code: 500, key: name", false))
                 .isEqualTo("HTTP status code: 500, key: name");
         assertThat(redactor.text("Bearer abc", true)).isEqualTo("Bearer abc");
+    }
+
+    @Test
+    void bearerInFreeTextIsMasked() {
+        assertThat(redactor.text("401 for Bearer abc.DEF-123", false)).doesNotContain("abc.DEF-123");
+        assertThat(redactor.text("401 for bearer abc.DEF-123", false)).doesNotContain("abc.DEF-123");
+        assertThat(redactor.body(b("{\"access_token\":\"SECRET\",\"token_type\":\"bearer\",\"expires_in\":86399}"),
+                MediaType.APPLICATION_JSON, false)).doesNotContain("SECRET").contains("\"token_type\":\"bearer\"");
+    }
+
+    @Test
+    void bungiesCredentialsAreMasked_inHeadersBodiesAndText() {
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.set("X-API-Key", "0123456789abcdef0123456789abcdef");
+        headers.set("Authorization", "Basic QkFTSUNTRUNSRVQ=");
+        assertThat(redactor.headers(headers, false)).doesNotContain("0123456789abcdef0123456789abcdef")
+                .doesNotContain("QkFTSUNTRUNSRVQ=");
+        assertThat(redactor.body(b("grant_type=refresh_token&refresh_token=RSECRET"),
+                MediaType.APPLICATION_FORM_URLENCODED, false)).doesNotContain("RSECRET");
+        assertThat(redactor.body(b("{\"access_token\":\"ATOKEN\",\"refresh_token\":\"RTOKEN\","
+                + "\"refresh_expires_in\":7776000,\"membership_id\":\"42\"}"), MediaType.APPLICATION_JSON, false))
+                .doesNotContain("ATOKEN").doesNotContain("RTOKEN").contains("membership_id");
+        assertThat(redactor.text("refused X-API-Key: 0123456789abcdef0123456789abcdef and client_secret=CSECRET", false))
+                .doesNotContain("0123456789abcdef0123456789abcdef").doesNotContain("CSECRET");
+    }
+
+    @Test
+    void aSupercellKey_isMaskedAsABearer_andWhereverItIsQuoted() {
+        String key = fr.enimaloc.catapult.service.supercell.SupercellTestKeys.clash("redactor");
+        String signature = key.substring(key.lastIndexOf('.') + 1);
+        assertThat(redactor.headers(header("Authorization", "Bearer " + key), false)).doesNotContain(signature);
+        assertThat(redactor.text("Authorization: Bearer " + key, false)).doesNotContain(signature);
+        assertThat(redactor.text("Supercell refused " + key + " at 10:00", false))
+                .isEqualTo("Supercell refused [masqué] at 10:00");
+        assertThat(redactor.body(b("{\"note\":\"" + key + "\"}"), MediaType.APPLICATION_JSON, false))
+                .doesNotContain(signature);
+        // a word that only starts the same way is left alone
+        assertThat(redactor.text("eyJ is how a JWT starts", false)).isEqualTo("eyJ is how a JWT starts");
+    }
+
+    @Test
+    void theRiotKey_isMaskedAsAHeader_andWhereverItIsQuoted() {
+        String key = "RGAPI-12345678-abcd-4ef0-9abc-0123456789ab";
+        assertThat(redactor.isSecretHeader("X-Riot-Token")).isTrue();
+        assertThat(redactor.headers(header("X-Riot-Token", key), false)).isEqualTo("X-Riot-Token: [masqué]");
+        assertThat(redactor.text("X-Riot-Token: " + key, false)).doesNotContain("12345678");
+        assertThat(redactor.text("Riot refused " + key + " at 10:00", false))
+                .isEqualTo("Riot refused [masqué] at 10:00");
+        assertThat(redactor.text("refused " + key.toUpperCase(java.util.Locale.ROOT), false))
+                .doesNotContain("12345678");
+        assertThat(redactor.body(b("{\"key\":\"" + key + "\"}"), MediaType.APPLICATION_JSON, false))
+                .doesNotContain("12345678");
+        // a word that only starts the same way is left alone
+        assertThat(redactor.text("RGAPI-docs page", false)).isEqualTo("RGAPI-docs page");
+        assertThat(redactor.text("refused " + key, true)).contains(key);
+    }
+
+    @Test
+    void theFaceitKey_isMaskedAsItsAuthorizationHeader_andAsABearerInText() {
+        String key = "12345678-abcd-4ef0-9abc-0123456789ab";
+        assertThat(redactor.headers(header("Authorization", "Bearer " + key), false))
+                .isEqualTo("Authorization: [masqué]");
+        assertThat(redactor.text("FACEIT 401 with Authorization: Bearer " + key, false)).doesNotContain("12345678");
+        assertThat(redactor.text("FACEIT refused Bearer " + key + " at 10:00", false))
+                .isEqualTo("FACEIT refused Bearer [masqué] at 10:00");
+        assertThat(redactor.text("refused Bearer " + key, true)).contains(key);
+    }
+
+    @Test
+    void osusCredentialsAreMasked_inHeadersBodiesAndText() {
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.set("Authorization", "Bearer MEMBERTOKEN");
+        assertThat(redactor.headers(headers, false)).doesNotContain("MEMBERTOKEN");
+        assertThat(redactor.body(b("client_id=1&client_secret=CSECRET&grant_type=refresh_token&refresh_token=RSECRET"),
+                MediaType.APPLICATION_FORM_URLENCODED, false)).doesNotContain("CSECRET").doesNotContain("RSECRET");
+        assertThat(redactor.body(b("{\"access_token\":\"ATOKEN\",\"refresh_token\":\"RTOKEN\","
+                + "\"expires_in\":86400}"), MediaType.APPLICATION_JSON, false))
+                .doesNotContain("ATOKEN").doesNotContain("RTOKEN").contains("expires_in");
+        assertThat(redactor.text("osu! refused client_secret=CSECRET&refresh_token=RSECRET", false))
+                .doesNotContain("CSECRET").doesNotContain("RSECRET");
     }
 }

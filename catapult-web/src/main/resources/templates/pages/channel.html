@@ -17,6 +17,7 @@
             <mdui-tab value="overview"><th:block th:text="#{channel.tab.overview}">channel.tab.overview</th:block><th:block th:replace="~{fragments/new-feature :: dot('channel.overview')}"></th:block></mdui-tab>
             <mdui-tab value="settings"><th:block th:text="#{channel.tab.settings}">channel.tab.settings</th:block><th:block th:replace="~{fragments/new-feature :: dot('channel.settings')}"></th:block></mdui-tab>
             <mdui-tab value="integrations" th:if="${channelPage.isOwner()}"><th:block th:text="#{channel.tab.integrations}">channel.tab.integrations</th:block><th:block th:replace="~{fragments/new-feature :: dot('channel.integrations')}"></th:block></mdui-tab>
+            <mdui-tab value="api" th:if="${channelPage.isOwner()}"><th:block th:text="#{channel.tab.api}">channel.tab.api</th:block><th:block th:replace="~{fragments/new-feature :: dot('channel.api')}"></th:block></mdui-tab>
             <mdui-tab value="commands" th:if="${channelPage.isOwner() and commandMigration != null}"><th:block th:text="#{channel.tab.commands}">channel.tab.commands</th:block><th:block th:replace="~{fragments/new-feature :: dot('channel.commands')}"></th:block></mdui-tab>
             <mdui-tab value="invitations" th:if="${channelPage.isOwner()}"><th:block th:text="#{channel.tab.invitations}">channel.tab.invitations</th:block><th:block th:replace="~{fragments/new-feature :: dot('channel.invitations')}"></th:block></mdui-tab>
             <mdui-tab value="account" th:if="${channelPage.isOwner()}"><th:block th:text="#{channel.tab.account}">channel.tab.account</th:block><th:block th:replace="~{fragments/new-feature :: dot('channel.account')}"></th:block></mdui-tab>
@@ -24,6 +25,7 @@
             <th:block th:replace="~{pages/channel-tab/overview::panel}"></th:block>
             <th:block th:replace="~{pages/channel-tab/settings::panel}"></th:block>
             <th:block th:replace="~{pages/channel-tab/integrations::panel}"></th:block>
+            <th:block th:replace="~{pages/channel-tab/api::panel}"></th:block>
             <th:block th:replace="~{pages/channel-tab/commands::panel}"></th:block>
             <th:block th:replace="~{pages/channel-tab/invitations::panel}"></th:block>
             <th:block th:replace="~{pages/channel-tab/account::panel}"></th:block>

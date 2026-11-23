@@ -922,6 +922,132 @@ class ChannelVisibilityRenderingTest {
         assertThat(html).doesNotContain("data-conn=\"ankama\"").doesNotContain("ankama-status-body");
     }
 
+    private String speedrunPage(fr.enimaloc.catapult.common.dto.channel.SpeedrunData speedrun) throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null, new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null, null, null, null, null, null,
+                null, null, speedrun));
+        return mvc.perform(get("/spa/channel/enimaloc").locale(java.util.Locale.ENGLISH))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    @Test
+    void speedrunCardShowsTheAccountUsedAndFollowsItsEvent() throws Exception {
+        String html = speedrunPage(new fr.enimaloc.catapult.common.dto.channel.SpeedrunData("n1", false, false, null,
+                "Linkus7", "https://www.speedrun.com/users/Linkus7", "twitch"));
+
+        String card = html.substring(html.indexOf("data-conn=\"speedrun\""));
+        assertThat(card).contains("<span>Speedrun.com</span>").contains("Account used:").contains("Linkus7")
+                .contains("(account linked to your Twitch channel)")
+                .contains("data-on=\"speedrunViaTwitch:SpeedrunAccountChangedEvent.resolvedSource=twitch\"")
+                .contains("data-value=\"textContent:SpeedrunAccountChangedEvent.resolvedName\"");
+        assertThat(countOccurrences(card, "speedrun-account hidden")).isEqualTo(2); // the other two sources
+        assertThat(card).contains("href=\"https://www.speedrun.com/settings/api\"").contains("rel=\"noopener noreferrer\"");
+        assertThat(openingTagForId(html, "speedrun-username-input")).contains("placeholder=\"speedrun.com username\"")
+                .contains("value=\"n1\"");
+        assertThat(openingTagForId(html, "speedrun-key-input")).contains("type=\"password\"")
+                .contains("placeholder=\"speedrun.com API key (optional)\"").contains("autocomplete=\"new-password\"")
+                .doesNotContain("hidden");
+        assertThat(openingTagForId(html, "speedrun-username-input")).doesNotContain("autocomplete");
+        assertThat(openingTagForId(html, "speedrun-key-delete-btn")).contains("hidden");
+        assertThat(openingTagForId(html, "speedrun-username-delete-btn")).doesNotContain("hidden");
+    }
+
+    @Test
+    void speedrunCardWithAKeyWarnsWhenItIsRefused_andNeverRendersTheKey() throws Exception {
+        String html = speedrunPage(new fr.enimaloc.catapult.common.dto.channel.SpeedrunData(null, true, true,
+                "KeyOwner", "KeyOwner", "https://www.speedrun.com/users/KeyOwner", "api_key"));
+
+        assertThat(html).contains("speedrun.com refused your API key").contains("API key saved.");
+        assertThat(openingTagForId(html, "speedrun-key-input")).contains("hidden").contains("value=\"\"");
+        assertThat(openingTagForId(html, "speedrun-key-delete-btn")).doesNotContain("hidden");
+        assertThat(openingTagForId(html, "speedrun-key-save-btn")).contains("hidden");
+    }
+
+    @Test
+    void speedrunCardWithoutAnAccountSaysSo_andOtherViewersHaveNoCard() throws Exception {
+        String html = speedrunPage(new fr.enimaloc.catapult.common.dto.channel.SpeedrunData(null, false, false, null,
+                null, null, null));
+
+        assertThat(html).contains("No account found");
+        assertThat(speedrunPage(null)).doesNotContain("data-conn=\"speedrun\"").doesNotContain("speedrun-key-input");
+    }
+
+    private String retroAchievementsPage(fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData ra) throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null, new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null, null, null, null, null, null,
+                null, null, null, ra));
+        return mvc.perform(get("/spa/channel/enimaloc").locale(java.util.Locale.ENGLISH))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    @Test
+    void retroAchievementsCardShowsTheAccountAndNeverRendersTheKey() throws Exception {
+        String html = retroAchievementsPage(new fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData("Bob",
+                "https://retroachievements.org/user/Bob", true, true, false));
+
+        String card = html.substring(html.indexOf("data-conn=\"retroachievements\""));
+        assertThat(card).contains("<span>RetroAchievements</span>").contains("Account:").contains("Bob")
+                .contains("RetroAchievements refused your API key").contains("API key saved.")
+                .contains("href=\"https://retroachievements.org/settings\"")
+                .contains("data-value=\"textContent:RetroAchievementsAccountChangedEvent.declaredUsername\"");
+        assertThat(openingTagForId(html, "retroachievements-username-input"))
+                .contains("placeholder=\"RetroAchievements username\"").contains("value=\"Bob\"");
+        assertThat(openingTagForId(html, "retroachievements-key-input")).contains("type=\"password\"")
+                .contains("autocomplete=\"new-password\"").contains("hidden").contains("value=\"\"");
+        assertThat(openingTagForId(html, "retroachievements-key-delete-btn")).doesNotContain("hidden");
+    }
+
+    @Test
+    void retroAchievementsCardWithoutAnAccountSaysSo_andOtherViewersHaveNoCard() throws Exception {
+        String html = retroAchievementsPage(new fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData(null, null, false, false, false));
+
+        assertThat(html).contains("No account: declare your RetroAchievements username.")
+                .contains("Catapult has no shared key for now");
+        assertThat(retroAchievementsPage(null)).doesNotContain("data-conn=\"retroachievements\"")
+                .doesNotContain("retroachievements-key-input");
+    }
+
+    private String blizzardPage(fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData blizzard) throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", true, true, true, null, new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(), null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, blizzard));
+        return mvc.perform(get("/spa/channel/enimaloc").locale(java.util.Locale.ENGLISH))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    @Test
+    void blizzardCardShowsTheSettingsAndOnlyOffersTheImportWhenAvailable() throws Exception {
+        var imported = new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(true, "eu", true,
+                List.of(new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData.WowCharacterOption(
+                        "eu:1001", "Thrall")), "eu:1001", true, java.time.Instant.parse("2026-11-20T10:00:00Z"));
+        String html = blizzardPage(imported);
+
+        String card = html.substring(html.indexOf("data-conn=\"blizzard-stats\""));
+        assertThat(card).contains("<span>Blizzard stats</span>").contains("Battle.net region")
+                .contains("Main character").contains("Imported on").contains("2026-11-20").contains("Thrall")
+                .contains("Import again").contains("Forget my characters")
+                .contains("Catapult does not keep the Blizzard authorization");
+        assertThat(openingTagForId(html, "blizzard-reimport-btn")).doesNotContain("hidden");
+        assertThat(openingTagForId(html, "blizzard-import-btn")).contains("hidden");
+
+        String off = blizzardPage(new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(true, "eu", false,
+                List.of(), null, false));
+        assertThat(openingTagForId(off, "blizzard-import-btn")).contains("hidden");
+        assertThat(openingTagForId(off, "blizzard-reimport-btn")).contains("hidden");
+
+        assertThat(blizzardPage(null)).doesNotContain("data-conn=\"blizzard-stats\"")
+                .doesNotContain("blizzard-import-btn");
+    }
+
     private String epicPage(fr.enimaloc.catapult.common.dto.channel.EpicData epic) throws Exception {
         when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
                 new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),

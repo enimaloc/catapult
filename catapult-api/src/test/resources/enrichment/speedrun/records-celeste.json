@@ -1,0 +1,324 @@
+{
+ "data": [
+  {
+   "weblink": "https://www.speedrun.com/celeste?h=any&x=7kjpl1gk",
+   "game": {
+    "data": {
+     "id": "o1y9j9v6",
+     "names": {
+      "international": "Celeste",
+      "japanese": null,
+      "twitch": "Celeste"
+     },
+     "abbreviation": "celeste",
+     "weblink": "https://www.speedrun.com/celeste",
+     "released": 2018,
+     "release-date": "2018-01-25",
+     "ruleset": {
+      "show-milliseconds": true,
+      "require-verification": true,
+      "require-video": true,
+      "run-times": [
+       "realtime",
+       "ingame"
+      ],
+      "default-time": "ingame",
+      "emulators-allowed": false
+     },
+     "romhack": false,
+     "gametypes": [],
+     "created": "2018-01-15T20:23:45Z",
+     "assets": {
+      "logo": {
+       "uri": "https://www.speedrun.com/static/theme/prd437rn/logo?v=e526c97"
+      },
+      "cover-large": {
+       "uri": "https://www.speedrun.com/static/game/o1y9j9v6/cover?v=9003452"
+      }
+     }
+    }
+   },
+   "category": {
+    "data": {
+     "id": "7kjpl1gk",
+     "name": "Any%",
+     "weblink": "https://www.speedrun.com/celeste?h=any&x=7kjpl1gk",
+     "type": "per-game",
+     "players": {
+      "type": "exactly",
+      "value": 1
+     },
+     "miscellaneous": false
+    }
+   },
+   "level": null,
+   "platform": null,
+   "region": null,
+   "emulators": null,
+   "video-only": false,
+   "timing": null,
+   "values": {},
+   "runs": [
+    {
+     "place": 1,
+     "run": {
+      "id": "z54n5v5m",
+      "weblink": "https://www.speedrun.com/celeste/runs/z54n5v5m",
+      "game": "o1y9j9v6",
+      "level": null,
+      "category": "7kjpl1gk",
+      "videos": {
+       "links": [
+        {
+         "uri": "https://youtu.be/pUexvH_hhgM"
+        }
+       ]
+      },
+      "status": {
+       "status": "verified",
+       "examiner": "v81qmp5j",
+       "verify-date": "2026-10-25T09:31:59Z"
+      },
+      "players": [
+       {
+        "rel": "user",
+        "id": "8rpk9dgj",
+        "uri": "https://www.speedrun.com/api/v1/users/8rpk9dgj"
+       }
+      ],
+      "date": "2026-10-18",
+      "date-time": "2026-10-18T01:59:37Z",
+      "submitted": "2026-10-18T01:59:37Z",
+      "times": {
+       "primary": "PT24M44.083S",
+       "primary_t": 1484.083,
+       "realtime": null,
+       "realtime_t": 0,
+       "realtime_noloads": null,
+       "realtime_noloads_t": 0,
+       "ingame": "PT24M44.083S",
+       "ingame_t": 1484.083
+      },
+      "system": {
+       "platform": "8gej2n93",
+       "emulated": false,
+       "region": null
+      },
+      "values": {
+       "38do9y4l": "810gdx5l"
+      }
+     }
+    }
+   ],
+   "players": {
+    "data": [
+     {
+      "rel": "user",
+      "id": "8rpk9dgj",
+      "names": {
+       "international": "secureaccount",
+       "japanese": null
+      },
+      "weblink": "https://www.speedrun.com/users/secureaccount",
+      "role": "user",
+      "twitch": {
+       "uri": "https://www.twitch.tv/secureaccount"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "weblink": "https://www.speedrun.com/celeste?h=all-red-berries&x=jdz8oprd",
+   "game": {
+    "data": {
+     "id": "o1y9j9v6",
+     "names": {
+      "international": "Celeste",
+      "japanese": null,
+      "twitch": "Celeste"
+     },
+     "abbreviation": "celeste",
+     "weblink": "https://www.speedrun.com/celeste",
+     "released": 2018,
+     "release-date": "2018-01-25",
+     "ruleset": {
+      "show-milliseconds": true,
+      "require-verification": true,
+      "require-video": true,
+      "run-times": [
+       "realtime",
+       "ingame"
+      ],
+      "default-time": "ingame",
+      "emulators-allowed": false
+     },
+     "romhack": false,
+     "gametypes": [],
+     "created": "2018-01-15T20:23:45Z",
+     "assets": {
+      "logo": {
+       "uri": "https://www.speedrun.com/static/theme/prd437rn/logo?v=e526c97"
+      },
+      "cover-large": {
+       "uri": "https://www.speedrun.com/static/game/o1y9j9v6/cover?v=9003452"
+      }
+     }
+    }
+   },
+   "category": {
+    "data": {
+     "id": "jdz8oprd",
+     "name": "All Red Berries",
+     "weblink": "https://www.speedrun.com/celeste?h=all-red-berries&x=jdz8oprd",
+     "type": "per-game",
+     "players": {
+      "type": "exactly",
+      "value": 1
+     },
+     "miscellaneous": false
+    }
+   },
+   "level": null,
+   "platform": null,
+   "region": null,
+   "emulators": null,
+   "video-only": false,
+   "timing": null,
+   "values": {},
+   "runs": [
+    {
+     "place": 1,
+     "run": {
+      "id": "m34r5qqz",
+      "weblink": "https://www.speedrun.com/celeste/runs/m34r5qqz",
+      "game": "o1y9j9v6",
+      "level": null,
+      "category": "jdz8oprd",
+      "videos": {
+       "links": [
+        {
+         "uri": "https://www.youtube.com/watch?v=4k9uR-q-WSshttps://youtu.be/4k9uR-q-WSs"
+        },
+        {
+         "uri": "https://www.youtube.com/watch?v=CMNkc2jtet0"
+        }
+       ]
+      },
+      "status": {
+       "status": "verified",
+       "examiner": "8143dol8",
+       "verify-date": "2026-08-12T15:19:54Z"
+      },
+      "players": [
+       {
+        "rel": "user",
+        "id": "j92yl1r8",
+        "uri": "https://www.speedrun.com/api/v1/users/j92yl1r8"
+       }
+      ],
+      "date": "2026-08-01",
+      "date-time": "2026-08-01T00:00:00Z",
+      "submitted": "2026-08-02T12:17:01Z",
+      "times": {
+       "primary": "PT44M42.345S",
+       "primary_t": 2682.345,
+       "realtime": null,
+       "realtime_t": 0,
+       "realtime_noloads": null,
+       "realtime_noloads_t": 0,
+       "ingame": "PT44M42.345S",
+       "ingame_t": 2682.345
+      },
+      "system": {
+       "platform": "8gej2n93",
+       "emulated": false,
+       "region": null
+      },
+      "values": {
+       "38do9y4l": "810gdx5l"
+      }
+     }
+    },
+    {
+     "place": 1,
+     "run": {
+      "id": "tiedrun1",
+      "weblink": "https://www.speedrun.com/celeste/runs/tiedrun1",
+      "game": "o1y9j9v6",
+      "level": null,
+      "category": "jdz8oprd",
+      "videos": {
+       "links": [
+        {
+         "uri": "https://www.youtube.com/watch?v=4k9uR-q-WSs"
+        },
+        {
+         "uri": "https://www.youtube.com/watch?v=CMNkc2jtet0"
+        }
+       ]
+      },
+      "status": {
+       "status": "verified",
+       "examiner": "8143dol8",
+       "verify-date": "2026-08-12T15:19:54Z"
+      },
+      "players": [
+       {
+        "rel": "guest",
+        "name": "Madeline"
+       }
+      ],
+      "date": "2026-08-01",
+      "date-time": "2026-08-01T00:00:00Z",
+      "submitted": "2026-08-02T12:17:01Z",
+      "times": {
+       "primary": "PT44M42.345S",
+       "primary_t": 2682.345,
+       "realtime": null,
+       "realtime_t": 0,
+       "realtime_noloads": null,
+       "realtime_noloads_t": 0,
+       "ingame": "PT44M42.345S",
+       "ingame_t": 2682.345
+      },
+      "system": {
+       "platform": "8gej2n93",
+       "emulated": false,
+       "region": null
+      },
+      "values": {
+       "38do9y4l": "810gdx5l"
+      }
+     }
+    }
+   ],
+   "players": {
+    "data": [
+     {
+      "rel": "user",
+      "id": "j92yl1r8",
+      "names": {
+       "international": "Jackthewack",
+       "japanese": null
+      },
+      "weblink": "https://www.speedrun.com/users/Jackthewack",
+      "role": "user",
+      "twitch": null
+     },
+     {
+      "rel": "guest",
+      "name": "Madeline",
+      "links": []
+     }
+    ]
+   }
+  }
+ ],
+ "pagination": {
+  "offset": 0,
+  "max": 20,
+  "size": 2,
+  "links": []
+ }
+}

@@ -27,6 +27,17 @@ class PresenceTrackerTest {
                 .setKey(PresenceFieldKey.newBuilder().setGroup(1).setField(21)).setDeleted(true));
     }
 
+    private static PresenceStateUpdatedNotification activity(String text) {
+        return push(PresenceField.newBuilder()
+                .setKey(PresenceFieldKey.newBuilder().setGroup(1).setField(25))
+                .setValue(Variant.newBuilder().setStringValue(text)));
+    }
+
+    private static PresenceStateUpdatedNotification noActivity() {
+        return push(PresenceField.newBuilder()
+                .setKey(PresenceFieldKey.newBuilder().setGroup(1).setField(25)).setDeleted(true));
+    }
+
     private static PresenceStateUpdatedNotification push(PresenceField.Builder field) {
         return PresenceStateUpdatedNotification.newBuilder()
                 .addStates(PresenceFieldState.newBuilder().setAccountId(FRIEND).addFields(field)).build();
@@ -80,5 +91,51 @@ class PresenceTrackerTest {
         tracker.clear();
         assertThat(tracker.forget(FRIEND)).isEmpty();
         assertThat(tracker.apply(activeGame("WTCG"))).hasSize(1);
+    }
+
+    @Test
+    void activityChangeAloneEmitsAnEvent() {
+        PresenceTracker tracker = new PresenceTracker();
+        assertThat(tracker.apply(activeGame("WoW"))).singleElement()
+                .satisfies(e -> assertThat(e.activity()).isNull());
+        assertThat(tracker.apply(activity("Forever - Normal - Undercity"))).singleElement().satisfies(e -> {
+            assertThat(e.game()).isEqualTo("WoW");
+            assertThat(e.activity()).isEqualTo("Forever - Normal - Undercity");
+        });
+    }
+
+    @Test
+    void sameActivityTwiceEmitsNothing() {
+        PresenceTracker tracker = new PresenceTracker();
+        tracker.apply(activeGame("WoW"));
+        tracker.apply(activity("Forever - Normal - Undercity"));
+        assertThat(tracker.apply(activity("Forever - Normal - Undercity"))).isEmpty();
+    }
+
+    @Test
+    void deletedActivityEmitsAnEventWithNullActivity() {
+        PresenceTracker tracker = new PresenceTracker();
+        tracker.apply(activeGame("WoW"));
+        tracker.apply(activity("Forever - Normal - Undercity"));
+        assertThat(tracker.apply(noActivity())).singleElement().satisfies(e -> {
+            assertThat(e.game()).isEqualTo("WoW");
+            assertThat(e.activity()).isNull();
+        });
+    }
+
+    @Test
+    void activityWithoutGameIsNotReported() {
+        assertThat(new PresenceTracker().apply(activity("Forever - Normal - Undercity"))).isEmpty();
+    }
+
+    @Test
+    void gameEndCarriesNoActivity() {
+        PresenceTracker tracker = new PresenceTracker();
+        tracker.apply(activeGame("WoW"));
+        tracker.apply(activity("Forever - Normal - Undercity"));
+        assertThat(tracker.apply(noActiveGame())).singleElement().satisfies(e -> {
+            assertThat(e.game()).isNull();
+            assertThat(e.activity()).isNull();
+        });
     }
 }

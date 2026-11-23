@@ -4,6 +4,30 @@ Toutes les versions publiées de Catapult, la plus récente en premier.
 
 Ce fichier est régénéré par le bot à chaque release à partir des notes des [GitHub Releases](https://github.com/enimaloc/catapult/releases) : pour corriger une entrée, modifie les notes de la release (ou le changelog de la PR de release avant sa publication), pas ce fichier.
 
+## [v1.8.0](https://github.com/enimaloc/catapult/releases/tag/v1.8.0) - 2026-11-20
+
+### Features
+- **bgs:** add a bgs.desc catalogue with a text protobuf codec (a00d783)
+- **bgs:** send raw calls that the wire tap never sees (c8cf597)
+- **battlenet:** capture the server pushes that follow an admin call (943deb9)
+- **battlenet:** let admins send any BGS call to a ready bot (291a548)
+- **web:** relay admin BGS calls to catapult-api (6a58d81)
+- **web:** add a BGS call panel to the Battle.net bot cards (bce52a2)
+- merge battlenet raw bgs call into dev (3533270)
+
+### Fixes
+- **web:** refill the BGS call lists after a tab patch empties them (5940592)
+- **battlenet:** release the call capture once and refuse hashes beyond 32 bits (ed5d82e)
+- **battlenet:** read the six-slot e-mail code page as a code request (8986b40)
+- **battlenet:** log the code page state when a submitted code is not accepted (74c6068)
+- merge battlenet e-mail code page into dev (a51e4f5)
+- **battlenet:** log the code page's requests, links and shadow controls (a49026a)
+- **battlenet:** do not read the Next.js route announcer as a login error (133ba84)
+- **battlenet:** skip the optional verify-email page instead of asking for a code (80d93d0)
+
+### Other
+- **web:** cover the BGS call relay and its mock (239778a)
+
 ## [v1.7.0](https://github.com/enimaloc/catapult/releases/tag/v1.7.0) - 2026-11-20
 
 ### Features

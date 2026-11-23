@@ -2,6 +2,16 @@ package fr.enimaloc.catapult.service.notification;
 
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
+import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
+import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
+import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
+import fr.enimaloc.catapult.common.dto.channel.RiotData;
+import fr.enimaloc.catapult.common.dto.channel.FaceitData;
+import fr.enimaloc.catapult.common.dto.channel.ChessData;
+import fr.enimaloc.catapult.common.dto.channel.OsuAccountData;
+import fr.enimaloc.catapult.common.dto.channel.HypixelData;
+import fr.enimaloc.catapult.common.dto.channel.SupercellData;
+import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
@@ -145,6 +155,66 @@ public class ChannelEventPublisher {
         publish(channelOwnerId, ChannelEvents.EPIC_LINK_CHANGED,
                 (id, login) -> new ChannelEvents.EpicLinkChanged(id, login, state.status(), state.displayName(),
                         state.serviceAccountName()));
+    }
+
+    /** The owner's speedrun.com settings now stand as {@code account} (names only, never the key). */
+    public void speedrunAccountChanged(UUID channelOwnerId, SpeedrunData account) {
+        publish(channelOwnerId, ChannelEvents.SPEEDRUN_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.SpeedrunAccountChanged(id, login, account));
+    }
+
+    /** The owner's Blizzard settings now stand as {@code account} (names only). */
+    public void blizzardAccountChanged(UUID channelOwnerId, BlizzardStatsData account) {
+        publish(channelOwnerId, ChannelEvents.BLIZZARD_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.BlizzardAccountChanged(id, login, account));
+    }
+
+    /** The owner's Bungie.net link now stands as {@code account} (names only, never a token). */
+    public void bungieAccountChanged(UUID channelOwnerId, BungieAccountData account) {
+        publish(channelOwnerId, ChannelEvents.BUNGIE_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.BungieAccountChanged(id, login, account));
+    }
+
+    /** The owner's Riot settings now stand as {@code account} (the Riot ID and platform only). */
+    public void riotAccountChanged(UUID channelOwnerId, RiotData account) {
+        publish(channelOwnerId, ChannelEvents.RIOT_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.RiotAccountChanged(id, login, account));
+    }
+
+    /** The owner's FACEIT settings now stand as {@code account} (the nickname only). */
+    public void faceitAccountChanged(UUID channelOwnerId, FaceitData account) {
+        publish(channelOwnerId, ChannelEvents.FACEIT_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.FaceitAccountChanged(id, login, account));
+    }
+
+    /** The owner's osu! link now stands as {@code account} (names only, never a token). */
+    public void osuAccountChanged(UUID channelOwnerId, OsuAccountData account) {
+        publish(channelOwnerId, ChannelEvents.OSU_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.OsuAccountChanged(id, login, account));
+    }
+
+    /** The owner's Hypixel settings now stand as {@code account} (the Minecraft name and UUID only). */
+    public void hypixelAccountChanged(UUID channelOwnerId, HypixelData account) {
+        publish(channelOwnerId, ChannelEvents.HYPIXEL_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.HypixelAccountChanged(id, login, account));
+    }
+
+    /** The owner's Supercell settings now stand as {@code account} (the player tags and names only). */
+    public void supercellAccountChanged(UUID channelOwnerId, SupercellData account) {
+        publish(channelOwnerId, ChannelEvents.SUPERCELL_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.SupercellAccountChanged(id, login, account));
+    }
+
+    /** The owner's RetroAchievements settings now stand as {@code account} (the name only, never the key). */
+    public void retroAchievementsAccountChanged(UUID channelOwnerId, RetroAchievementsData account) {
+        publish(channelOwnerId, ChannelEvents.RETROACHIEVEMENTS_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.RetroAchievementsAccountChanged(id, login, account));
+    }
+
+    /** The owner's chess accounts now stand as {@code account} (names only). */
+    public void chessAccountChanged(UUID channelOwnerId, ChessData account) {
+        publish(channelOwnerId, ChannelEvents.CHESS_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.ChessAccountChanged(id, login, account));
     }
 
     /** The channel's active custom binding is now {@code activeId}; null once deactivated. */

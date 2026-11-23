@@ -12,6 +12,7 @@ import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetServiceAccountAdmin.AccountDto;
 import fr.enimaloc.catapult.service.battlenet.login.BattleNetLoginCoordinator;
+import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -44,8 +46,9 @@ class BattleNetServiceAccountAdminTest {
     private final BattleNetSessionManager sessions = mock(BattleNetSessionManager.class);
     private final GetterConfigRepository getterConfigs = mock(GetterConfigRepository.class);
     private final ChannelEventPublisher channelEvents = mock(ChannelEventPublisher.class);
+    private final BlizzardAccountService blizzardAccounts = mock(BlizzardAccountService.class);
     private final BattleNetServiceAccountAdmin admin = new BattleNetServiceAccountAdmin(accounts, links, encryption,
-            coordinator, sessions, getterConfigs, channelEvents);
+            coordinator, sessions, getterConfigs, channelEvents, blizzardAccounts);
     private final BattleNetServiceAccount account = new BattleNetServiceAccount();
     private CompletableFuture<Void> login;
 
@@ -179,7 +182,7 @@ class BattleNetServiceAccountAdminTest {
 
     @Test
     void codeWithNoFlowWaitingIsAConflict() {
-        org.mockito.Mockito.doThrow(new IllegalStateException("none")).when(coordinator).submitCode(any(), any());
+        doThrow(new IllegalStateException("none")).when(coordinator).submitCode(any(), any());
 
         assertThatThrownBy(() -> admin.submitCode(account.getId(), "123456"))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
@@ -227,6 +230,22 @@ class BattleNetServiceAccountAdminTest {
         order.verify(getterConfigs).save(getter);
         order.verify(accounts).delete(account);
         order.verify(channelEvents).battleNetLinkChanged(streamer.getId(), "NONE", null, null);
+        verify(blizzardAccounts).forget(streamer.getId());
+    }
+
+    @Test
+    void deleteStillDeletesWhenThePurgeFails() {
+        UserAccount streamer = new UserAccount();
+        streamer.setId(UUID.randomUUID());
+        BattleNetFriendLink link = new BattleNetFriendLink();
+        link.setUser(streamer);
+        link.setServiceAccount(account);
+        when(links.findByServiceAccount(account)).thenReturn(List.of(link));
+        doThrow(new IllegalStateException("db")).when(blizzardAccounts).forget(any());
+
+        admin.delete(account.getId());
+
+        verify(accounts).delete(account);
     }
 
     @Test
@@ -283,7 +302,7 @@ class BattleNetServiceAccountAdminTest {
 
     @Test
     void deleteRetriesOnceOnAConflict() {
-        org.mockito.Mockito.doThrow(conflict()).doNothing().when(accounts).delete(account);
+        doThrow(conflict()).doNothing().when(accounts).delete(account);
 
         admin.delete(account.getId());
 

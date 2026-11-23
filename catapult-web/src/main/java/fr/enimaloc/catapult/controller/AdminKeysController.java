@@ -17,7 +17,7 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 /**
  * The admin Keys tab's Steam and DTDD actions (add, delete, refresh), forwarded to catapult-api
  * with the session's JWT and answered with its status (204; 400 for an invalid key format; 404 for
- * an unknown key; 502 when unreachable). {@code provider} is {@code steam} or {@code dtdd}, else
+ * an unknown key; 502 when unreachable). {@code provider} is {@code steam}, {@code dtdd}, {@code steamgriddb}, {@code itad}, {@code opencritic}, {@code retroachievements} or {@code faceit}, else
  * 404. The key (a secret) and the key id travel in the body and are never logged.
  */
 @RestController

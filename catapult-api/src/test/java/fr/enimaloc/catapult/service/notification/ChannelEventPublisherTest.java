@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.notification;
 
+import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
@@ -155,6 +156,61 @@ class ChannelEventPublisherTest {
 
         assertThat(published(ChannelEvents.MINECRAFT_LINK_CHANGED)).isEqualTo(
                 new ChannelEvents.MinecraftLinkChanged(ownerId.toString(), "streamername", "PENDING", "jeb_"));
+    }
+
+    @Test
+    void blizzardAccountChanged_publishesTheCardsData() {
+        var account = new BlizzardStatsData(true, "eu", true,
+                List.of(new BlizzardStatsData.WowCharacterOption("eu:1", "A")),
+                "eu:1", true);
+
+        publisher.blizzardAccountChanged(ownerId, account);
+
+        assertThat(published(ChannelEvents.BLIZZARD_ACCOUNT_CHANGED)).isEqualTo(
+                new ChannelEvents.BlizzardAccountChanged(ownerId.toString(), "streamername", account));
+    }
+
+    @Test
+    void riotAccountChanged_publishesTheCardsData() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.RiotData("Catapult#EUW", "euw1", true);
+
+        publisher.riotAccountChanged(ownerId, account);
+
+        assertThat(published(ChannelEvents.RIOT_ACCOUNT_CHANGED)).isEqualTo(
+                new ChannelEvents.RiotAccountChanged(ownerId.toString(), "streamername", account));
+    }
+
+    @Test
+    void retroAchievementsAccountChanged_publishesTheCardsData() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData("Scott",
+                "https://retroachievements.org/user/Scott", true, false, true);
+
+        publisher.retroAchievementsAccountChanged(ownerId, account);
+
+        assertThat(published(ChannelEvents.RETROACHIEVEMENTS_ACCOUNT_CHANGED)).isEqualTo(
+                new ChannelEvents.RetroAchievementsAccountChanged(ownerId.toString(), "streamername", account));
+    }
+
+    @Test
+    void faceitAccountChanged_publishesTheCardsData() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.FaceitData("Catapult",
+                "https://www.faceit.com/en/players/Catapult", true);
+
+        publisher.faceitAccountChanged(ownerId, account);
+
+        assertThat(published(ChannelEvents.FACEIT_ACCOUNT_CHANGED)).isEqualTo(
+                new ChannelEvents.FaceitAccountChanged(ownerId.toString(), "streamername", account));
+    }
+
+    @Test
+    void speedrunAccountChanged_publishesTheCardsData() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.SpeedrunData("n1", true, false, "KeyOwner",
+                "KeyOwner", "https://www.speedrun.com/users/KeyOwner", "api_key");
+
+        publisher.speedrunAccountChanged(ownerId, account);
+
+        assertThat(published(ChannelEvents.SPEEDRUN_ACCOUNT_CHANGED)).isEqualTo(
+                new ChannelEvents.SpeedrunAccountChanged(ownerId.toString(), "streamername", account));
     }
 
     @Test

@@ -51,6 +51,18 @@ public class ExternalServices {
         if (within(host, "battle.net") || within(host, "blizzard.com")) {
             return "battlenet";
         }
+        if (within(host, "bungie.net")) {
+            return "bungie";
+        }
+        if (within(host, "ppy.sh")) {
+            return "osu";
+        }
+        if (within(host, "hypixel.net")) {
+            return "hypixel";
+        }
+        if (within(host, "clashofclans.com") || within(host, "clashroyale.com") || within(host, "brawlstars.com")) {
+            return "supercell";
+        }
         if (within(host, "ankama.com")) {
             return "ankama";
         }

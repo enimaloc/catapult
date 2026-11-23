@@ -126,6 +126,100 @@ class ChannelEventStreamControllerTest {
     }
 
     @Test
+    void theSpeedrunAccountGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent("enimaloc", "RunnerName",
+                true, false, "KeyOwnerName", "KeyOwnerName", "https://www.speedrun.com/users/KeyOwnerName", "api_key");
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:SpeedrunAccountChangedEvent",
+                "RunnerName", "KeyOwnerName");
+        assertThat(moderator.getResponse().getContentAsString()).doesNotContain("SpeedrunAccountChangedEvent")
+                .doesNotContain("RunnerName").doesNotContain("KeyOwnerName");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
+
+    @Test
+    void theBlizzardSettingsGoToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent("enimaloc", true, "eu", true, true, "eu:424242", "2026-11-20", true);
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:BlizzardAccountChangedEvent",
+                "eu:424242");
+        assertThat(moderator.getResponse().getContentAsString())
+                .doesNotContain("BlizzardAccountChangedEvent").doesNotContain("eu:424242");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
+
+    @Test
+    void theOsuLinkGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent("enimaloc", true, true,
+                "Inspector4242", false, true, false);
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:OsuAccountChangedEvent",
+                "Inspector4242");
+        assertThat(moderator.getResponse().getContentAsString())
+                .doesNotContain("OsuAccountChangedEvent").doesNotContain("Inspector4242");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
+
+    @Test
+    void theBungieLinkGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent("enimaloc", true, true,
+                "Guardian#4242", false, false, true, false);
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:BungieAccountChangedEvent",
+                "Guardian#4242");
+        assertThat(moderator.getResponse().getContentAsString())
+                .doesNotContain("BungieAccountChangedEvent").doesNotContain("Guardian#4242");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
+
+    @Test
+    void theChessAccountsGoToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent("enimaloc", "chessplayer", null);
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:ChessAccountChangedEvent",
+                "chessplayer");
+        assertThat(moderator.getResponse().getContentAsString())
+                .doesNotContain("ChessAccountChangedEvent").doesNotContain("chessplayer");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
+
+    @Test
+    void theRetroAchievementsAccountGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent("enimaloc", "RaPlayer",
+                "https://retroachievements.org/user/RaPlayer", true, false, true);
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:RetroAchievementsAccountChangedEvent",
+                "RaPlayer");
+        assertThat(moderator.getResponse().getContentAsString())
+                .doesNotContain("RetroAchievementsAccountChangedEvent").doesNotContain("RaPlayer");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
+
+    @Test
     void theEpicLinkGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
         MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
         MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
@@ -268,5 +362,46 @@ class ChannelEventStreamControllerTest {
         mvc.perform(get("/events/channel/{username}", "someone-else").session(loggedIn("enimaloc"))
                         .accept(MediaType.TEXT_EVENT_STREAM))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void theSupercellSettingsGoToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent.of("enimaloc", new fr.enimaloc.catapult.common.dto.channel.SupercellData(new fr.enimaloc.catapult.common.dto.channel.SupercellData.Game("#2PP", "Chief", true), null, null));
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:SupercellAccountChangedEvent", "#2PP");
+        assertThat(moderator.getResponse().getContentAsString()).doesNotContain("#2PP");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
+
+    @Test
+    void theRiotSettingsGoToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent("enimaloc", "Catapult#EUW", "euw1",
+                true);
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:RiotAccountChangedEvent", "Catapult#EUW");
+        assertThat(moderator.getResponse().getContentAsString()).doesNotContain("Catapult#EUW");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
+
+    @Test
+    void theFaceitSettingsGoToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent("enimaloc", "Catapult",
+                "https://www.faceit.com/en/players/Catapult", true);
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:FaceitAccountChangedEvent", "Catapult");
+        assertThat(moderator.getResponse().getContentAsString()).doesNotContain("FaceitAccountChangedEvent");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
     }
 }

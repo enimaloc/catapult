@@ -23,6 +23,7 @@ import fr.enimaloc.catapult.security.JwtService;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
 import fr.enimaloc.catapult.service.account.WidgetTokenService;
 import fr.enimaloc.catapult.service.binding.CustomBindingService;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunClient;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.minecraft.MsaAuthClient;
 import fr.enimaloc.catapult.service.steam.SteamStoreService;
@@ -104,7 +105,8 @@ import tools.jackson.databind.json.JsonMapper;
  * (which also says who moderates the channel), {@link SteamStoreService}, {@link XboxService},
  * {@link MsaAuthClient}, {@link SteamApiClient} and {@link SteamPlaytestRedirectResolver}, and the two a run was
  * seen to call: {@link IgdbService} (its app token, from {@code id.twitch.tv}) and {@link XboxStoreService} (the
- * Microsoft display catalog). The configurable ones point at a closed local port ({@code full-context.properties}).
+ * Microsoft display catalog), {@link SpeedrunClient} (the speedrun.com settings check the name or key a
+ * member saves) and {@code RetroAchievementsClient} (the same check for a RetroAchievements name or key). The configurable ones point at a closed local port ({@code full-context.properties}).
  *
  * <p>Each caller's request runs in its own transaction, rolled back after it, so no caller sees what another did
  * (a slug one created, a statement that failed and aborted the transaction); the accounts are committed once, before
@@ -197,6 +199,21 @@ abstract class AccessMatrixSupport {
     @MockitoBean
     XboxStoreService xboxStoreService;
 
+    @MockitoBean
+    SpeedrunClient speedrunClient;
+
+    @MockitoBean
+    fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsClient retroAchievementsClient;
+
+    /** The chess settings check the Chess.com or Lichess name a member saves. */
+    @MockitoBean
+    fr.enimaloc.catapult.service.enrichment.chess.ChessClient chessClient;
+    @MockitoBean
+    fr.enimaloc.catapult.service.enrichment.hypixel.HypixelClient hypixelClient;
+    /** The Supercell settings check the player tag a member saves. */
+    @MockitoBean
+    fr.enimaloc.catapult.service.enrichment.supercell.SupercellClient supercellClient;
+
     @Autowired
     MockMvc mvc;
 
@@ -281,6 +298,16 @@ abstract class AccessMatrixSupport {
         when(twitchService.getModeratedChannelIds(any())).thenReturn(List.of());
         when(twitchService.getModeratedChannelIds(argThat(a -> a != null && mod.getId().equals(a.getId()))))
                 .thenReturn(List.of(owner.getTwitchId()));
+        when(speedrunClient.charging(any())).thenReturn(speedrunClient);
+        // A declared chess name always exists here: the matrix is about who may save it, not about the sites
+        when(chessClient.chesscomPlayer(any())).thenAnswer(i -> new fr.enimaloc.catapult.service.enrichment.chess
+                .ChesscomPlayer(1L, i.getArgument(0), null, null, null));
+        when(chessClient.lichessUser(any())).thenAnswer(i -> new fr.enimaloc.catapult.service.enrichment.chess
+                .LichessUser(i.getArgument(0), i.getArgument(0), null, null, java.util.Map.of(), null, null, null,
+                        null, null, null));
+        // A declared Supercell tag always belongs to a player here, of whichever game is asked
+        when(supercellClient.player(any(), any())).thenAnswer(i -> new fr.enimaloc.catapult.service.enrichment
+                .supercell.SupercellModels.SupercellPlayer(i.getArgument(1), "matrix", null, null, null));
     }
 
     private UserAccount account(String username, String twitchId) {

@@ -87,6 +87,16 @@ abstract class ApiChannelActionsTestSupport {
     @MockitoBean fr.enimaloc.catapult.service.binding.CustomBindingActivations customBindingActivations;
     @MockitoBean fr.enimaloc.catapult.service.emergency.EmergencyViews emergencyViews;
     @MockitoBean fr.enimaloc.catapult.service.emergency.EmergencyStopService emergencyStopService;
+    @MockitoBean fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService speedrunAccountService;
+    @MockitoBean fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService retroAchievementsAccountService;
+    @MockitoBean fr.enimaloc.catapult.service.blizzard.BlizzardAccountService blizzardAccountService;
+    @MockitoBean fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinkService;
+    @MockitoBean fr.enimaloc.catapult.service.riot.RiotAccountService riotAccountService;
+    @MockitoBean fr.enimaloc.catapult.service.faceit.FaceitAccountService faceitAccountService;
+    @MockitoBean fr.enimaloc.catapult.service.chess.ChessAccountService chessAccountService;
+    @MockitoBean fr.enimaloc.catapult.service.osu.OsuLinkService osuLinkService;
+    @MockitoBean fr.enimaloc.catapult.service.hypixel.HypixelAccountService hypixelAccountService;
+    @MockitoBean fr.enimaloc.catapult.service.supercell.SupercellAccountService supercellAccountService;
 
     static RequestPostProcessor userJwt(UUID id) {
         return jwt().jwt(j -> j.subject(id.toString()).claim("twitchId", "123"))

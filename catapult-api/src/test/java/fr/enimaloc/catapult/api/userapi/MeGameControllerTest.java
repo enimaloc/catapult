@@ -3,10 +3,24 @@ package fr.enimaloc.catapult.api.userapi;
 import fr.enimaloc.catapult.api.ApiUserResolver;
 import fr.enimaloc.catapult.domain.account.ApiTokenScope;
 import fr.enimaloc.catapult.domain.account.UserAccount;
+import fr.enimaloc.catapult.domain.binding.GameBinding;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.security.ApiSecurityConfig;
 import fr.enimaloc.catapult.service.account.ApiTokenOwner;
 import fr.enimaloc.catapult.service.account.UserApiTokenService;
+import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
+import fr.enimaloc.catapult.service.enrichment.PersonalStatsEnrichment;
+import fr.enimaloc.catapult.service.enrichment.PublisherEnrichment;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardPublisher;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStats;
+import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BlizzardGame;
+import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
+import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbSummary;
+import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckCompatibility;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Achievement;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.AchievementSummary;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.PlatformStats;
+import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Status;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +38,11 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -144,6 +162,180 @@ class MeGameControllerTest {
         mvc.perform(withToken(get("/api/me/game/summary")).param("f", "xbox.name"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(""));
+    }
+
+    private void playingPortalV3() {
+        GameInfoResponse.XboxObject xbox = new GameInfoResponse.XboxObject("9NBLGGH2JHXJ", "Portal", "Portal desc",
+                "Valve", "Valve", "https://cover", "https://store/portal", "http://localhost/more");
+        GameInfoResponse base = new GameInfoResponse(true, null, null, xbox, null, null, "Portal");
+        GameEnrichment enrichment = new GameEnrichment(new TimeToBeat(3600L, 7200L, 10800L, 42),
+                new ProtonDbSummary("platinum", "gold", "platinum", "strong", 0.9, 120,
+                        "https://www.protondb.com/app/400"),
+                null, new SteamDeckCompatibility(SteamDeckCompatibility.Category.VERIFIED, List.of()), null,
+                new GameEnrichment.Trailer(GameEnrichment.Trailer.YOUTUBE, "https://www.youtube.com/watch?v=x"),
+                "400", null, null, null, null, new PersonalStatsEnrichment(new PlatformStats(Status.OK, "400", 610L,
+                        null, null, AchievementSummary.of(List.of(new Achievement("A1", "First", "d", "i", true,
+                                Instant.parse("2026-11-20T10:00:00Z"), new BigDecimal("3.2"), null, false))), null,
+                        Map.of()), null, null, null, GameBinding.SourceType.STEAM), null);
+        when(games.gameInfoV3(eq(user), any(Locale.class), any(), any())).thenReturn(GameInfoV3Response.of(base, enrichment,
+                new MoreLinks("http://localhost", GameInfoAssembler.LinkStyle.CURRENT), Optional.of("1942")));
+    }
+
+    @Test
+    void meGame_v3_hasEnrichmentObjects() throws Exception {
+        playingPortalV3();
+
+        mvc.perform(withToken(get("/api/me/game")).header(ApiV2.VERSION_HEADER, "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.inGame").value(true))
+                .andExpect(jsonPath("$.xbox.productId").value("9NBLGGH2JHXJ"))
+                .andExpect(jsonPath("$.hltb.normally").value(7200))
+                .andExpect(jsonPath("$.hltb.more").value("http://localhost/api/games/hltb/1942?version=3"))
+                .andExpect(jsonPath("$.protondb.tier").value("platinum"))
+                .andExpect(jsonPath("$.steamDeck.category").value("verified"))
+                .andExpect(jsonPath("$.name").value("Portal"));
+
+        verify(games).gameInfoV3(user, Locale.ENGLISH, null, null);
+        verify(games, never()).gameInfo(any(UserAccount.class), any());
+    }
+
+    @Test
+    void meGame_v3_hasPersonalStats() throws Exception {
+        playingPortalV3();
+
+        mvc.perform(withToken(get("/api/me/game")).header(ApiV2.VERSION_HEADER, "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stats.steam.status").value("ok"))
+                .andExpect(jsonPath("$.stats.steam.playtimeMinutes").value(610))
+                .andExpect(jsonPath("$.stats.steam.achievements.recent[0].name").value("First"))
+                .andExpect(jsonPath("$.stats.steam.more").value("http://localhost/api/me/stats/steam/400?version=3"))
+                .andExpect(jsonPath("$.stats.xbox").doesNotExist());
+
+        mvc.perform(withToken(get("/api/me/game/summary")).header(ApiV2.VERSION_HEADER, "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playtime").value(610))
+                .andExpect(jsonPath("$.achievements.platform").value("steam"))
+                .andExpect(jsonPath("$.achievements.unlocked").value(1))
+                .andExpect(jsonPath("$.lastAchievement.name").value("First"))
+                .andExpect(jsonPath("$.lastAchievement.unlockedAt").value("2026-11-20T10:00:00Z"))
+                .andExpect(jsonPath("$.stats").doesNotExist());
+    }
+
+    @Test
+    void meGame_v3_hasBlizzardStatsAndPublicData() throws Exception {
+        GameInfoResponse base = new GameInfoResponse(true, null, null, null, null, null, "World of Warcraft");
+        BlizzardStats.WowStats wow = new BlizzardStats.WowStats(Status.OK, "Inspectordob", "Ravencrest", 90,
+                "Evoker", "Preservation", "Dracthyr", "ALLIANCE", null, 28_755, 290, 288, null, null, null,
+                List.of(new Achievement("40219", "Battleground Blitzest", null, null, true,
+                        Instant.parse("2026-11-21T10:00:00Z"), null, null, false)), null);
+        GameEnrichment enrichment = new GameEnrichment(null, null, null, null, null, null, null, null, null, null,
+                null, new PersonalStatsEnrichment(null, null, null, new BlizzardStats(Status.OK, BlizzardGame.WOW,
+                        "Name#1234", "eu", wow, null, null, null), GameBinding.SourceType.BATTLENET),
+                new PublisherEnrichment(new BlizzardPublisher(BlizzardGame.WOW, "eu",
+                        new BlizzardPublisher.Wow(470_531L, null), null, null, null)));
+        when(games.gameInfoV3(eq(user), any(Locale.class), any(), any())).thenReturn(GameInfoV3Response.of(base,
+                enrichment, new MoreLinks("http://localhost", GameInfoAssembler.LinkStyle.CURRENT),
+                Optional.of("123")));
+
+        mvc.perform(withToken(get("/api/me/game")).header(ApiV2.VERSION_HEADER, "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stats.blizzard.account").value("Name#1234"))
+                .andExpect(jsonPath("$.stats.blizzard.wow.level").value(90))
+                .andExpect(jsonPath("$.stats.blizzard.more")
+                        .value("http://localhost/api/me/stats/blizzard/wow?version=3"))
+                .andExpect(jsonPath("$.publisher.blizzard.wow.tokenGold").value(470531))
+                .andExpect(jsonPath("$.publisher.blizzard.account").doesNotExist());
+        mvc.perform(withToken(get("/api/me/game/summary")).header(ApiV2.VERSION_HEADER, "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lastAchievement.platform").value("blizzard"))
+                .andExpect(jsonPath("$.playtime").doesNotExist())
+                .andExpect(jsonPath("$.publisher").doesNotExist())
+                .andExpect(jsonPath("$.stats").doesNotExist());
+    }
+
+    @Test
+    void meGame_v3_field_returnsPlainText() throws Exception {
+        playingPortalV3();
+
+        mvc.perform(withToken(get("/api/me/game")).queryParam("version", "3").param("f", "protondb.tier"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "text/plain;charset=UTF-8"))
+                .andExpect(content().string("platinum"));
+    }
+
+    @Test
+    void meGame_v2_unchanged() throws Exception {
+        playingHalo();
+
+        mvc.perform(withToken(get("/api/me/game")).header(ApiV2.VERSION_HEADER, "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Halo"))
+                .andExpect(jsonPath("$.hltb").doesNotExist())
+                .andExpect(jsonPath("$.protondb").doesNotExist())
+                .andExpect(jsonPath("$.stats").doesNotExist());
+
+        verify(games, never()).gameInfoV3(any(UserAccount.class), any(), any(), any());
+    }
+
+    @Test
+    void meGameSummary_v3_hasTimeToBeatAndTrailer() throws Exception {
+        playingPortalV3();
+
+        mvc.perform(withToken(get("/api/me/game/summary")).header(ApiV2.VERSION_HEADER, "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.inGame").value(true))
+                .andExpect(jsonPath("$.name").value("Portal"))
+                .andExpect(jsonPath("$.timeToBeat").value(7200))
+                .andExpect(jsonPath("$.protonTier").value("platinum"))
+                .andExpect(jsonPath("$.deckStatus").value("verified"))
+                .andExpect(jsonPath("$.trailer.kind").value("youtube"))
+                .andExpect(jsonPath("$.trailer.url").value("https://www.youtube.com/watch?v=x"))
+                .andExpect(jsonPath("$.hltb").doesNotExist())
+                .andExpect(jsonPath("$.xbox").doesNotExist());
+    }
+
+    @Test
+    void meGameSummary_v3_field_returnsPlainText() throws Exception {
+        playingPortalV3();
+
+        mvc.perform(withToken(get("/api/me/game/summary")).header(ApiV2.VERSION_HEADER, "3").param("f", "timeToBeat"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("7200"));
+        // Outside the summary view: empty
+        mvc.perform(withToken(get("/api/me/game/summary")).header(ApiV2.VERSION_HEADER, "3").param("f", "hltb.count"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(""));
+    }
+
+    @Test
+    void invalidCountryOnSummaryIs400() throws Exception {
+        playingPortalV3();
+
+        mvc.perform(withToken(get("/api/me/game/summary")).header(ApiV2.VERSION_HEADER, "3").param("country", "zz"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(withToken(get("/api/me/game")).header(ApiV2.VERSION_HEADER, "3").param("language", "english"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void countryAndLanguage_validated_languageLowerCased() throws Exception {
+        playingPortalV3();
+
+        mvc.perform(withToken(get("/api/me/game/summary")).header(ApiV2.VERSION_HEADER, "3")
+                        .param("country", "us").param("language", "DE"))
+                .andExpect(status().isOk());
+
+        verify(games).gameInfoV3(user, Locale.ENGLISH, "US", "de");
+    }
+
+    @Test
+    void meGameSummary_v2_hasNoEnrichmentField() throws Exception {
+        playingHalo();
+
+        mvc.perform(withToken(get("/api/me/game/summary")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.timeToBeat").doesNotExist())
+                .andExpect(jsonPath("$.trailer").doesNotExist());
     }
 
     @Test

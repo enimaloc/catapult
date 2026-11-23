@@ -28,6 +28,25 @@ class MockKeysStoreTest {
         assertThat(store.add(ApiKeyProvider.DTDD, RAW)).isEqualTo(400);
         assertThat(store.add(ApiKeyProvider.DTDD, null)).isEqualTo(400);
         assertThat(store.add(ApiKeyProvider.DTDD, "ddd_abcdefghijklmnop5678")).isEqualTo(204);
+        assertThat(store.add(ApiKeyProvider.STEAMGRIDDB, "ddd_abcdefghijklmnop5678")).isEqualTo(400);
+        assertThat(store.add(ApiKeyProvider.STEAMGRIDDB, " " + RAW + " ")).isEqualTo(204);
+        assertThat(store.add(ApiKeyProvider.ITAD, RAW)).isEqualTo(400);
+        assertThat(store.add(ApiKeyProvider.ITAD, RAW + "01234567")).isEqualTo(204);
+        assertThat(store.add(ApiKeyProvider.OPENCRITIC, "ddd_abcdefghijklmnop5678")).isEqualTo(400);
+        assertThat(store.add(ApiKeyProvider.OPENCRITIC, " " + RAW + "AbCdEf01 ")).isEqualTo(204);
+        assertThat(store.add(ApiKeyProvider.RETROACHIEVEMENTS, "short")).isEqualTo(400);
+        assertThat(store.add(ApiKeyProvider.RETROACHIEVEMENTS, " " + RAW + " ")).isEqualTo(204);
+        assertThat(store.add(ApiKeyProvider.RIOT, RAW)).isEqualTo(400);
+        assertThat(store.add(ApiKeyProvider.RIOT, " RGAPI-12345678-abcd-4ef0-9abc-0123456789ab ")).isEqualTo(204);
+        assertThat(store.add(ApiKeyProvider.FACEIT, RAW)).isEqualTo(400);
+        assertThat(store.add(ApiKeyProvider.FACEIT, " 12345678-abcd-4ef0-9abc-0123456789ab ")).isEqualTo(204);
+        assertThat(store.add(ApiKeyProvider.HYPIXEL, RAW)).isEqualTo(400);
+        assertThat(store.add(ApiKeyProvider.HYPIXEL, " 12345678-abcd-4ef0-9abc-0123456789ab ")).isEqualTo(204);
+        assertThat(store.add(ApiKeyProvider.CLASHROYALE, RAW)).isEqualTo(400);
+        assertThat(store.add(ApiKeyProvider.CLASHROYALE, " " + MockKeysStore.MOCK_SUPERCELL_KEY + " ")).isEqualTo(204);
+        assertThat(store.page(ApiKeyProvider.CLASHROYALE).keys()).hasSize(1);
+        assertThat(store.page(ApiKeyProvider.BRAWLSTARS).keys()).isEmpty();
+        assertThat(store.page(ApiKeyProvider.CLASHOFCLANS).keys().getFirst().usage().windowSeconds()).isEqualTo(60);
     }
 
     @Test
@@ -40,5 +59,42 @@ class MockKeysStoreTest {
         assertThat(store.delete(ApiKeyProvider.STEAM, id)).isEqualTo(204);
         assertThat(store.delete(ApiKeyProvider.STEAM, id)).isEqualTo(404);
         assertThat(store.page(ApiKeyProvider.STEAM).keys()).noneMatch(k -> k.id().equals(id));
+    }
+
+    @Test
+    void bungie_isSetFromTheStart_masked_andRefusesWhatCatapultApiRefuses() {
+        assertThat(store.bungie().configured()).isTrue();
+        assertThat(store.bungie().apiKeyMasked()).isEqualTo("0123…cdef");
+
+        assertThat(store.saveBungie("abc", "", "")).isEqualTo(400);
+        assertThat(store.saveBungie("42", "short", "")).isEqualTo(400);
+        assertThat(store.saveBungie("42", "", "nothex")).isEqualTo(400);
+        assertThat(store.saveBungie(" 42 ", "", RAW)).isEqualTo(400);
+        assertThat(store.saveBungie(" 42 ", "a-long-enough-secret", RAW)).isEqualTo(204);
+        assertThat(store.saveBungie("42", "", "")).isEqualTo(204);
+        assertThat(store.bungie().clientId()).isEqualTo("42");
+        assertThat(store.bungie().toString()).doesNotContain(RAW);
+
+        assertThat(store.deleteBungie()).isEqualTo(204);
+        assertThat(store.bungie().configured()).isFalse();
+        assertThat(store.saveBungie("42", "", RAW)).isEqualTo(400);
+        assertThat(store.saveBungie("42", "a-long-enough-secret", RAW)).isEqualTo(204);
+    }
+
+    @Test
+    void osu_isSetFromTheStart_andRefusesWhatCatapultApiRefuses() {
+        assertThat(store.osu().configured()).isTrue();
+
+        assertThat(store.saveOsu("abc", "")).isEqualTo(400);
+        assertThat(store.saveOsu("42", "short")).isEqualTo(400);
+        assertThat(store.saveOsu(" 42 ", "")).isEqualTo(400);
+        assertThat(store.saveOsu(" 42 ", "a-long-enough-secret")).isEqualTo(204);
+        assertThat(store.saveOsu("42", "")).isEqualTo(204);
+        assertThat(store.osu().clientId()).isEqualTo("42");
+
+        assertThat(store.deleteOsu()).isEqualTo(204);
+        assertThat(store.osu().configured()).isFalse();
+        assertThat(store.saveOsu("42", "")).isEqualTo(400);
+        assertThat(store.saveOsu("42", "a-long-enough-secret")).isEqualTo(204);
     }
 }

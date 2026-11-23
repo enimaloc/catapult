@@ -63,7 +63,7 @@
     </section>
 </mdui-layout-main>
 
-<!--/* One personal API token's row of the keys card, the Account tab's card in small (the same labels, <labels>.*):
+<!--/* One personal API token's row of the keys card, the API tab's card in small (the same labels, <labels>.*):
      its elements are <prefix>-status, -generate-btn… as api-token-cards.js wires them. */-->
 <div th:fragment="token-row(prefix, labels, kind, exampleName)" th:id="${prefix}" class="api-docs-key"
      th:attr="data-example-name=${exampleName},data-label-none=#{${labels + '.none'}},data-label-since=#{${labels + '.since'}('{0}')},data-label-generate=#{${labels + '.generate'}},data-label-regenerate=#{${labels + '.regenerate'}},data-label-copied=#{${labels + '.copied'}},data-label-unavailable=#{${labels + '.unavailable'}}">

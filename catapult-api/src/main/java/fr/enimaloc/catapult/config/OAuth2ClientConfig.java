@@ -1,5 +1,8 @@
 package fr.enimaloc.catapult.config;
 
+import fr.enimaloc.catapult.service.bungie.BungieCredentialsService;
+import fr.enimaloc.catapult.service.osu.OsuCredentialsService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,12 +14,13 @@ import org.springframework.security.oauth2.client.endpoint.RestClientAuthorizati
 import org.springframework.security.oauth2.client.endpoint.RestClientRefreshTokenTokenResponseClient;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
-import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @Configuration
 public class OAuth2ClientConfig {
@@ -39,6 +43,9 @@ public class OAuth2ClientConfig {
     @Value("${battlenet.client-secret:}")
     private String battleNetClientSecret;
 
+    @Value("${battlenet.enabled:false}")
+    private boolean battleNetEnabled;
+
     @Value("${epic.client-id:}")
     private String epicClientId;
 
@@ -48,8 +55,19 @@ public class OAuth2ClientConfig {
     @Value("${app.base-url}")
     private String baseUrl;
 
+    /** The Bungie.net OAuth endpoints (client confidential: its secret in the Basic header). */
+    static final String BUNGIE_AUTHORIZE = "https://www.bungie.net/en/OAuth/Authorize";
+    static final String BUNGIE_TOKEN = "https://www.bungie.net/platform/app/oauth/token/";
+    static final String BUNGIE_MEMBERSHIPS = "https://www.bungie.net/Platform/User/GetMembershipsForCurrentUser/";
+    /** The osu! OAuth endpoints (its client id and secret in the token request's body, as osu! documents). */
+    static final String OSU_AUTHORIZE = "https://osu.ppy.sh/oauth/authorize";
+    static final String OSU_TOKEN = "https://osu.ppy.sh/oauth/token";
+    static final String OSU_ME = "https://osu.ppy.sh/api/v2/me";
+
     @Bean
-    public ClientRegistrationRepository clientRegistrationRepository() {
+    public ClientRegistrationRepository clientRegistrationRepository(
+            ObjectProvider<BungieCredentialsService> bungieCredentials,
+            ObjectProvider<OsuCredentialsService> osuCredentials) {
         List<ClientRegistration> registrations = new ArrayList<>();
 
         registrations.add(authorizationCode("twitch", twitchClientId, twitchClientSecret)
@@ -88,6 +106,19 @@ public class OAuth2ClientConfig {
                 .build());
         }
 
+        if (battleNetEnabled && configured(battleNetClientId, battleNetClientSecret)) {
+            // The World of Warcraft import: a consent of its own, so that the link above (and the bot's enrolment)
+            // never changes. Its user token is read once and forgotten (TwitchLoginSuccessHandler). No "openid", as
+            // above. Its callback, <base>/login/oauth2/code/battlenet-stats, must be declared on Blizzard's portal.
+            registrations.add(authorizationCode("battlenet-stats", battleNetClientId, battleNetClientSecret)
+                .scope("wow.profile")
+                .authorizationUri("https://oauth.battle.net/authorize")
+                .tokenUri("https://oauth.battle.net/token")
+                .userInfoUri("https://oauth.battle.net/userinfo")
+                .userNameAttributeName("sub")
+                .build());
+        }
+
         if (configured(epicClientId, epicClientSecret)) {
             // No "openid": it would switch Spring to the OIDC flow and bypass CatapultOAuth2UserService; basic_profile
             // is what EOS needs to answer userInfo with the account id and the display name.
@@ -101,7 +132,59 @@ public class OAuth2ClientConfig {
                 .build());
         }
 
-        return new InMemoryClientRegistrationRepository(registrations);
+        // Bungie: the credentials are an admin's (bungie_app_credentials), read at each lookup, so the login exists
+        // only while they are set. Bungie sets the scopes on its portal (none is sent) and has no userinfo endpoint:
+        // CatapultOAuth2UserService reads the memberships itself, with the API key. Its callback,
+        // <base>/login/oauth2/code/bungie, must be declared on Bungie's portal.
+        // osu!: the same, from osu_app_credentials; scopes identify (implicit) and public (the scores), its callback
+        // <base>/login/oauth2/code/osu set as the application's callback URL on osu!.
+        return new DynamicClientRegistrationRepository(registrations, Map.of("bungie",
+            () -> bungieRegistration(bungieCredentials), "osu", () -> osuRegistration(osuCredentials)));
+    }
+
+    /** The osu! registration from the admin's credentials; empty when none is set or they cannot be read now. */
+    private Optional<ClientRegistration> osuRegistration(ObjectProvider<OsuCredentialsService> credentials) {
+        try {
+            return Optional.ofNullable(credentials.getIfAvailable())
+                .flatMap(OsuCredentialsService::current)
+                .map(c -> osu(c.clientId(), c.clientSecret()));
+        } catch (RuntimeException e) {
+            return Optional.empty();
+        }
+    }
+
+    /** The osu! registration of {@code clientId}. */
+    ClientRegistration osu(String clientId, String clientSecret) {
+        return authorizationCode("osu", clientId, clientSecret)
+            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
+            .scope("identify", "public")
+            .authorizationUri(OSU_AUTHORIZE)
+            .tokenUri(OSU_TOKEN)
+            .userInfoUri(OSU_ME)
+            .userNameAttributeName("id")
+            .build();
+    }
+
+    /** The Bungie registration from the admin's credentials; empty when none is set or they cannot be read now. */
+    private Optional<ClientRegistration> bungieRegistration(ObjectProvider<BungieCredentialsService> credentials) {
+        try {
+            return Optional.ofNullable(credentials.getIfAvailable())
+                .flatMap(BungieCredentialsService::current)
+                .map(c -> bungie(c.clientId(), c.clientSecret()));
+        } catch (RuntimeException e) {
+            return Optional.empty();
+        }
+    }
+
+    /** The Bungie.net registration of {@code clientId}. */
+    ClientRegistration bungie(String clientId, String clientSecret) {
+        return authorizationCode("bungie", clientId, clientSecret)
+            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+            .authorizationUri(BUNGIE_AUTHORIZE)
+            .tokenUri(BUNGIE_TOKEN)
+            .userInfoUri(BUNGIE_MEMBERSHIPS)
+            .userNameAttributeName("membershipId")
+            .build();
     }
 
     /** An authorization-code registration redirecting back to this API's login callback. */

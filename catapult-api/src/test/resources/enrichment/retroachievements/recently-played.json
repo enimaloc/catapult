@@ -1,0 +1,34 @@
+[
+  {
+    "GameID": 228,
+    "ConsoleID": 3,
+    "ConsoleName": "SNES/Super Famicom",
+    "Title": "Super Mario World",
+    "ImageIcon": "/Images/112233.png",
+    "ImageTitle": "/Images/000001.png",
+    "ImageIngame": "/Images/000002.png",
+    "ImageBoxArt": "/Images/000003.png",
+    "LastPlayed": "2026-11-22 10:00:00",
+    "AchievementsTotal": 96,
+    "NumAchieved": 40,
+    "ScoreAchieved": 300,
+    "NumAchievedHardcore": 38,
+    "ScoreAchievedHardcore": 280,
+    "PossibleScore": 600
+  },
+  {
+    "GameID": 1,
+    "ConsoleID": 1,
+    "ConsoleName": "Mega Drive/Genesis",
+    "Title": "Sonic the Hedgehog",
+    "ImageIcon": "/Images/000011.png",
+    "ImageBoxArt": "/Images/000013.png",
+    "LastPlayed": "2026-11-20 18:30:00",
+    "AchievementsTotal": 23,
+    "NumAchieved": 0,
+    "ScoreAchieved": 0,
+    "NumAchievedHardcore": 0,
+    "ScoreAchievedHardcore": 0,
+    "PossibleScore": 400
+  }
+]

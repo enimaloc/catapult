@@ -95,6 +95,10 @@ class AccountResolutionPerRequestTest {
     @MockitoBean TokenEncryptionService tokenEncryptionService;
     @MockitoBean SteamApiKeyRepository steamApiKeyRepository;
     @MockitoBean ChannelEventPublisher channelEventPublisher;
+    @MockitoBean fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinkService;
+    @MockitoBean fr.enimaloc.catapult.service.osu.OsuLinkService osuLinkService;
+    @MockitoBean fr.enimaloc.catapult.service.hypixel.HypixelAccountService hypixelAccountService;
+    @MockitoBean fr.enimaloc.catapult.service.supercell.SupercellAccountService supercellAccountService;
     @MockitoBean SchedulerService schedulerService;
     @MockitoBean TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     @MockitoBean TwitchatEventActionService twitchatEventActionService;
@@ -108,6 +112,11 @@ class AccountResolutionPerRequestTest {
     @MockitoBean NotificationService notificationService;
     @MockitoBean EmergencyViews emergencyViews;
     @MockitoBean EmergencyStopService emergencyStopService;
+    @MockitoBean fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService speedrunAccountService;
+    @MockitoBean fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService retroAchievementsAccountService;
+    @MockitoBean fr.enimaloc.catapult.service.riot.RiotAccountService riotAccountService;
+    @MockitoBean fr.enimaloc.catapult.service.faceit.FaceitAccountService faceitAccountService;
+    @MockitoBean fr.enimaloc.catapult.service.chess.ChessAccountService chessAccountService;
 
     private static RequestPostProcessor as(UserAccount account) {
         return jwt().jwt(j -> j.subject(account.getId().toString()).claim("twitchId", account.getTwitchId()))

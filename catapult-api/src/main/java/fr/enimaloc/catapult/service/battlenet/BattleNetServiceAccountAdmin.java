@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountReposito
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.security.TokenEncryptionService;
 import fr.enimaloc.catapult.service.battlenet.login.BattleNetLoginCoordinator;
+import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +55,7 @@ public class BattleNetServiceAccountAdmin {
     private final BattleNetSessionManager sessionManager;
     private final GetterConfigRepository getterConfigRepository;
     private final ChannelEventPublisher channelEventPublisher;
+    private final BlizzardAccountService blizzardAccounts;
 
     public List<AccountDto> list() {
         return accountRepository.findAll().stream().map(this::toDto).toList();
@@ -167,6 +169,14 @@ public class BattleNetServiceAccountAdmin {
         });
         log.info("Battle.net service account deleted: {} ({} link(s) dropped)", deleted.getId(), owners.size());
         owners.forEach(owner -> channelEventPublisher.battleNetLinkChanged(owner, "NONE", null, null));
+        for (UUID owner : owners) {
+            try {
+                blizzardAccounts.forget(owner);
+            } catch (RuntimeException e) {
+                log.warn("Blizzard settings of user {} not purged with their Battle.net link: {}", owner,
+                        e.getClass().getSimpleName());
+            }
+        }
     }
 
     /**

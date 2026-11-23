@@ -58,9 +58,10 @@ class SimulatedResolutionClientsTest {
         assertThat(igdb.fetchGamesByIds(List.of("1"), "name", "token")).isEmpty();
         assertThat(igdb.fetchGameById("1", "name", "token")).isEmpty();
         assertThat(igdb.fetchGameDetails("1", "token")).isEmpty();
+        assertThat(igdb.findTimeToBeat("1", "token")).isEmpty();
 
         verifyNoInteractions(realIgdb);
-        assertThat(fx.journaledKeys()).hasSize(8);
+        assertThat(fx.journaledKeys()).hasSize(9);
     }
 
     @Test

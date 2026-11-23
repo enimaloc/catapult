@@ -41,13 +41,37 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
     private static final Set<String> BUSINESS_ERROR_CODES = Set.of(
             "not_whitelisted", "invalid_invite", "alpha_full",
             "system_account_login_forbidden", "unauthorized", "battlenet_unavailable", "battlenet_full",
-            "epic_unavailable", "epic_full", "epic_already_linked");
+            "epic_unavailable", "epic_full", "epic_already_linked",
+            "battlenet_stats_unavailable", "battlenet_stats_failed", "battlenet_stats_mismatch",
+            "battlenet_stats_cancelled",
+            "bungie_unavailable", "bungie_failed", "bungie_mismatch", "bungie_cancelled",
+            "osu_unavailable", "osu_failed", "osu_mismatch", "osu_cancelled");
     /**
-     * Refusals of a link the member started from their channel's integrations tab: they go back there, the code as
-     * {@code error}, for the card to tell why (TwitchLoginSuccessHandler sends a successful link to the same tab).
+     * Refusals of a link the member started from their channel's page: they go back to the card's tab (Integrations for
+     * Epic, API for the personal stats' Blizzard, Bungie and osu!), the code as {@code error}, for the card to tell why
+     * (TwitchLoginSuccessHandler sends a successful link to the same tab).
      */
     private static final Set<String> CHANNEL_LINK_ERROR_CODES = Set.of(
-            "epic_unavailable", "epic_full", "epic_already_linked");
+            "epic_unavailable", "epic_full", "epic_already_linked",
+            "battlenet_stats_unavailable", "battlenet_stats_failed", "battlenet_stats_mismatch",
+            "battlenet_stats_cancelled",
+            "bungie_unavailable", "bungie_failed", "bungie_mismatch", "bungie_cancelled",
+            "osu_unavailable", "osu_failed", "osu_mismatch", "osu_cancelled");
+    /** The World of Warcraft import: a failure that is not one of its refusals is a failed import on the card. */
+    private static final String WOW_IMPORT = "battlenet-stats";
+    private static final Set<String> WOW_IMPORT_ERROR_CODES = Set.of(
+            "battlenet_stats_unavailable", "battlenet_stats_failed", "battlenet_stats_mismatch",
+            "battlenet_stats_cancelled");
+
+    /** The Bungie.net link: a failure that is not one of its refusals is a failed link on the card. */
+    private static final String BUNGIE = "bungie";
+    private static final Set<String> BUNGIE_ERROR_CODES = Set.of(
+            "bungie_unavailable", "bungie_failed", "bungie_mismatch", "bungie_cancelled");
+
+    /** The osu! link: a failure that is not one of its refusals is a failed link on the card. */
+    private static final String OSU = "osu";
+    private static final Set<String> OSU_ERROR_CODES = Set.of(
+            "osu_unavailable", "osu_failed", "osu_mismatch", "osu_cancelled");
 
     @Value("${app.web-url:http://localhost:8080}")
     private String webUrl;
@@ -59,6 +83,29 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
         log.error("OAuth2 login failed: [{}] {}", exception.getClass().getSimpleName(), exception.getMessage(), exception);
 
         String registrationId = registrationIdOf(request);
+        if (WOW_IMPORT.equals(registrationId) && "access_denied".equals(errorCode)) {
+            // The member declined on Blizzard's consent page: not a failure
+            errorCode = "battlenet_stats_cancelled";
+        }
+        if (WOW_IMPORT.equals(registrationId) && !"unauthorized".equals(errorCode)
+                && !WOW_IMPORT_ERROR_CODES.contains(errorCode)) {
+            errorCode = "battlenet_stats_failed";
+        }
+        if (BUNGIE.equals(registrationId) && "access_denied".equals(errorCode)) {
+            // The member declined on Bungie's authorization page: not a failure
+            errorCode = "bungie_cancelled";
+        }
+        if (BUNGIE.equals(registrationId) && !"unauthorized".equals(errorCode)
+                && !BUNGIE_ERROR_CODES.contains(errorCode)) {
+            errorCode = "bungie_failed";
+        }
+        if (OSU.equals(registrationId) && "access_denied".equals(errorCode)) {
+            // The member declined on osu!'s authorization page: not a failure
+            errorCode = "osu_cancelled";
+        }
+        if (OSU.equals(registrationId) && !"unauthorized".equals(errorCode) && !OSU_ERROR_CODES.contains(errorCode)) {
+            errorCode = "osu_failed";
+        }
         if ("twitch".equals(registrationId) && !BUSINESS_ERROR_CODES.contains(errorCode) && !alreadyRetried(request)) {
             markRetried(request, response);
             if (request.getSession(false) != null) {
@@ -123,7 +170,7 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
                 return UriComponentsBuilder.fromUriString(webUrl)
                         .path("/channel/{username}")
                         .queryParam("error", errorCode)
-                        .fragment("integrations")
+                        .fragment(errorCode.startsWith("epic_") ? "integrations" : "api")
                         .buildAndExpand(login)
                         .toUriString();
             }

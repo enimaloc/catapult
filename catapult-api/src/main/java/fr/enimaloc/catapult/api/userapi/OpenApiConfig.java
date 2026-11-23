@@ -100,7 +100,7 @@ public class OpenApiConfig {
     }
 
     /**
-     * The bearer scheme opens an {@code /api/me} operation; the {@code ?token=} one opens its {@code GET}s too, the
+     * The bearer scheme opens an {@code /api/me} operation; the {@code ?token=} one opens its {@code GET}s (and {@code HEAD}s) too, the
      * read-only token opening no write.
      */
     @Bean
@@ -113,13 +113,13 @@ public class OpenApiConfig {
                 if (path.equals(ME_PREFIX) || path.startsWith(ME_PREFIX + "/")) {
                     for (Operation operation : item.readOperations()) {
                         operation.addSecurityItem(new SecurityRequirement().addList(PERSONAL_TOKEN));
-                        if (operation != item.getGet()) {
+                        if (operation == item.getGet() || operation == item.getHead()) {
+                            // a HEAD reads no more than its GET: the read-only token opens both
+                            operation.addSecurityItem(new SecurityRequirement().addList(READ_TOKEN));
+                            appendNote(operation, READ_NOTE);
+                        } else {
                             appendNote(operation, WRITE_NOTE);
                         }
-                    }
-                    if (item.getGet() != null) {
-                        item.getGet().addSecurityItem(new SecurityRequirement().addList(READ_TOKEN));
-                        appendNote(item.getGet(), READ_NOTE);
                     }
                 }
             });

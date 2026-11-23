@@ -25,6 +25,18 @@ function page() {
                 <div class="admin-keys-card" data-provider="dtdd" data-label-invalid="Invalid DTDD key">
                     <input name="apiKey"><button class="admin-keys-add-save"></button>
                 </div>
+                <div class="admin-keys-card admin-osu" data-label-invalid="Invalid osu" data-label-saved="Saved"
+                     data-label-removed="Removed">
+                    <input name="clientId"><input name="clientSecret">
+                    <button class="admin-osu-save"></button>
+                    <button class="admin-osu-delete" data-confirm="Remove?"></button>
+                </div>
+                <div class="admin-keys-card admin-bungie" data-label-invalid="Invalid Bungie" data-label-saved="Saved"
+                     data-label-removed="Removed">
+                    <input name="clientId"><input name="clientSecret"><input name="apiKey">
+                    <button class="admin-bungie-save"></button>
+                    <button class="admin-bungie-delete" data-confirm="Remove?"></button>
+                </div>
             </div>
         </mdui-tab-panel>`);
     render();
@@ -115,5 +127,99 @@ describe("admin-keys", () => {
         expect(CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
         expect(CatapultAdminTabs.patch).toHaveBeenCalledTimes(1);
         expect(card("steam").querySelector(".admin-keys-refresh").disabled).toBe(false);
+    });
+
+    describe("bungie", () => {
+        const bungieField = name => document.querySelector(`.admin-bungie [name="${name}"]`);
+
+        it("saves the three values trimmed, clears the secrets and patches", async () => {
+            fill(bungieField("clientId"), " 12345 ");
+            fill(bungieField("clientSecret"), " s3cret ");
+            fill(bungieField("apiKey"), " abc ");
+            await click(".admin-bungie-save");
+            expect(posted).toHaveBeenLastCalledWith("/admin/bungie-credentials/save",
+                { clientId: "12345", clientSecret: "s3cret", apiKey: "abc" });
+            expect(bungieField("clientSecret").value).toBe("");
+            expect(bungieField("apiKey").value).toBe("");
+            expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Saved" });
+            expect(window.CatapultAdminTabs.patch).toHaveBeenCalled();
+        });
+
+        it("needs a client id, and says the card's invalid text on a 400", async () => {
+            await click(".admin-bungie-save");
+            expect(posted).not.toHaveBeenCalled();
+            expect(bungieField("clientId").hasAttribute("invalid")).toBe(true);
+
+            posted.mockResolvedValueOnce(response(400));
+            fill(bungieField("clientId"), "12345");
+            fill(bungieField("clientSecret"), "kept");
+            await click(".admin-bungie-save");
+            expect(window.CatapultChannel.showError).toHaveBeenLastCalledWith("Invalid Bungie");
+            expect(bungieField("clientSecret").value).toBe("kept");
+        });
+
+        it("removes after a confirmation only", async () => {
+            confirmAnswer = false;
+            await click(".admin-bungie-delete");
+            expect(posted).not.toHaveBeenCalled();
+
+            confirmAnswer = true;
+            await click(".admin-bungie-delete");
+            expect(posted).toHaveBeenLastCalledWith("/admin/bungie-credentials/delete", {});
+            expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Removed" });
+        });
+
+        it("says unavailable when catapult-api cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(502));
+            fill(bungieField("clientId"), "12345");
+            await click(".admin-bungie-save");
+            expect(window.CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
+        });
+    });
+
+    describe("osu", () => {
+        const osuField = name => document.querySelector(`.admin-osu [name="${name}"]`);
+
+        it("saves the two values trimmed, clears the secret and patches", async () => {
+            fill(osuField("clientId"), " 12345 ");
+            fill(osuField("clientSecret"), " s3cret ");
+            await click(".admin-osu-save");
+            expect(posted).toHaveBeenLastCalledWith("/admin/osu-credentials/save",
+                { clientId: "12345", clientSecret: "s3cret" });
+            expect(osuField("clientSecret").value).toBe("");
+            expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Saved" });
+            expect(window.CatapultAdminTabs.patch).toHaveBeenCalled();
+        });
+
+        it("needs a client id, and says the card's invalid text on a 400", async () => {
+            await click(".admin-osu-save");
+            expect(posted).not.toHaveBeenCalled();
+            expect(osuField("clientId").hasAttribute("invalid")).toBe(true);
+
+            posted.mockResolvedValueOnce(response(400));
+            fill(osuField("clientId"), "12345");
+            fill(osuField("clientSecret"), "kept");
+            await click(".admin-osu-save");
+            expect(window.CatapultChannel.showError).toHaveBeenLastCalledWith("Invalid osu");
+            expect(osuField("clientSecret").value).toBe("kept");
+        });
+
+        it("removes after a confirmation only", async () => {
+            confirmAnswer = false;
+            await click(".admin-osu-delete");
+            expect(posted).not.toHaveBeenCalled();
+
+            confirmAnswer = true;
+            await click(".admin-osu-delete");
+            expect(posted).toHaveBeenLastCalledWith("/admin/osu-credentials/delete", {});
+            expect(window.mdui.snackbar).toHaveBeenLastCalledWith({ message: "Removed" });
+        });
+
+        it("says unavailable when catapult-api cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(502));
+            fill(osuField("clientId"), "12345");
+            await click(".admin-osu-save");
+            expect(window.CatapultChannel.showError).toHaveBeenLastCalledWith("Down");
+        });
     });
 });

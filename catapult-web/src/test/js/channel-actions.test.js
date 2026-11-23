@@ -289,6 +289,45 @@ describe("channel-connections", () => {
               <button id="ankama-connect-btn"></button>
               <button id="ankama-resend-btn"></button>
               <button id="ankama-disconnect-btn"></button>
+              <input id="speedrun-username-input" value="  Linkus7 ">
+              <button id="speedrun-username-save-btn"></button>
+              <button id="speedrun-username-delete-btn"></button>
+              <input id="speedrun-key-input" value=" abc123 ">
+              <button id="speedrun-key-save-btn"></button>
+              <button id="speedrun-key-delete-btn"></button>
+              <input id="retroachievements-username-input" value="  Bob ">
+              <button id="retroachievements-username-save-btn"></button>
+              <button id="retroachievements-username-delete-btn"></button>
+              <input id="retroachievements-key-input" value=" abc123 ">
+              <button id="retroachievements-key-save-btn"></button>
+              <button id="retroachievements-key-delete-btn"></button>
+              <input id="hypixel-player-input" value="  Notch ">
+              <button id="hypixel-save-btn"></button>
+              <button id="hypixel-delete-btn"></button>
+              <input id="supercell-clash-of-clans-input" value="  #2pp ">
+              <button id="supercell-clash-of-clans-save-btn"></button>
+              <button id="supercell-clash-of-clans-delete-btn"></button>
+              <input id="supercell-brawl-stars-input" value="9YY">
+              <button id="supercell-brawl-stars-save-btn"></button>
+              <button id="supercell-brawl-stars-delete-btn"></button>
+              <input id="faceit-nickname-input" value="  Catapult ">
+              <button id="faceit-save-btn"></button>
+              <button id="faceit-delete-btn"></button>
+              <input id="riot-id-input" value="  Catapult#EUW ">
+              <select id="riot-platform-select"><option value="euw1">EUW1</option><option value="na1">NA1</option></select>
+              <button id="riot-save-btn"></button>
+              <button id="riot-delete-btn"></button>
+              <input id="chess-chesscom-username-input" value="  Hikaru ">
+              <button id="chess-chesscom-save-btn"></button>
+              <button id="chess-chesscom-delete-btn"></button>
+              <input id="chess-lichess-username-input" value="DrNykterstein">
+              <button id="chess-lichess-save-btn"></button>
+              <button id="chess-lichess-delete-btn"></button>
+              <select id="blizzard-region-select"><option value="eu">EU</option><option value="us">US</option></select>
+              <select id="blizzard-main-select"><option value="eu:1001">Thrall</option><option value="us:77">Jaina</option></select>
+              <button id="blizzard-forget-btn"></button>
+              <button id="bungie-disconnect-btn"></button>
+              <button id="osu-disconnect-btn"></button>
               <button id="epic-resend-btn"></button>
               <button id="epic-disconnect-btn"></button>
               <input id="obs-host" value="10.0.0.2">
@@ -366,6 +405,325 @@ describe("channel-connections", () => {
         expect(posts()).toEqual([["/channel/enimaloc/battlenet/disconnect", {}]]);
     });
 
+    describe("the speedrun.com account", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
+        it("saves the trimmed name and removes it with posts", async () => {
+            await click("#speedrun-username-save-btn");
+            await click("#speedrun-username-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/speedrun/username", { username: "Linkus7" }],
+                ["/channel/enimaloc/settings/speedrun/username/delete", {}],
+            ]);
+            expect(snackbars()).toEqual([]);
+        });
+
+        it("saves the trimmed key, empties its field, and deletes it with a post", async () => {
+            await click("#speedrun-key-save-btn");
+            await click("#speedrun-key-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/speedrun/api-key", { apiKey: "abc123" }],
+                ["/channel/enimaloc/settings/speedrun/api-key/delete", {}],
+            ]);
+            expect(document.getElementById("speedrun-key-input").value).toBe("");
+        });
+
+        it("sends nothing for an empty field", async () => {
+            document.getElementById("speedrun-username-input").value = "   ";
+            document.getElementById("speedrun-key-input").value = "";
+            await click("#speedrun-username-save-btn");
+            await click("#speedrun-key-save-btn");
+
+            expect(posts()).toEqual([]);
+        });
+
+        it("tells a name or a key speedrun.com refuses, and that it cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(400));
+            await click("#speedrun-username-save-btn");
+            posted.mockResolvedValueOnce(response(400));
+            await click("#speedrun-key-save-btn");
+            posted.mockResolvedValueOnce(response(503));
+            await click("#speedrun-username-save-btn");
+
+            expect(snackbars()).toEqual([
+                "speedrun.com does not know this username",
+                "speedrun.com refused this API key",
+                "speedrun.com cannot be reached right now: try again later.",
+            ]);
+        });
+
+        it("speaks the page's language, and tells any other failure or an unreachable server", async () => {
+            document.body.dataset.labelSpeedrunRefusedUsername = "Nom inconnu";
+            posted.mockResolvedValueOnce(response(400));
+            await click("#speedrun-username-save-btn");
+            posted.mockResolvedValueOnce(response(502));
+            await click("#speedrun-username-save-btn");
+            posted.mockRejectedValueOnce(new TypeError("offline"));
+            await click("#speedrun-username-save-btn");
+
+            expect(snackbars()).toEqual(["Nom inconnu", "Action failed (502)", "Catapult could not be reached"]);
+            delete document.body.dataset.labelSpeedrunRefusedUsername;
+        });
+    });
+
+    describe("the Riot ID", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
+        it("saves the trimmed Riot ID with the picked server, and removes it with a post", async () => {
+            document.getElementById("riot-platform-select").value = "na1";
+            await click("#riot-save-btn");
+            await click("#riot-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/riot/account", { riotId: "Catapult#EUW", platform: "na1" }],
+                ["/channel/enimaloc/settings/riot/account/delete", {}],
+            ]);
+            expect(snackbars()).toEqual([]);
+        });
+
+        it("sends nothing for an empty Riot ID", async () => {
+            document.getElementById("riot-id-input").value = "  ";
+            await click("#riot-save-btn");
+
+            expect(posts()).toEqual([]);
+        });
+
+        it("tells a Riot ID Riot does not know, and that Riot cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(400));
+            await click("#riot-save-btn");
+            posted.mockResolvedValueOnce(response(503));
+            await click("#riot-save-btn");
+
+            expect(snackbars()).toEqual([
+                "Riot does not know this Riot ID on that server",
+                "Riot cannot be reached right now: try again later.",
+            ]);
+        });
+    });
+
+    describe("the FACEIT nickname", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
+        it("saves the trimmed nickname, and removes it with a post", async () => {
+            await click("#faceit-save-btn");
+            await click("#faceit-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/faceit/nickname", { nickname: "Catapult" }],
+                ["/channel/enimaloc/settings/faceit/nickname/delete", {}],
+            ]);
+            expect(snackbars()).toEqual([]);
+        });
+
+        it("sends nothing for an empty nickname", async () => {
+            document.getElementById("faceit-nickname-input").value = "  ";
+            await click("#faceit-save-btn");
+
+            expect(posts()).toEqual([]);
+        });
+
+        it("tells a nickname FACEIT does not know, and that FACEIT cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(400));
+            await click("#faceit-save-btn");
+            posted.mockResolvedValueOnce(response(503));
+            await click("#faceit-save-btn");
+
+            expect(snackbars()).toEqual([
+                "FACEIT does not know this nickname",
+                "FACEIT cannot be reached right now: try again later.",
+            ]);
+        });
+    });
+
+    describe("the Supercell player tags", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
+        it("saves each game's trimmed tag, and removes it with a post", async () => {
+            await click("#supercell-clash-of-clans-save-btn");
+            await click("#supercell-brawl-stars-save-btn");
+            await click("#supercell-clash-of-clans-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/supercell/clash-of-clans", { tag: "#2pp" }],
+                ["/channel/enimaloc/settings/supercell/brawl-stars", { tag: "9YY" }],
+                ["/channel/enimaloc/settings/supercell/clash-of-clans/delete", {}],
+            ]);
+            expect(snackbars()).toEqual([]);
+        });
+
+        it("sends nothing for an empty entry", async () => {
+            document.getElementById("supercell-brawl-stars-input").value = "  ";
+            await click("#supercell-brawl-stars-save-btn");
+
+            expect(posts()).toEqual([]);
+        });
+
+        it("tells a tag that cannot be one, without asking", async () => {
+            document.getElementById("supercell-brawl-stars-input").value = "#ABC";
+            await click("#supercell-brawl-stars-save-btn");
+
+            expect(posts()).toEqual([]);
+            expect(snackbars()).toEqual(["A player tag is # then 3 to 12 of 0289PYLQGRJCUV."]);
+        });
+
+        it("tells a tag no player has, and that Supercell cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(400));
+            await click("#supercell-clash-of-clans-save-btn");
+            posted.mockResolvedValueOnce(response(503));
+            await click("#supercell-clash-of-clans-save-btn");
+
+            expect(snackbars()).toEqual([
+                "No player has this tag in this game.",
+                "Supercell cannot be reached right now: try again later.",
+            ]);
+        });
+    });
+
+    describe("the Hypixel account", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
+        it("saves the trimmed name, and removes it with a post", async () => {
+            await click("#hypixel-save-btn");
+            await click("#hypixel-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/hypixel/account", { player: "Notch" }],
+                ["/channel/enimaloc/settings/hypixel/account/delete", {}],
+            ]);
+            expect(snackbars()).toEqual([]);
+        });
+
+        it("sends nothing for an empty entry", async () => {
+            document.getElementById("hypixel-player-input").value = "  ";
+            await click("#hypixel-save-btn");
+
+            expect(posts()).toEqual([]);
+        });
+
+        it("tells an unknown account, and that Hypixel cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(400));
+            await click("#hypixel-save-btn");
+            posted.mockResolvedValueOnce(response(503));
+            await click("#hypixel-save-btn");
+
+            expect(snackbars()).toEqual([
+                "This name does not exist, or this account never joined Hypixel.",
+                "Hypixel cannot be reached right now: try again later.",
+            ]);
+        });
+    });
+
+    describe("the RetroAchievements account", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
+        it("saves the trimmed name and removes it with posts", async () => {
+            await click("#retroachievements-username-save-btn");
+            await click("#retroachievements-username-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/retroachievements/username", { username: "Bob" }],
+                ["/channel/enimaloc/settings/retroachievements/username/delete", {}],
+            ]);
+            expect(snackbars()).toEqual([]);
+        });
+
+        it("saves the trimmed key, empties its field, and deletes it with a post", async () => {
+            await click("#retroachievements-key-save-btn");
+            await click("#retroachievements-key-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/retroachievements/api-key", { apiKey: "abc123" }],
+                ["/channel/enimaloc/settings/retroachievements/api-key/delete", {}],
+            ]);
+            expect(document.getElementById("retroachievements-key-input").value).toBe("");
+        });
+
+        it("sends nothing for an empty field", async () => {
+            document.getElementById("retroachievements-username-input").value = "   ";
+            document.getElementById("retroachievements-key-input").value = "";
+            await click("#retroachievements-username-save-btn");
+            await click("#retroachievements-key-save-btn");
+
+            expect(posts()).toEqual([]);
+        });
+
+        it("tells a name or a key RetroAchievements refuses, and that it cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(400));
+            await click("#retroachievements-username-save-btn");
+            posted.mockResolvedValueOnce(response(400));
+            await click("#retroachievements-key-save-btn");
+            posted.mockResolvedValueOnce(response(503));
+            await click("#retroachievements-username-save-btn");
+
+            expect(snackbars()).toEqual([
+                "RetroAchievements does not know this username",
+                "RetroAchievements refused this API key",
+                "RetroAchievements cannot be reached right now: try again later.",
+            ]);
+        });
+
+        it("speaks the page's language", async () => {
+            document.body.dataset.labelRetroachievementsUnavailable = "Injoignable";
+            posted.mockResolvedValueOnce(response(503));
+            await click("#retroachievements-username-save-btn");
+
+            expect(snackbars()).toEqual(["Injoignable"]);
+            delete document.body.dataset.labelRetroachievementsUnavailable;
+        });
+    });
+
+    describe("the chess accounts", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
+        it("saves each trimmed name and removes it with posts", async () => {
+            await click("#chess-chesscom-save-btn");
+            await click("#chess-lichess-save-btn");
+            await click("#chess-chesscom-delete-btn");
+            await click("#chess-lichess-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/chess/chesscom", { username: "Hikaru" }],
+                ["/channel/enimaloc/settings/chess/lichess", { username: "DrNykterstein" }],
+                ["/channel/enimaloc/settings/chess/chesscom/delete", {}],
+                ["/channel/enimaloc/settings/chess/lichess/delete", {}],
+            ]);
+            expect(snackbars()).toEqual([]);
+        });
+
+        it("sends nothing for an empty field", async () => {
+            document.getElementById("chess-lichess-username-input").value = "  ";
+            await click("#chess-lichess-save-btn");
+
+            expect(posts()).toEqual([]);
+        });
+
+        it("tells a name a site refuses, and that it cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(400));
+            await click("#chess-chesscom-save-btn");
+            posted.mockResolvedValueOnce(response(400));
+            await click("#chess-lichess-save-btn");
+            posted.mockResolvedValueOnce(response(503));
+            await click("#chess-lichess-save-btn");
+
+            expect(snackbars()).toEqual([
+                "Chess.com does not know this username",
+                "Lichess does not know this username, or the account is closed",
+                "Chess.com or Lichess cannot be reached right now: try again later.",
+            ]);
+        });
+
+        it("speaks the page's language", async () => {
+            document.body.dataset.labelChessRefusedChesscom = "Nom inconnu";
+            posted.mockResolvedValueOnce(response(400));
+            await click("#chess-chesscom-save-btn");
+
+            expect(snackbars()).toEqual(["Nom inconnu"]);
+            delete document.body.dataset.labelChessRefusedChesscom;
+        });
+    });
+
     describe("the Ankama link", () => {
         const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
         const typed = text => { document.getElementById("ankama-name-input").value = text; };
@@ -441,6 +799,170 @@ describe("channel-connections", () => {
                 ["/channel/enimaloc/ankama/resend", {}],
                 ["/channel/enimaloc/ankama/disconnect", {}],
             ]);
+        });
+    });
+
+    describe("the Blizzard stats", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+        const pick = (id, value) => {
+            const select = document.getElementById(id);
+            select.value = value;
+            select.dispatchEvent(new Event("change"));
+            return flush();
+        };
+
+        it("saves the region as picked", async () => {
+            await pick("blizzard-region-select", "us");
+
+            expect(posts()).toEqual([["/channel/enimaloc/settings/blizzard/region", { region: "us" }]]);
+        });
+
+        it("saves the main character as its region and numeric id", async () => {
+            await pick("blizzard-main-select", "us:77");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/blizzard/wow-main", { region: "us", characterId: 77 }]]);
+        });
+
+        it("forgets the characters with a post", async () => {
+            await click("#blizzard-forget-btn");
+
+            expect(posts()).toEqual([["/channel/enimaloc/settings/blizzard/wow-characters/delete", {}]]);
+        });
+
+        it.each([
+            ["battlenet_stats_unavailable", "The Blizzard import is not available for now: try again later."],
+            ["battlenet_stats_mismatch",
+                "This is not the Battle.net account linked to Catapult: sign in with the same account."],
+            ["battlenet_stats_failed", "Importing your characters failed: try again later."],
+        ])("tells an import refused with %s once, and takes it off the address", (code, text) => {
+            history.replaceState(null, "", `/channel/enimaloc?error=${code}#integrations`);
+
+            render();
+            render();
+
+            expect(snackbars()).toEqual([text]);
+            expect(location.pathname + location.search + location.hash).toBe("/channel/enimaloc#integrations");
+        });
+
+        it("unlinks osu! with a post", async () => {
+            await click("#osu-disconnect-btn");
+
+            expect(posts()).toEqual([["/channel/enimaloc/settings/osu/delete", {}]]);
+        });
+
+        it.each([
+            ["osu_unavailable", "Linking osu! is not available for now: try again later."],
+            ["osu_mismatch", "osu! answered for another account than the one you signed in with: try again."],
+            ["osu_failed", "Linking your osu! account failed: try again later."],
+            ["osu_cancelled", "osu! linking cancelled."],
+        ])("tells an osu! link refused with %s once, and takes it off the address", (code, text) => {
+            history.replaceState(null, "", `/channel/enimaloc?error=${code}#integrations`);
+
+            render();
+            render();
+
+            expect(snackbars()).toEqual([text]);
+            expect(location.pathname + location.search + location.hash).toBe("/channel/enimaloc#integrations");
+        });
+
+        it("tells a finished osu! link once", () => {
+            document.body.dataset.labelOsuDone = "Lie";
+            history.replaceState(null, "", "/channel/enimaloc?linked=osu#integrations");
+
+            render();
+            render();
+
+            expect(snackbars()).toEqual(["Lie"]);
+            expect(location.search).toBe("");
+            delete document.body.dataset.labelOsuDone;
+        });
+
+        it("unlinks Bungie.net with a post", async () => {
+            await click("#bungie-disconnect-btn");
+
+            expect(posts()).toEqual([["/channel/enimaloc/settings/bungie/delete", {}]]);
+        });
+
+        it.each([
+            ["bungie_unavailable", "Linking Bungie.net is not available for now: try again later."],
+            ["bungie_mismatch", "Bungie answered for another account than the one you signed in with: try again."],
+            ["bungie_failed", "Linking your Bungie.net account failed: try again later."],
+            ["bungie_cancelled", "Bungie.net linking cancelled."],
+        ])("tells a Bungie link refused with %s once, and takes it off the address", (code, text) => {
+            history.replaceState(null, "", `/channel/enimaloc?error=${code}#integrations`);
+
+            render();
+            render();
+
+            expect(snackbars()).toEqual([text]);
+            expect(location.pathname + location.search + location.hash).toBe("/channel/enimaloc#integrations");
+        });
+
+        it("tells a finished Bungie link once", () => {
+            document.body.dataset.labelBungieDone = "Lie";
+            history.replaceState(null, "", "/channel/enimaloc?linked=bungie#integrations");
+
+            render();
+            render();
+
+            expect(snackbars()).toEqual(["Lie"]);
+            expect(location.search).toBe("");
+            delete document.body.dataset.labelBungieDone;
+        });
+
+        it("tells a finished import once, in the page's language", () => {
+            document.body.dataset.labelBlizzardStatsDone = "Importe";
+            history.replaceState(null, "", "/channel/enimaloc?imported=wow#integrations");
+
+            render();
+            render();
+
+            expect(snackbars()).toEqual(["Importe"]);
+            expect(location.search).toBe("");
+            delete document.body.dataset.labelBlizzardStatsDone;
+        });
+
+        it("tells an import that found nothing apart from a success, once", () => {
+            document.body.dataset.labelBlizzardStatsEmpty = "Aucun personnage";
+            history.replaceState(null, "", "/channel/enimaloc?imported=wow-empty#integrations");
+
+            render();
+            render();
+
+            expect(snackbars()).toEqual(["Aucun personnage"]);
+            expect(location.search).toBe("");
+            delete document.body.dataset.labelBlizzardStatsEmpty;
+        });
+
+        it("tells a cancelled import as a plain message, not an error", () => {
+            const errors = vi.spyOn(window.CatapultChannel, "showError");
+            history.replaceState(null, "", "/channel/enimaloc?error=battlenet_stats_cancelled#integrations");
+
+            render();
+
+            expect(snackbars()).toEqual(["Import cancelled."]);
+            expect(errors).not.toHaveBeenCalled();
+            errors.mockRestore();
+        });
+
+        it("tells a finished import without going through the error path", () => {
+            const errors = vi.spyOn(window.CatapultChannel, "showError");
+            history.replaceState(null, "", "/channel/enimaloc?imported=wow#integrations");
+
+            render();
+
+            expect(errors).not.toHaveBeenCalled();
+            errors.mockRestore();
+        });
+
+        it("leaves any other imported value alone", () => {
+            history.replaceState(null, "", "/channel/enimaloc?imported=other#integrations");
+
+            render();
+
+            expect(snackbars()).toEqual([]);
+            expect(location.search).toBe("?imported=other");
         });
     });
 
@@ -1095,5 +1617,45 @@ describe("parts built only once shown (lazy.js)", () => {
             ["/channel/enimaloc/settings/ccl", { cclEnabled: true, blockedCcls: [] }],
             ["/channel/enimaloc/settings/twitchat/branch", { branch: "beta" }],
         ]);
+    });
+
+    it("binds the API tab's cards at render, and the Integrations tab's once built, each once", async () => {
+        html(`
+            <section id="integrations"><template data-lazy>
+              <div id="channel-connections">
+                <button id="battlenet-disconnect-btn"></button>
+              </div>
+            </template></section>
+            <section id="api">
+              <div id="channel-api-connections">
+                <button id="faceit-delete-btn"></button>
+                <button id="osu-disconnect-btn"></button>
+                <button id="hypixel-delete-btn"></button>
+              </div>
+            </section>`);
+        render();
+
+        CatapultLazy.showIn(document.getElementById("integrations"));
+        await click("#faceit-delete-btn");
+        await click("#osu-disconnect-btn");
+        await click("#hypixel-delete-btn");
+        await click("#battlenet-disconnect-btn");
+
+        expect(posts()).toEqual([
+            ["/channel/enimaloc/settings/faceit/nickname/delete", {}],
+            ["/channel/enimaloc/settings/osu/delete", {}],
+            ["/channel/enimaloc/settings/hypixel/account/delete", {}],
+            ["/channel/enimaloc/battlenet/disconnect", {}],
+        ]);
+    });
+
+    it("leaves a page without any grid of cards alone", async () => {
+        html(`<section id="other"><template data-lazy><button id="faceit-delete-btn"></button></template></section>`);
+        render();
+
+        CatapultLazy.showIn(document.getElementById("other"));
+        await click("#faceit-delete-btn");
+
+        expect(posts()).toEqual([]);
     });
 });

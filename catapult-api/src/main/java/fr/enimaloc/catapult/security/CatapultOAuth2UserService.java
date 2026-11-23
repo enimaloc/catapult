@@ -14,6 +14,10 @@ import fr.enimaloc.catapult.service.access.WhitelistService;
 import fr.enimaloc.catapult.service.account.AdminMigrationService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetFriendService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
+import fr.enimaloc.catapult.service.blizzard.BlizzardImportRefusedException;
+import fr.enimaloc.catapult.service.bungie.BungieLinkService;
+import fr.enimaloc.catapult.service.osu.OsuLinkService;
+import fr.enimaloc.catapult.service.blizzard.BlizzardWowImportService;
 import fr.enimaloc.catapult.service.epic.EpicEnrollmentException;
 import fr.enimaloc.catapult.service.epic.EpicFriendService;
 import fr.enimaloc.catapult.service.epic.EpicGateService;
@@ -23,6 +27,7 @@ import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -36,6 +41,8 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 import java.util.Map;
@@ -63,6 +70,10 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     // Only present when epic.enabled.
     private final ObjectProvider<EpicFriendService> epicFriends;
     private final TransactionTemplate transactions;
+    // Only present when battlenet.enabled.
+    private final ObjectProvider<BlizzardWowImportService> wowImports;
+    private final ObjectProvider<BungieLinkService> bungieLinks;
+    private final ObjectProvider<OsuLinkService> osuLinks;
 
     @Value("${app.owner-id:}")
     private String ownerId;
@@ -98,7 +109,10 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
                 case "xbox" -> transactions.execute(status ->
                     handleSecondaryLink(userRequest, OAuthToken.Provider.XBOX));
                 case "battlenet" -> handleBattleNetLink(userRequest);
+                case "battlenet-stats" -> handleBattleNetStatsConsent(userRequest);
                 case "epic" -> handleEpicLink(userRequest);
+                case "bungie" -> handleBungieLink(userRequest);
+                case "osu" -> handleOsuLink(userRequest);
                 default -> delegate.loadUser(userRequest);
             };
         } catch (OAuth2AuthenticationException e) {
@@ -163,6 +177,97 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             throw new OAuth2AuthenticationException(new OAuth2Error("battlenet_full"), e);
         }
         log.info("BATTLENET linked for user {}", user.getId());
+        return existingUser;
+    }
+
+    /**
+     * The World of Warcraft import ({@code wow.profile} consent) of a member already linked to Battle.net: the user
+     * token reads their characters, then is forgotten (TwitchLoginSuccessHandler drops the authorized client). Neither
+     * the link nor the bot's enrolment is touched, and no userinfo is loaded for them. The token never reaches a log:
+     * failures are logged by their type only. Not transactional, see {@link #loadUser}.
+     */
+    private OAuth2User handleBattleNetStatsConsent(OAuth2UserRequest userRequest) {
+        Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
+        if (currentAuth == null || !(currentAuth.getPrincipal() instanceof CatapultOAuth2User existingUser)) {
+            log.error("BATTLENET-STATS consent without an authenticated Twitch session");
+            throw new OAuth2AuthenticationException(new OAuth2Error("unauthorized"));
+        }
+        UserAccount user = existingUser.getUserAccount();
+        BlizzardWowImportService imports = wowImports.getIfAvailable();
+        if (imports == null || !battleNetGate.isAvailableFor(user)) {
+            throw new OAuth2AuthenticationException(new OAuth2Error("battlenet_stats_unavailable"));
+        }
+        try {
+            int count = imports.importFor(user, userRequest.getAccessToken().getTokenValue(),
+                    LocaleContextHolder.getLocale());
+            if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes web) {
+                web.getRequest().setAttribute(TwitchLoginSuccessHandler.WOW_IMPORT_COUNT_ATTRIBUTE, count);
+            }
+        } catch (BlizzardImportRefusedException e) {
+            log.warn("World of Warcraft import refused for user {}: {}", user.getId(), e.reason());
+            String code = e.reason() == BlizzardImportRefusedException.Reason.OTHER_ACCOUNT
+                ? "battlenet_stats_mismatch" : "battlenet_stats_unavailable";
+            throw new OAuth2AuthenticationException(new OAuth2Error(code));
+        } catch (RuntimeException e) {
+            log.warn("World of Warcraft import failed for user {}: {}", user.getId(), e.getClass().getSimpleName());
+            throw new OAuth2AuthenticationException(new OAuth2Error("battlenet_stats_failed"));
+        }
+        return existingUser;
+    }
+
+    /**
+     * The osu! link of a member already logged in with Twitch: the account the token reads ({@code GET /me}) is left
+     * as a pending link in the request; it is written by TwitchLoginSuccessHandler, the only one that gets the refresh
+     * token. Nothing is written here and no token reaches a log. Not transactional, see {@link #loadUser}.
+     */
+    private OAuth2User handleOsuLink(OAuth2UserRequest userRequest) {
+        Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
+        if (currentAuth == null || !(currentAuth.getPrincipal() instanceof CatapultOAuth2User existingUser)) {
+            log.error("OSU link without an authenticated Twitch session");
+            throw new OAuth2AuthenticationException(new OAuth2Error("unauthorized"));
+        }
+        OsuLinkService links = osuLinks.getIfAvailable();
+        if (links == null) {
+            throw new OAuth2AuthenticationException(new OAuth2Error("osu_unavailable"));
+        }
+        try {
+            OsuLinkService.PendingLink pending = links.check(userRequest.getAccessToken().getTokenValue());
+            if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes web) {
+                web.getRequest().setAttribute(OsuLinkService.PENDING_ATTRIBUTE, pending);
+            }
+        } catch (OsuLinkService.RefusedException e) {
+            log.warn("osu! link refused for user {}: {}", existingUser.getUserAccount().getId(), e.reason());
+            throw new OAuth2AuthenticationException(new OAuth2Error(e.reason().code()));
+        }
+        return existingUser;
+    }
+
+    /**
+     * The Bungie.net link of a member already logged in with Twitch: the token's account is checked (the account
+     * Bungie says the token reads must be the one its answer named) and left as a pending link in the request; it is
+     * written by TwitchLoginSuccessHandler, the only one that gets the refresh token. Nothing is written here and no
+     * token reaches a log: failures are logged by their type only. Not transactional, see {@link #loadUser}.
+     */
+    private OAuth2User handleBungieLink(OAuth2UserRequest userRequest) {
+        Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
+        if (currentAuth == null || !(currentAuth.getPrincipal() instanceof CatapultOAuth2User existingUser)) {
+            log.error("BUNGIE link without an authenticated Twitch session");
+            throw new OAuth2AuthenticationException(new OAuth2Error("unauthorized"));
+        }
+        BungieLinkService links = bungieLinks.getIfAvailable();
+        if (links == null) {
+            throw new OAuth2AuthenticationException(new OAuth2Error("bungie_unavailable"));
+        }
+        try {
+            BungieLinkService.PendingLink pending = links.check(userRequest.getAccessToken().getTokenValue(),
+                userRequest.getAdditionalParameters());
+            if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes web) {
+                web.getRequest().setAttribute(BungieLinkService.PENDING_ATTRIBUTE, pending);
+            }
+        } catch (BungieLinkService.RefusedException e) {
+            log.warn("Bungie link refused for user {}: {}", existingUser.getUserAccount().getId(), e.reason());
+            throw new OAuth2AuthenticationException(new OAuth2Error(e.reason().code()));
+        }
         return existingUser;
     }
 

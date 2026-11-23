@@ -5,6 +5,8 @@ import fr.enimaloc.catapult.common.dto.DegradedStatusDto;
 import fr.enimaloc.catapult.common.dto.InvitePageData;
 import fr.enimaloc.catapult.common.dto.UserInfoResponse;
 import fr.enimaloc.catapult.common.dto.TokenResponse;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantDto;
+import fr.enimaloc.catapult.common.dto.admin.BattleNetGameVariantRequest;
 import fr.enimaloc.catapult.common.dto.admin.BgsCallRequest;
 import fr.enimaloc.catapult.common.dto.admin.BgsCallResult;
 import fr.enimaloc.catapult.common.dto.admin.BgsMethodDto;
@@ -103,6 +105,12 @@ import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
+import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
+import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
+import fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent;
+import fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent;
+import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
+import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftEnrollEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
@@ -168,6 +176,7 @@ public class MockApiService implements ApiService {
     private static final JsonMapper JSON = JsonMapper.builder().build();
     /** What catapult-api answers an action that went through. */
     private static final int NO_CONTENT = 204;
+    private static final int BAD_REQUEST = 400;
 
     /** {@code catapult.mock.degraded=true} shows the degraded banner. */
     @Value("${catapult.mock.degraded:false}")
@@ -195,6 +204,7 @@ public class MockApiService implements ApiService {
     private final MockDtddProposalsStore dtddProposals = new MockDtddProposalsStore();
     /** Application-wide: the game mappings an admin edits are the same for every mock session. */
     private final MockGameMappingsStore gameMappings = new MockGameMappingsStore();
+    private final MockBattleNetGameVariantsStore battleNetGameVariants = new MockBattleNetGameVariantsStore();
     private final MockDtddCachesStore dtddCaches = new MockDtddCachesStore();
     private final MockEmergencyStore emergency = new MockEmergencyStore(Clock.systemUTC());
     private final MockRateLimitsStore rateLimits = new MockRateLimitsStore(Clock.systemUTC());
@@ -581,6 +591,267 @@ public class MockApiService implements ApiService {
         return currentData().getEpicLink();
     }
 
+    // The key is never logged, in the mock either.
+    @Override
+    public int saveSpeedrunUsername(String username, String speedrunName) {
+        log.trace("saveSpeedrunUsername({}, {})", username, speedrunName);
+        return speedrunChanged(username, data -> data.saveSpeedrunUsername(speedrunName));
+    }
+
+    @Override
+    public int deleteSpeedrunUsername(String username) {
+        log.trace("deleteSpeedrunUsername({})", username);
+        return speedrunChanged(username, MockData::deleteSpeedrunUsername);
+    }
+
+    @Override
+    public int saveSpeedrunApiKey(String username, String apiKey) {
+        log.trace("saveSpeedrunApiKey({})", username);
+        return speedrunChanged(username, MockData::saveSpeedrunKey);
+    }
+
+    @Override
+    public int deleteSpeedrunApiKey(String username) {
+        log.trace("deleteSpeedrunApiKey({})", username);
+        return speedrunChanged(username, MockData::deleteSpeedrunKey);
+    }
+
+    private int speedrunChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(SpeedrunAccountChangedEvent.of(username, data.speedrunData()));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public int saveRetroAchievementsUsername(String username, String raName) {
+        log.trace("saveRetroAchievementsUsername({}, {})", username, raName);
+        return retroAchievementsChanged(username, data -> data.saveRetroAchievementsUsername(raName));
+    }
+
+    @Override
+    public int deleteRetroAchievementsUsername(String username) {
+        log.trace("deleteRetroAchievementsUsername({})", username);
+        return retroAchievementsChanged(username, MockData::deleteRetroAchievementsUsername);
+    }
+
+    @Override
+    public int saveRetroAchievementsApiKey(String username, String apiKey) {
+        log.trace("saveRetroAchievementsApiKey({})", username);
+        return retroAchievementsChanged(username, MockData::saveRetroAchievementsKey);
+    }
+
+    @Override
+    public int deleteRetroAchievementsApiKey(String username) {
+        log.trace("deleteRetroAchievementsApiKey({})", username);
+        return retroAchievementsChanged(username, MockData::deleteRetroAchievementsKey);
+    }
+
+    /** Like catapult-api: a Riot ID gameName#tagLine on a known platform; the game name "ghost" is unknown. */
+    @Override
+    public int saveRiotAccount(String username, String riotId, String platform) {
+        log.trace("saveRiotAccount({}, {}, {})", username, riotId, platform);
+        String id = riotId == null ? "" : riotId.strip();
+        int hash = id.lastIndexOf('#');
+        if (hash < 3 || hash > id.length() - 4 || hash < id.length() - 6
+                || !fr.enimaloc.catapult.controller.IntegrationCards.RIOT_PLATFORMS.contains(platform)) {
+            return BAD_REQUEST;
+        }
+        if (id.substring(0, hash).strip().equalsIgnoreCase("ghost")) {
+            return BAD_REQUEST;
+        }
+        return riotChanged(username, data -> data.saveRiotAccount(id, platform));
+    }
+
+    @Override
+    public int deleteRiotAccount(String username) {
+        log.trace("deleteRiotAccount({})", username);
+        return riotChanged(username, MockData::deleteRiotAccount);
+    }
+
+    private int riotChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent.of(username,
+                data.riotData()));
+        return NO_CONTENT;
+    }
+
+    /** Like catapult-api: 2 to 32 letters, digits, dots, dashes or underscores; the nickname "ghost" is unknown. */
+    @Override
+    public int saveFaceitNickname(String username, String nickname) {
+        log.trace("saveFaceitNickname({}, {})", username, nickname);
+        String name = nickname == null ? "" : nickname.strip();
+        if (!name.matches("[\\p{L}\\p{N}._-]{2,32}") || name.equalsIgnoreCase("ghost")) {
+            return BAD_REQUEST;
+        }
+        return faceitChanged(username, data -> data.saveFaceitNickname(name));
+    }
+
+    @Override
+    public int deleteFaceitNickname(String username) {
+        log.trace("deleteFaceitNickname({})", username);
+        return faceitChanged(username, MockData::deleteFaceitNickname);
+    }
+
+    private int faceitChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent.of(username,
+                data.faceitData()));
+        return NO_CONTENT;
+    }
+
+    /** Like catapult-api: a Minecraft name or UUID; the name "ghost" is unknown, "stranger" never joined Hypixel. */
+    @Override
+    public int saveHypixelAccount(String username, String player) {
+        log.trace("saveHypixelAccount({}, {})", username, player);
+        String raw = player == null ? "" : player.strip();
+        boolean uuid = raw.matches("[0-9a-fA-F]{32}|[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}");
+        if (!uuid && !raw.matches("[A-Za-z0-9_]{3,16}")) {
+            return BAD_REQUEST;
+        }
+        if (raw.equalsIgnoreCase("ghost") || raw.equalsIgnoreCase("stranger")) {
+            return BAD_REQUEST;
+        }
+        String id = uuid ? raw.replace("-", "").toLowerCase(java.util.Locale.ROOT)
+                : java.util.UUID.nameUUIDFromBytes(raw.toLowerCase(java.util.Locale.ROOT)
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString().replace("-", "");
+        return hypixelChanged(username, data -> data.saveHypixelAccount(uuid ? id : raw, id));
+    }
+
+    @Override
+    public int deleteHypixelAccount(String username) {
+        log.trace("deleteHypixelAccount({})", username);
+        return hypixelChanged(username, MockData::deleteHypixelAccount);
+    }
+
+    /**
+     * Like catapult-api: a known game and a tag of Supercell's characters ({@code #} optional, O read as 0); the tag
+     * {@code #000} is no player's.
+     */
+    @Override
+    public int saveSupercellAccount(String username, String game, String tag) {
+        log.trace("saveSupercellAccount({}, {}, {})", username, game, tag);
+        String body = tag == null ? "" : tag.replaceAll("\\s+", "").toUpperCase(java.util.Locale.ROOT).replace('O', '0');
+        body = body.startsWith("#") ? body.substring(1) : body;
+        if (!MockData.SUPERCELL_GAMES.contains(game) || !SUPERCELL_TAG.matcher(body).matches()
+                || body.equals("000")) {
+            return BAD_REQUEST;
+        }
+        String normalized = "#" + body;
+        return supercellChanged(username, data -> data.saveSupercellAccount(game, normalized));
+    }
+
+    @Override
+    public int deleteSupercellAccount(String username, String game) {
+        log.trace("deleteSupercellAccount({}, {})", username, game);
+        if (!MockData.SUPERCELL_GAMES.contains(game)) {
+            return BAD_REQUEST;
+        }
+        return supercellChanged(username, data -> data.deleteSupercellAccount(game));
+    }
+
+    /** The characters of a Supercell tag, after its {@code #}. */
+    private static final java.util.regex.Pattern SUPERCELL_TAG = java.util.regex.Pattern.compile("[0289PYLQGRJCUV]{3,12}");
+
+    private int supercellChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent.of(username,
+                data.supercellData()));
+        return NO_CONTENT;
+    }
+
+    private int hypixelChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(fr.enimaloc.catapult.event.hypixel.HypixelAccountChangedEvent.of(username,
+                data.hypixelData()));
+        return NO_CONTENT;
+    }
+
+    private int retroAchievementsChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(RetroAchievementsAccountChangedEvent.of(username, data.retroAchievementsData()));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public int saveBlizzardRegion(String username, String region) {
+        log.trace("saveBlizzardRegion({}, {})", username, region);
+        if (!MockData.BLIZZARD_REGIONS.contains(region)) {
+            return BAD_REQUEST;
+        }
+        return blizzardChanged(username, data -> data.saveBlizzardRegion(region));
+    }
+
+    @Override
+    public int saveBlizzardWowMain(String username, String region, long characterId) {
+        log.trace("saveBlizzardWowMain({}, {}, {})", username, region, characterId);
+        MockData data = currentData();
+        if (!data.saveBlizzardWowMain(region + ":" + characterId)) {
+            return BAD_REQUEST;
+        }
+        eventPublisher.publishEvent(BlizzardAccountChangedEvent.of(username, data.blizzardStatsData()));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public int deleteBlizzardWowCharacters(String username) {
+        log.trace("deleteBlizzardWowCharacters({})", username);
+        return blizzardChanged(username, MockData::deleteBlizzardWowCharacters);
+    }
+
+    @Override
+    public int deleteBungieLink(String username) {
+        log.trace("deleteBungieLink({})", username);
+        MockData data = currentData();
+        data.unlinkBungie();
+        eventPublisher.publishEvent(BungieAccountChangedEvent.of(username, data.bungieData()));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public int saveChessUsername(String username, String site, String name) {
+        log.trace("saveChessUsername({}, {}, {})", username, site, name);
+        // "gone" stands for a name the site does not know
+        if (name == null || name.isBlank() || "gone".equalsIgnoreCase(name.strip())) {
+            return BAD_REQUEST;
+        }
+        return chessChanged(username, data -> data.saveChessUsername(site, name.strip()));
+    }
+
+    @Override
+    public int deleteChessUsername(String username, String site) {
+        log.trace("deleteChessUsername({}, {})", username, site);
+        return chessChanged(username, data -> data.deleteChessUsername(site));
+    }
+
+    private int chessChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(ChessAccountChangedEvent.of(username, data.chessData()));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public int deleteOsuLink(String username) {
+        log.trace("deleteOsuLink({})", username);
+        MockData data = currentData();
+        data.unlinkOsu();
+        eventPublisher.publishEvent(OsuAccountChangedEvent.of(username, data.osuData()));
+        return NO_CONTENT;
+    }
+
+    private int blizzardChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(BlizzardAccountChangedEvent.of(username, data.blizzardStatsData()));
+        return NO_CONTENT;
+    }
+
     @Override
     public int epicResend(String username) {
         log.trace("epicResend({})", username);
@@ -946,6 +1217,32 @@ public class MockApiService implements ApiService {
     public ApiClient.Result<GameMappingResult> adminDeleteGameMapping(UUID id, boolean applyLive) {
         log.trace("adminDeleteGameMapping({}, {})", id, applyLive);
         return gameMappings.delete(id, applyLive);
+    }
+
+    @Override
+    public List<BattleNetGameVariantDto> adminBattleNetGameVariants() {
+        log.trace("adminBattleNetGameVariants()");
+        return battleNetGameVariants.list();
+    }
+
+    @Override
+    public ApiClient.Result<BattleNetGameVariantDto> adminCreateBattleNetGameVariant(
+            BattleNetGameVariantRequest request) {
+        log.trace("adminCreateBattleNetGameVariant({})", request);
+        return battleNetGameVariants.create(request, "admin");
+    }
+
+    @Override
+    public ApiClient.Result<BattleNetGameVariantDto> adminUpdateBattleNetGameVariant(
+            UUID id, BattleNetGameVariantRequest request) {
+        log.trace("adminUpdateBattleNetGameVariant({}, {})", id, request);
+        return battleNetGameVariants.update(id, request, "admin");
+    }
+
+    @Override
+    public ApiClient.Result<Void> adminDeleteBattleNetGameVariant(UUID id) {
+        log.trace("adminDeleteBattleNetGameVariant({})", id);
+        return battleNetGameVariants.delete(id);
     }
 
     @Override
@@ -1891,6 +2188,44 @@ public class MockApiService implements ApiService {
     public int adminRefreshApiKeys(ApiKeyProvider provider) {
         log.trace("adminRefreshApiKeys({})", provider);
         return apiKeys.refresh();
+    }
+
+    // The secret is never logged.
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData adminOsuCredentials() {
+        log.trace("adminOsuCredentials()");
+        return apiKeys.osu();
+    }
+
+    @Override
+    public int adminSaveOsuCredentials(String clientId, String clientSecret) {
+        log.trace("adminSaveOsuCredentials()");
+        return apiKeys.saveOsu(clientId, clientSecret);
+    }
+
+    @Override
+    public int adminDeleteOsuCredentials() {
+        log.trace("adminDeleteOsuCredentials()");
+        return apiKeys.deleteOsu();
+    }
+
+    // The secrets are never logged.
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData adminBungieCredentials() {
+        log.trace("adminBungieCredentials()");
+        return apiKeys.bungie();
+    }
+
+    @Override
+    public int adminSaveBungieCredentials(String clientId, String clientSecret, String apiKey) {
+        log.trace("adminSaveBungieCredentials()");
+        return apiKeys.saveBungie(clientId, clientSecret, apiKey);
+    }
+
+    @Override
+    public int adminDeleteBungieCredentials() {
+        log.trace("adminDeleteBungieCredentials()");
+        return apiKeys.deleteBungie();
     }
 
     @Override

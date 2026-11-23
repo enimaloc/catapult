@@ -106,6 +106,26 @@ class ChannelDashboardAssemblerTest {
             mock(fr.enimaloc.catapult.service.ankama.AnkamaLinkStateService.class);
     private final fr.enimaloc.catapult.service.epic.EpicLinkStateService epicStates =
             mock(fr.enimaloc.catapult.service.epic.EpicLinkStateService.class);
+    private final fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService speedrunAccounts =
+            mock(fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService.class);
+    private final fr.enimaloc.catapult.service.blizzard.BlizzardAccountService blizzardAccounts =
+            mock(fr.enimaloc.catapult.service.blizzard.BlizzardAccountService.class);
+    private final fr.enimaloc.catapult.service.faceit.FaceitAccountService faceitAccounts =
+            mock(fr.enimaloc.catapult.service.faceit.FaceitAccountService.class);
+    private final fr.enimaloc.catapult.service.hypixel.HypixelAccountService hypixelAccounts =
+            mock(fr.enimaloc.catapult.service.hypixel.HypixelAccountService.class);
+    private final fr.enimaloc.catapult.service.supercell.SupercellAccountService supercellAccounts =
+            mock(fr.enimaloc.catapult.service.supercell.SupercellAccountService.class);
+    private final fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinks =
+            mock(fr.enimaloc.catapult.service.bungie.BungieLinkService.class);
+    private final fr.enimaloc.catapult.service.riot.RiotAccountService riotAccounts =
+            mock(fr.enimaloc.catapult.service.riot.RiotAccountService.class);
+    private final fr.enimaloc.catapult.service.osu.OsuLinkService osuLinks =
+            mock(fr.enimaloc.catapult.service.osu.OsuLinkService.class);
+    private final fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService raAccounts =
+            mock(fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService.class);
+    private final fr.enimaloc.catapult.service.chess.ChessAccountService chessAccounts =
+            mock(fr.enimaloc.catapult.service.chess.ChessAccountService.class);
     private final MinecraftLinkStateService minecraftStates =
             new MinecraftLinkStateService(minecraft, minecraftGate, minecraftAccounts);
     private final TwitchatWidgetSettingsService twitchat = mock(TwitchatWidgetSettingsService.class);
@@ -137,7 +157,9 @@ class ChannelDashboardAssemblerTest {
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.binding.schedule.CustomBindingScheduleService.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumService.class)), categoryCache,
-                streamTitle, dropsGate, dropsCatalog);
+                streamTitle, dropsGate, dropsCatalog, speedrunAccounts, raAccounts, java.util.Optional.of(blizzardAccounts),
+                bungieLinks, riotAccounts, faceitAccounts, chessAccounts, osuLinks, hypixelAccounts,
+                supercellAccounts);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }
@@ -522,6 +544,161 @@ class ChannelDashboardAssemblerTest {
             assertThat(assembler().page(owner, owner, "streamer", 0, null, null).epic())
                     .isEqualTo(new fr.enimaloc.catapult.common.dto.channel.EpicData("PENDING", "Streamer", "CatapultBot"));
             assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).epic()).isNull();
+        }
+
+        @Test
+        void dashboardCarriesTheSpeedrunAccountForTheOwnerOnly() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.SpeedrunData("n1", true, false, "KeyOwner",
+                    "KeyOwner", "https://www.speedrun.com/users/KeyOwner", "api_key");
+            when(speedrunAccounts.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).speedrun()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).speedrun()).isNull();
+            verify(speedrunAccounts, never()).data(moderator);
+        }
+
+        @Test
+        void dashboardNeverCarriesTheKey() {
+            when(speedrunAccounts.data(owner)).thenReturn(new fr.enimaloc.catapult.common.dto.channel.SpeedrunData(
+                    "n1", true, false, "KeyOwner", "KeyOwner", "https://www.speedrun.com/users/KeyOwner", "api_key"));
+
+            // The card's data is the names and flags only: no component could hold the key or its ciphertext.
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.SpeedrunData.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("declaredUsername", "hasApiKey", "keyInvalid", "keyAccountName", "resolvedName",
+                            "resolvedUrl", "resolvedSource");
+        }
+
+        @Test
+        void dashboardCarriesTheRetroAchievementsAccountForTheOwnerOnly() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData("Bob",
+                    "https://retroachievements.org/user/Bob", true, false, true);
+            when(raAccounts.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).retroAchievements())
+                    .isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).retroAchievements()).isNull();
+            verify(raAccounts, never()).data(moderator);
+        }
+
+        @Test
+        void retroAchievementsDashboardDataNeverCarriesTheKey() {
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("username", "profileUrl", "hasApiKey", "keyInvalid", "poolAvailable");
+        }
+
+        @Test
+        void dashboardCarriesTheBlizzardSettingsForTheOwnerOnly() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(true, "eu", true,
+                    List.of(new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData.WowCharacterOption(
+                            "eu:1", "Thrall")), "eu:1", true, java.time.Instant.parse("2026-11-20T10:00:00Z"));
+            when(blizzardAccounts.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).blizzardStats()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).blizzardStats()).isNull();
+            verify(blizzardAccounts, never()).data(moderator);
+        }
+
+        @Test
+        void dashboardCarriesTheOsuLinkForTheOwnerOnly_withoutAnyToken() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.OsuAccountData(true, "Inspector", false, true,
+                    java.time.Instant.parse("2026-11-20T10:00:00Z"));
+            when(osuLinks.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).osu()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).osu()).isNull();
+            verify(osuLinks, never()).data(moderator);
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.OsuAccountData.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("linked", "account", "invalid", "available", "linkedAt");
+        }
+
+        @Test
+        void dashboardCarriesTheBungieLinkForTheOwnerOnly_withoutAnyToken() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.BungieAccountData(true, "G#0042", "steam", false,
+                    true, java.time.Instant.parse("2026-11-20T10:00:00Z"));
+            when(bungieLinks.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).bungie()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).bungie()).isNull();
+            verify(bungieLinks, never()).data(moderator);
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.BungieAccountData.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("linked", "account", "platform", "invalid", "available", "linkedAt");
+        }
+
+        @Test
+        void dashboardCarriesTheRiotSettingsForTheOwnerOnly() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.RiotData("Catapult#EUW", "euw1", true);
+            when(riotAccounts.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).riot()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).riot()).isNull();
+            verify(riotAccounts, never()).data(moderator);
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.RiotData.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("riotId", "platform", "available");
+        }
+
+        @Test
+        void dashboardCarriesTheFaceitSettingsForTheOwnerOnly() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.FaceitData("Catapult",
+                    "https://www.faceit.com/en/players/Catapult", true);
+            when(faceitAccounts.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).faceit()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).faceit()).isNull();
+            verify(faceitAccounts, never()).data(moderator);
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.FaceitData.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("nickname", "profileUrl", "available");
+        }
+
+        @Test
+        void dashboardCarriesTheHypixelSettingsForTheOwnerOnly() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.HypixelData("Notch",
+                    "069a79f444e94726a5befca90e38aaf5", true);
+            when(hypixelAccounts.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).hypixel()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).hypixel()).isNull();
+            verify(hypixelAccounts, never()).data(moderator);
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.HypixelData.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("name", "uuid", "available");
+        }
+
+        @Test
+        void dashboardCarriesTheSupercellSettingsForTheOwnerOnly() {
+            var game = new fr.enimaloc.catapult.common.dto.channel.SupercellData.Game("#2PP", "Chief", true);
+            var account = new fr.enimaloc.catapult.common.dto.channel.SupercellData(game, null, null);
+            when(supercellAccounts.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).supercell()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).supercell()).isNull();
+            verify(supercellAccounts, never()).data(moderator);
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.SupercellData.Game.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("tag", "name", "available");
+        }
+
+        @Test
+        void blizzardDashboardDataNeverCarriesInternalIdsOrTokens() {
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("linked", "region", "wowImported", "characters", "wowMainKey", "available",
+                            "wowImportedAt");
+        }
+
+        @Test
+        void dashboardCarriesTheChessAccountsForTheOwnerOnly() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.ChessData("hikaru", "DrNykterstein");
+            when(chessAccounts.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).chess()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).chess()).isNull();
+            verify(chessAccounts, never()).data(moderator);
         }
 
         @Test

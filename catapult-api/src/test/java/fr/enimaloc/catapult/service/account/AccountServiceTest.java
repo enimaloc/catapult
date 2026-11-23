@@ -27,6 +27,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
@@ -56,6 +57,9 @@ class AccountServiceTest {
     @Mock private BotToggleService botToggleService;
     @Mock private TwitchChatService twitchChatService;
     @Mock private EventSubService twitchEventSubService;
+    @Mock private fr.enimaloc.catapult.service.enrichment.EnrichmentCache enrichmentCache;
+    @Mock private fr.enimaloc.catapult.service.enrichment.bungie.BungieTokenService bungieTokens;
+    @Mock private fr.enimaloc.catapult.service.enrichment.osu.OsuTokenService osuTokens;
     @InjectMocks private AccountService accountService;
 
     private UserAccount account;
@@ -124,6 +128,25 @@ class AccountServiceTest {
         order.verify(twitchatActionTokenRepository).deleteByUserId(account.getId());
         order.verify(twitchatEventActionService).deleteAllOfUser(account);
         order.verify(userAccountRepository).delete(account);
+    }
+
+    @Test
+    void unlinkingSteamOrXboxEvictsTheStats() {
+        ReflectionTestUtils.setField(accountService, "xboxUserTokenService", Optional.empty());
+        accountService.disconnectProvider(account, OAuthToken.Provider.STEAM);
+        accountService.disconnectProvider(account, OAuthToken.Provider.XBOX);
+
+        verify(enrichmentCache, times(2)).evictUser(account.getId());
+    }
+
+    @Test
+    void accountDeletionEvictsEnrichment() {
+        when(oAuthTokenRepository.findByUserAndProvider(account, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.empty());
+
+        accountService.deleteAccountImmediately(account);
+
+        verify(enrichmentCache).evictUser(account.getId());
     }
 
     @Test

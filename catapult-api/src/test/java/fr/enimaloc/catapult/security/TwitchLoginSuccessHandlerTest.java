@@ -42,6 +42,10 @@ class TwitchLoginSuccessHandlerTest {
     @Mock JwtService jwtService;
     @Mock AuthCodeStore codeStore;
 
+    @Mock org.springframework.beans.factory.ObjectProvider<fr.enimaloc.catapult.service.bungie.BungieLinkService> bungieLinkProvider;
+    @Mock fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinks;
+    @Mock org.springframework.beans.factory.ObjectProvider<fr.enimaloc.catapult.service.osu.OsuLinkService> osuLinkProvider;
+    @Mock fr.enimaloc.catapult.service.osu.OsuLinkService osuLinks;
     @InjectMocks TwitchLoginSuccessHandler handler;
 
     private MockHttpServletRequest request;
@@ -51,6 +55,9 @@ class TwitchLoginSuccessHandlerTest {
 
     @BeforeEach
     void setup() {
+        // two providers of one raw type: each is set by name, never left to injection by type
+        ReflectionTestUtils.setField(handler, "bungieLinks", bungieLinkProvider);
+        ReflectionTestUtils.setField(handler, "osuLinks", osuLinkProvider);
         handler.init();
         request = new MockHttpServletRequest();
         response = new MockHttpServletResponse();
@@ -234,6 +241,52 @@ class TwitchLoginSuccessHandlerTest {
     }
 
     @Test
+    void userTokenIsForgottenAfterImport() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("battlenet-stats");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(authorizedClientRepository).removeAuthorizedClient("battlenet-stats", authToken, request, response);
+        verify(authorizedClientRepository, never()).removeAuthorizedClient(eq("battlenet"), any(), any(), any());
+        verify(authorizedClientRepository, never()).loadAuthorizedClient(any(), any(), any());
+        verify(oAuthTokenRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("https://web.example.com/channel/jeb_?imported=wow#api");
+    }
+
+    @Test
+    void anImportThatFoundNoCharacterIsToldApart() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        request.setAttribute(TwitchLoginSuccessHandler.WOW_IMPORT_COUNT_ATTRIBUTE, 0);
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("battlenet-stats");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("https://web.example.com/channel/jeb_?imported=wow-empty#api");
+    }
+
+    @Test
+    void userTokenIsForgottenEvenWithoutTheWeb() throws Exception {
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("battlenet-stats");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(authorizedClientRepository).removeAuthorizedClient("battlenet-stats", authToken, request, response);
+        assertThat(response.getRedirectedUrl()).isEqualTo("/dashboard");
+    }
+
+    @Test
     void epicAuthorizedClient_isRemovedAfterTheLink() throws Exception {
         ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
         userAccount.setTwitchUsername("jeb_");
@@ -292,5 +345,146 @@ class TwitchLoginSuccessHandlerTest {
         when(jwtService.generate(catapultUser)).thenReturn("jwt");
         when(codeStore.issue("jwt")).thenReturn("one-time");
         return authToken;
+    }
+
+    private org.springframework.security.oauth2.client.OAuth2AuthorizedClient bungieClient(String refresh) {
+        var registration = org.springframework.security.oauth2.client.registration.ClientRegistration
+                .withRegistrationId("bungie").clientId("12345").redirectUri("http://localhost/cb")
+                .authorizationGrantType(org.springframework.security.oauth2.core.AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationUri("https://www.bungie.net/en/OAuth/Authorize")
+                .tokenUri("https://www.bungie.net/platform/app/oauth/token/").build();
+        var access = new org.springframework.security.oauth2.core.OAuth2AccessToken(
+                org.springframework.security.oauth2.core.OAuth2AccessToken.TokenType.BEARER, "access",
+                java.time.Instant.now(), java.time.Instant.now().plusSeconds(3600));
+        return new org.springframework.security.oauth2.client.OAuth2AuthorizedClient(registration, "42", access,
+                refresh == null ? null : new org.springframework.security.oauth2.core.OAuth2RefreshToken(refresh,
+                        java.time.Instant.now()));
+    }
+
+    @Test
+    void bungieLink_isWrittenWithItsRefreshToken_andSpringsCopyIsForgotten() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("bungie");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("bungie", authToken, request))
+                .thenReturn(bungieClient("refresh-token"));
+        when(bungieLinkProvider.getIfAvailable()).thenReturn(bungieLinks);
+        var pending = new fr.enimaloc.catapult.service.bungie.BungieLinkService.PendingLink("42", "G#0042", 3, "461",
+                java.time.Instant.now());
+        request.setAttribute(fr.enimaloc.catapult.service.bungie.BungieLinkService.PENDING_ATTRIBUTE, pending);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(bungieLinks).complete(eq(userAccount), eq(pending), eq("refresh-token"), eq("access"), any());
+        verify(authorizedClientRepository).removeAuthorizedClient("bungie", authToken, request, response);
+        verify(oAuthTokenRepository, never()).save(any());
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("https://web.example.com/channel/jeb_?linked=bungie#api");
+    }
+
+    @Test
+    void bungieLink_withoutACheckedLoginOrARefreshToken_isAFailedLink_andTheTokenIsStillForgotten() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("bungie");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("bungie", authToken, request))
+                .thenReturn(bungieClient(null));
+        when(bungieLinkProvider.getIfAvailable()).thenReturn(bungieLinks);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(bungieLinks, never()).complete(any(), any(), any(), any(), any());
+        verify(authorizedClientRepository).removeAuthorizedClient("bungie", authToken, request, response);
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("https://web.example.com/channel/jeb_?error=bungie_failed#api");
+    }
+
+    @Test
+    void bungieLink_aFailedWrite_isAFailedLink() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("bungie");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("bungie", authToken, request))
+                .thenReturn(bungieClient("refresh-token"));
+        when(bungieLinkProvider.getIfAvailable()).thenReturn(bungieLinks);
+        var pending = new fr.enimaloc.catapult.service.bungie.BungieLinkService.PendingLink("42", null, null, null,
+                java.time.Instant.now());
+        request.setAttribute(fr.enimaloc.catapult.service.bungie.BungieLinkService.PENDING_ATTRIBUTE, pending);
+        org.mockito.Mockito.doThrow(new IllegalStateException("refresh-token")).when(bungieLinks)
+                .complete(any(), any(), any(), any(), any());
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(response.getRedirectedUrl()).contains("error=bungie_failed");
+    }
+
+    private org.springframework.security.oauth2.client.OAuth2AuthorizedClient osuClient(String refresh) {
+        var registration = org.springframework.security.oauth2.client.registration.ClientRegistration
+                .withRegistrationId("osu").clientId("12345").redirectUri("http://localhost/cb")
+                .authorizationGrantType(org.springframework.security.oauth2.core.AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationUri("https://osu.ppy.sh/oauth/authorize")
+                .tokenUri("https://osu.ppy.sh/oauth/token").build();
+        var access = new org.springframework.security.oauth2.core.OAuth2AccessToken(
+                org.springframework.security.oauth2.core.OAuth2AccessToken.TokenType.BEARER, "access",
+                java.time.Instant.now(), java.time.Instant.now().plusSeconds(86_400));
+        return new org.springframework.security.oauth2.client.OAuth2AuthorizedClient(registration, "42", access,
+                refresh == null ? null : new org.springframework.security.oauth2.core.OAuth2RefreshToken(refresh,
+                        java.time.Instant.now()));
+    }
+
+    @Test
+    void osuLink_isWrittenWithItsRefreshToken_andSpringsCopyIsForgotten() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("osu");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("osu", authToken, request))
+                .thenReturn(osuClient("refresh-token"));
+        when(osuLinkProvider.getIfAvailable()).thenReturn(osuLinks);
+        var pending = new fr.enimaloc.catapult.service.osu.OsuLinkService.PendingLink(42L, "Inspector", "osu");
+        request.setAttribute(fr.enimaloc.catapult.service.osu.OsuLinkService.PENDING_ATTRIBUTE, pending);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(osuLinks).complete(eq(userAccount), eq(pending), eq("refresh-token"), eq("access"), any());
+        verify(authorizedClientRepository).removeAuthorizedClient("osu", authToken, request, response);
+        verify(oAuthTokenRepository, never()).save(any());
+        verifyNoInteractions(bungieLinks);
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("https://web.example.com/channel/jeb_?linked=osu#api");
+    }
+
+    @Test
+    void osuLink_withoutARefreshToken_orAFailedWrite_isAFailedLink_andTheTokenIsStillForgotten() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("osu");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("osu", authToken, request))
+                .thenReturn(osuClient(null), osuClient("refresh-token"));
+        when(osuLinkProvider.getIfAvailable()).thenReturn(osuLinks);
+        var pending = new fr.enimaloc.catapult.service.osu.OsuLinkService.PendingLink(42L, null, null);
+        request.setAttribute(fr.enimaloc.catapult.service.osu.OsuLinkService.PENDING_ATTRIBUTE, pending);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(osuLinks, never()).complete(any(), any(), any(), any(), any());
+        verify(authorizedClientRepository).removeAuthorizedClient("osu", authToken, request, response);
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("https://web.example.com/channel/jeb_?error=osu_failed#api");
+
+        response = new MockHttpServletResponse();
+        org.mockito.Mockito.doThrow(new IllegalStateException("refresh-token")).when(osuLinks)
+                .complete(any(), any(), any(), any(), any());
+        handler.onAuthenticationSuccess(request, response, authToken);
+        assertThat(response.getRedirectedUrl()).contains("error=osu_failed");
     }
 }

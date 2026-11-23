@@ -262,7 +262,17 @@ public class ChannelFixture {
                 new ChannelAccountActions(mock(AccountService.class), publisher),
                 mock(TwitchatWidgetSettingsService.class), mock(TwitchatEventActionService.class), dispatcher,
                 mock(fr.enimaloc.catapult.service.emergency.EmergencyViews.class),
-                mock(fr.enimaloc.catapult.service.emergency.EmergencyStopService.class));
+                mock(fr.enimaloc.catapult.service.emergency.EmergencyStopService.class),
+                mock(fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService.class),
+                mock(fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService.class),
+                Optional.empty(),
+                mock(fr.enimaloc.catapult.service.bungie.BungieLinkService.class),
+                mock(fr.enimaloc.catapult.service.riot.RiotAccountService.class),
+                mock(fr.enimaloc.catapult.service.faceit.FaceitAccountService.class),
+                mock(fr.enimaloc.catapult.service.chess.ChessAccountService.class),
+                mock(fr.enimaloc.catapult.service.osu.OsuLinkService.class),
+                mock(fr.enimaloc.catapult.service.hypixel.HypixelAccountService.class),
+                mock(fr.enimaloc.catapult.service.supercell.SupercellAccountService.class));
     }
 
     /** The category events and Twitch writes, in order. */

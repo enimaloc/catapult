@@ -19,6 +19,16 @@ import fr.enimaloc.catapult.event.binding.GameChangedEvent;
 import fr.enimaloc.catapult.event.ankama.AnkamaLinkEvent;
 import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
+import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
+import fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent;
+import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
+import fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent;
+import fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent;
+import fr.enimaloc.catapult.event.hypixel.HypixelAccountChangedEvent;
+import fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent;
+import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
+import fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent;
+import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
 import fr.enimaloc.catapult.event.steam.SteamConnectionStateEvent;
@@ -158,6 +168,56 @@ public class ChannelEventRedisBridge {
             case ChannelEvents.EPIC_LINK_CHANGED -> {
                 var link = read(data, ChannelEvents.EpicLinkChanged.class);
                 yield List.of(new EpicLinkEvent(login, link.status(), link.displayName(), link.serviceAccountName()));
+            }
+            case ChannelEvents.SPEEDRUN_ACCOUNT_CHANGED -> {
+                var changed = read(data, ChannelEvents.SpeedrunAccountChanged.class);
+                if (changed.account() == null) throw new IllegalArgumentException("no speedrun account");
+                yield List.of(SpeedrunAccountChangedEvent.of(login, changed.account()));
+            }
+            case ChannelEvents.RETROACHIEVEMENTS_ACCOUNT_CHANGED -> {
+                var changed = read(data, ChannelEvents.RetroAchievementsAccountChanged.class);
+                if (changed.account() == null) throw new IllegalArgumentException("no retroachievements account");
+                yield List.of(RetroAchievementsAccountChangedEvent.of(login, changed.account()));
+            }
+            case ChannelEvents.BLIZZARD_ACCOUNT_CHANGED -> {
+                var changed = read(data, ChannelEvents.BlizzardAccountChanged.class);
+                if (changed.account() == null) throw new IllegalArgumentException("no blizzard account");
+                yield List.of(BlizzardAccountChangedEvent.of(login, changed.account()));
+            }
+            case ChannelEvents.BUNGIE_ACCOUNT_CHANGED -> {
+                var changed = read(data, ChannelEvents.BungieAccountChanged.class);
+                if (changed.account() == null) throw new IllegalArgumentException("no bungie account");
+                yield List.of(BungieAccountChangedEvent.of(login, changed.account()));
+            }
+            case ChannelEvents.HYPIXEL_ACCOUNT_CHANGED -> {
+                var changed = read(data, ChannelEvents.HypixelAccountChanged.class);
+                if (changed.account() == null) throw new IllegalArgumentException("no hypixel account");
+                yield List.of(HypixelAccountChangedEvent.of(login, changed.account()));
+            }
+            case ChannelEvents.SUPERCELL_ACCOUNT_CHANGED -> {
+                var changed = read(data, ChannelEvents.SupercellAccountChanged.class);
+                if (changed.account() == null) throw new IllegalArgumentException("no supercell account");
+                yield List.of(SupercellAccountChangedEvent.of(login, changed.account()));
+            }
+            case ChannelEvents.RIOT_ACCOUNT_CHANGED -> {
+                var changed = read(data, ChannelEvents.RiotAccountChanged.class);
+                if (changed.account() == null) throw new IllegalArgumentException("no riot account");
+                yield List.of(RiotAccountChangedEvent.of(login, changed.account()));
+            }
+            case ChannelEvents.FACEIT_ACCOUNT_CHANGED -> {
+                var changed = read(data, ChannelEvents.FaceitAccountChanged.class);
+                if (changed.account() == null) throw new IllegalArgumentException("no faceit account");
+                yield List.of(FaceitAccountChangedEvent.of(login, changed.account()));
+            }
+            case ChannelEvents.CHESS_ACCOUNT_CHANGED -> {
+                var changed = read(data, ChannelEvents.ChessAccountChanged.class);
+                if (changed.account() == null) throw new IllegalArgumentException("no chess account");
+                yield List.of(ChessAccountChangedEvent.of(login, changed.account()));
+            }
+            case ChannelEvents.OSU_ACCOUNT_CHANGED -> {
+                var changed = read(data, ChannelEvents.OsuAccountChanged.class);
+                if (changed.account() == null) throw new IllegalArgumentException("no osu account");
+                yield List.of(OsuAccountChangedEvent.of(login, changed.account()));
             }
             default -> List.of();
         };

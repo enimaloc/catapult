@@ -3,12 +3,15 @@ package fr.enimaloc.catapult.security;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.event.TwitchLoginEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
+import fr.enimaloc.catapult.service.bungie.BungieLinkService;
+import fr.enimaloc.catapult.service.osu.OsuLinkService;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.Authentication;
@@ -35,12 +38,18 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
 
+    /** Request attribute the World of Warcraft import leaves its character count in, for the redirect. */
+    public static final String WOW_IMPORT_COUNT_ATTRIBUTE = "catapult.blizzard.wow-import-count";
+
+
     private final OAuth2AuthorizedClientRepository authorizedClientRepository;
     private final OAuthTokenRepository oAuthTokenRepository;
     private final TokenEncryptionService tokenEncryptionService;
     private final ApplicationEventPublisher eventPublisher;
     private final JwtService jwtService;
     private final AuthCodeStore codeStore;
+    private final ObjectProvider<BungieLinkService> bungieLinks;
+    private final ObjectProvider<OsuLinkService> osuLinks;
 
     @Value("${app.web-url:}")
     private String webUrl;
@@ -89,6 +98,38 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                     response.sendRedirect(channelIntegrationsUrl(catUser));
                     return;
                 }
+            } else if ("battlenet-stats".equals(registrationId)) {
+                // The World of Warcraft import read the characters with this token: it is forgotten at once, and
+                // the card (on the API tab) says the import is done.
+                authorizedClientRepository.removeAuthorizedClient("battlenet-stats", authentication, request, response);
+                if (webUrl != null && !webUrl.isBlank()) {
+                    boolean none = Integer.valueOf(0).equals(request.getAttribute(WOW_IMPORT_COUNT_ATTRIBUTE));
+                    response.sendRedirect(UriComponentsBuilder.fromUriString(channelApiUrl(catUser))
+                            .replaceQueryParam("imported", none ? "wow-empty" : "wow").toUriString());
+                    return;
+                }
+            } else if ("osu".equals(registrationId)) {
+                // The osu! link: CatapultOAuth2UserService read the account and left it pending; its refresh token,
+                // only known here, is written encrypted, then Spring's copy is forgotten at once.
+                boolean linked = completeOsuLink(request, response, authentication, catUser);
+                if (webUrl != null && !webUrl.isBlank()) {
+                    UriComponentsBuilder target = UriComponentsBuilder.fromUriString(channelApiUrl(catUser));
+                    target = linked ? target.replaceQueryParam("linked", "osu")
+                            : target.replaceQueryParam("error", "osu_failed");
+                    response.sendRedirect(target.toUriString());
+                    return;
+                }
+            } else if ("bungie".equals(registrationId)) {
+                // The Bungie.net link: CatapultOAuth2UserService checked the account and left it pending; its
+                // refresh token, only known here, is written encrypted, then Spring's copy is forgotten at once.
+                boolean linked = completeBungieLink(request, response, authentication, catUser);
+                if (webUrl != null && !webUrl.isBlank()) {
+                    UriComponentsBuilder target = UriComponentsBuilder.fromUriString(channelApiUrl(catUser));
+                    target = linked ? target.replaceQueryParam("linked", "bungie")
+                            : target.replaceQueryParam("error", "bungie_failed");
+                    response.sendRedirect(target.toUriString());
+                    return;
+                }
             } else if ("epic".equals(registrationId)) {
                 // Like Battle.net: the bot befriends the account, so the EOS access token is forgotten at once.
                 authorizedClientRepository.removeAuthorizedClient("epic", authentication, request, response);
@@ -114,10 +155,71 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
         delegate.onAuthenticationSuccess(request, response, authentication);
     }
 
+    /** Writes the pending osu! link with its refresh token; false when it could not be (never logging a token). */
+    private boolean completeOsuLink(HttpServletRequest request, HttpServletResponse response,
+                                    Authentication authentication, CatapultOAuth2User catUser) {
+        OAuth2AuthorizedClient client = authorizedClientRepository.loadAuthorizedClient("osu", authentication,
+                request);
+        authorizedClientRepository.removeAuthorizedClient("osu", authentication, request, response);
+        OsuLinkService links = osuLinks == null ? null : osuLinks.getIfAvailable();
+        Object pending = request.getAttribute(OsuLinkService.PENDING_ATTRIBUTE);
+        String refreshToken = client == null || client.getRefreshToken() == null ? null
+                : client.getRefreshToken().getTokenValue();
+        if (links == null || !(pending instanceof OsuLinkService.PendingLink link) || refreshToken == null) {
+            log.warn("osu! link of user {} not written: {}", catUser.getUserAccount().getId(),
+                    refreshToken == null ? "no refresh token" : "no checked login");
+            return false;
+        }
+        try {
+            links.complete(catUser.getUserAccount(), link, refreshToken, client.getAccessToken().getTokenValue(),
+                    client.getAccessToken().getExpiresAt());
+            return true;
+        } catch (RuntimeException e) {
+            log.warn("osu! link of user {} not written: {}", catUser.getUserAccount().getId(),
+                    e.getClass().getSimpleName());
+            return false;
+        }
+    }
+
+    /** Writes the pending Bungie link with its refresh token; false when it could not be (never logging a token). */
+    private boolean completeBungieLink(HttpServletRequest request, HttpServletResponse response,
+                                       Authentication authentication, CatapultOAuth2User catUser) {
+        OAuth2AuthorizedClient client = authorizedClientRepository.loadAuthorizedClient("bungie", authentication,
+                request);
+        authorizedClientRepository.removeAuthorizedClient("bungie", authentication, request, response);
+        BungieLinkService links = bungieLinks == null ? null : bungieLinks.getIfAvailable();
+        Object pending = request.getAttribute(BungieLinkService.PENDING_ATTRIBUTE);
+        String refreshToken = client == null || client.getRefreshToken() == null ? null
+                : client.getRefreshToken().getTokenValue();
+        if (links == null || !(pending instanceof BungieLinkService.PendingLink link) || refreshToken == null) {
+            log.warn("Bungie link of user {} not written: {}", catUser.getUserAccount().getId(),
+                    refreshToken == null ? "no refresh token" : "no checked login");
+            return false;
+        }
+        try {
+            links.complete(catUser.getUserAccount(), link, refreshToken, client.getAccessToken().getTokenValue(),
+                    client.getAccessToken().getExpiresAt());
+            return true;
+        } catch (RuntimeException e) {
+            log.warn("Bungie link of user {} not written: {}", catUser.getUserAccount().getId(),
+                    e.getClass().getSimpleName());
+            return false;
+        }
+    }
+
     private String channelIntegrationsUrl(CatapultOAuth2User catUser) {
+        return channelTabUrl(catUser, "integrations");
+    }
+
+    /** The channel's API tab, where the cards that only feed the personal stats are (Blizzard stats, Bungie, osu!). */
+    private String channelApiUrl(CatapultOAuth2User catUser) {
+        return channelTabUrl(catUser, "api");
+    }
+
+    private String channelTabUrl(CatapultOAuth2User catUser, String tab) {
         return UriComponentsBuilder.fromUriString(webUrl)
                 .path("/channel/{username}")
-                .fragment("integrations")
+                .fragment(tab)
                 .buildAndExpand(catUser.getUserAccount().getTwitchUsername())
                 .toUriString();
     }

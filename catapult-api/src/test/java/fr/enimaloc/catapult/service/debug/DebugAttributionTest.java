@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.debug;
 
+import fr.enimaloc.catapult.service.enrichment.EnrichmentCache;
 import fr.enimaloc.catapult.site.SiteRoles;
 import fr.enimaloc.catapult.service.category.ExtensionLayoutApplier;
 import fr.enimaloc.catapult.service.category.CategoryChain;
@@ -242,7 +243,7 @@ class DebugAttributionTest {
                 .andRespond(withSuccess("is_valid:true\n", MediaType.TEXT_PLAIN));
         SteamOpenIdLinkService links = new SteamOpenIdLinkService(accounts,
                 mock(ApplicationEventPublisher.class), mock(ChannelEventPublisher.class), builder.build(),
-                DebugRecording.OFF);
+                DebugRecording.OFF, mock(EnrichmentCache.class));
         ReflectionTestUtils.setField(links, "apiBaseUrl", "http://api.test");
         ApiSteamConnectController controller = new ApiSteamConnectController(links);
         ReflectionTestUtils.setField(controller, "webBaseUrl", "http://web.test");

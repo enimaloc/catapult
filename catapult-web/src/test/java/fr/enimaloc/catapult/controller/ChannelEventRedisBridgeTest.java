@@ -234,6 +234,90 @@ class ChannelEventRedisBridgeTest {
     }
 
     @Test
+    void bridgeRelaysSpeedrunAccountChanged() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.SpeedrunData("n1", true, false, "KeyOwner", "KeyOwner",
+                "https://www.speedrun.com/users/KeyOwner", "api_key");
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.SPEEDRUN_ACCOUNT_CHANGED,
+                new ChannelEvents.SpeedrunAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent("streamer", "n1",
+                        true, false, "KeyOwner", "KeyOwner", "https://www.speedrun.com/users/KeyOwner", "api_key"));
+    }
+
+    @Test
+    void bridgeRelaysRetroAchievementsAccountChanged() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData("Bob", "https://retroachievements.org/user/Bob",
+                true, false, true);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.RETROACHIEVEMENTS_ACCOUNT_CHANGED,
+                new ChannelEvents.RetroAchievementsAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent("streamer", "Bob",
+                        "https://retroachievements.org/user/Bob", true, false, true));
+    }
+
+    @Test
+    void bridgeRelaysOsuAccountChanged() {
+        var account = fr.enimaloc.catapult.common.dto.channel.OsuAccountData.unlinked(true);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.OSU_ACCOUNT_CHANGED,
+                new ChannelEvents.OsuAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent("streamer", false,
+                        false, "", false, true, true));
+    }
+
+    @Test
+    void bridgeRelaysBungieAccountChanged() {
+        var account = fr.enimaloc.catapult.common.dto.channel.BungieAccountData.unlinked(true);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.BUNGIE_ACCOUNT_CHANGED,
+                new ChannelEvents.BungieAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent("streamer", false,
+                        false, "", false, false, true, true));
+    }
+
+    @Test
+    void bridgeRelaysBlizzardAccountChanged() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(true, "eu", false, List.of(), null, true);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.BLIZZARD_ACCOUNT_CHANGED,
+                new ChannelEvents.BlizzardAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent("streamer", true, "eu", false, false, null, "", true));
+    }
+
+    @Test
+    void bridgeRelaysChessAccountChanged() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.ChessData("hikaru", "DrNykterstein");
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CHESS_ACCOUNT_CHANGED,
+                new ChannelEvents.ChessAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent("streamer", "hikaru", "DrNykterstein"));
+    }
+
+    @Test
+    void bridgeDropsAChessEventWithoutItsData() {
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CHESS_ACCOUNT_CHANGED,
+                new ChannelEvents.ChessAccountChanged(owner.toString(), "streamer", null)))).isEmpty();
+    }
+
+    @Test
+    void bridgeDropsABlizzardEventWithoutItsData() {
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.BLIZZARD_ACCOUNT_CHANGED,
+                new ChannelEvents.BlizzardAccountChanged(owner.toString(), "streamer", null)))).isEmpty();
+    }
+
+    @Test
+    void bridgeDropsARetroAchievementsEventWithoutItsData() {
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.RETROACHIEVEMENTS_ACCOUNT_CHANGED,
+                new ChannelEvents.RetroAchievementsAccountChanged(owner.toString(), "streamer", null)))).isEmpty();
+    }
+
+    @Test
+    void bridgeDropsASpeedrunEventWithoutItsData() {
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.SPEEDRUN_ACCOUNT_CHANGED,
+                new ChannelEvents.SpeedrunAccountChanged(owner.toString(), "streamer", null)))).isEmpty();
+    }
+
+    @Test
     void bridgeRelaysEpicLinkChanged() {
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.EPIC_LINK_CHANGED,
                 new ChannelEvents.EpicLinkChanged(owner.toString(), "streamer", "PENDING", "Me", "Bot"))))
@@ -331,5 +415,49 @@ class ChannelEventRedisBridgeTest {
         assertThatCode(() -> bridge.startChannelEventListener(listener).run(new DefaultApplicationArguments()))
                 .doesNotThrowAnyException();
         verify(events, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    void bridgeRelaysSupercellAccountChanged_andRefusesOneWithoutAccount() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.SupercellData(new fr.enimaloc.catapult.common.dto.channel.SupercellData.Game("#2PP", "Chief", true), null, null);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.SUPERCELL_ACCOUNT_CHANGED,
+                new ChannelEvents.SupercellAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent.of("streamer", account));
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.SUPERCELL_ACCOUNT_CHANGED,
+                new ChannelEvents.SupercellAccountChanged(owner.toString(), "streamer", null)))).isEmpty();
+    }
+
+    @Test
+    void bridgeRelaysRiotAccountChanged() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.RiotData("Catapult#EUW", "euw1", true);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.RIOT_ACCOUNT_CHANGED,
+                new ChannelEvents.RiotAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent("streamer",
+                        "Catapult#EUW", "euw1", true));
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.RIOT_ACCOUNT_CHANGED,
+                new ChannelEvents.RiotAccountChanged(owner.toString(), "streamer",
+                        new fr.enimaloc.catapult.common.dto.channel.RiotData(null, null, false)))))
+                .containsExactly(new fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent("streamer", "", "",
+                        false));
+    }
+
+    @Test
+    void bridgeRelaysFaceitAccountChanged_andDropsItWithoutItsData() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.FaceitData("Catapult",
+                "https://www.faceit.com/en/players/Catapult", true);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.FACEIT_ACCOUNT_CHANGED,
+                new ChannelEvents.FaceitAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent("streamer",
+                        "Catapult", "https://www.faceit.com/en/players/Catapult", true));
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.FACEIT_ACCOUNT_CHANGED,
+                new ChannelEvents.FaceitAccountChanged(owner.toString(), "streamer",
+                        new fr.enimaloc.catapult.common.dto.channel.FaceitData(null, null, false)))))
+                .containsExactly(new fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent("streamer", "", "",
+                        false));
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.FACEIT_ACCOUNT_CHANGED,
+                new ChannelEvents.FaceitAccountChanged(owner.toString(), "streamer", null)))).isEmpty();
     }
 }

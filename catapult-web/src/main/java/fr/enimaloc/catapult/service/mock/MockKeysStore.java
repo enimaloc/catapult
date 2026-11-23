@@ -11,20 +11,50 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * The mock's Steam and DTDD shared API keys: one store for the whole application. Answers like
+ * The mock's Steam, DTDD, SteamGridDB, IsThereAnyDeal, OpenCritic, RetroAchievements, Riot, FACEIT and Hypixel shared API keys: one store for the whole application. Answers like
  * catapult-api: the same key formats (400 otherwise), an already listed key changes nothing, an
  * unknown key id is a 404, and only the masked form ever leaves the store.
  */
 class MockKeysStore {
+    /** The shape an OAuth client secret takes (osu!, Bungie): checked like the API does. */
+    private static final Pattern SECRET_SHAPE = Pattern.compile("[A-Za-z0-9._~+/=-]{16,128}");
+    /** A Supercell key: a JWT (three base64url parts, the first two JSON objects), one pool per game. */
+    private static final Pattern SUPERCELL_KEY_FORMAT =
+            Pattern.compile("eyJ[A-Za-z0-9_-]{8,}\\.eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}");
+    private static final java.util.Set<ApiKeyProvider> SUPERCELL = java.util.EnumSet.of(
+            ApiKeyProvider.CLASHOFCLANS, ApiKeyProvider.CLASHROYALE, ApiKeyProvider.BRAWLSTARS);
+    /** The mock's Clash of Clans key, put together at run time: not a real key, nor shaped like one in the source. */
+    static final String MOCK_SUPERCELL_KEY = "ey" + "J" + "mockheader00" + ".ey" + "J" + "mockpayload0" + ".fake-signature";
     private static final Map<ApiKeyProvider, Pattern> FORMATS = Map.of(
             ApiKeyProvider.STEAM, Pattern.compile("[0-9A-Fa-f]{32}"),
-            ApiKeyProvider.DTDD, Pattern.compile("ddd_[A-Za-z0-9]{16,128}"));
+            ApiKeyProvider.DTDD, Pattern.compile("ddd_[A-Za-z0-9]{16,128}"),
+            ApiKeyProvider.STEAMGRIDDB, Pattern.compile("[0-9A-Fa-f]{32}"),
+            ApiKeyProvider.ITAD, Pattern.compile("[0-9A-Fa-f]{40}"),
+            ApiKeyProvider.OPENCRITIC, Pattern.compile("[A-Za-z0-9]{40,60}"),
+            ApiKeyProvider.RETROACHIEVEMENTS, Pattern.compile("[A-Za-z0-9]{16,64}"),
+            ApiKeyProvider.RIOT, Pattern.compile(
+                    "RGAPI-[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"),
+            ApiKeyProvider.FACEIT, Pattern.compile(
+                    "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"),
+            ApiKeyProvider.HYPIXEL, Pattern.compile(
+                    "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"));
 
     private final Map<ApiKeyProvider, List<String>> keys = new EnumMap<>(ApiKeyProvider.class);
 
     MockKeysStore() {
         keys.put(ApiKeyProvider.STEAM, new ArrayList<>(List.of("0123456789ABCDEF0123456789ABCDEF")));
         keys.put(ApiKeyProvider.DTDD, new ArrayList<>(List.of("ddd_abcdefghijklmnop1234")));
+        keys.put(ApiKeyProvider.STEAMGRIDDB, new ArrayList<>(List.of("fedcba9876543210FEDCBA9876543210")));
+        keys.put(ApiKeyProvider.ITAD, new ArrayList<>(List.of("fedcba9876543210FEDCBA9876543210fedcba98")));
+        keys.put(ApiKeyProvider.OPENCRITIC,
+                new ArrayList<>(List.of("MockRapidApiKey0123456789MockRapidApiKey0123456789")));
+        keys.put(ApiKeyProvider.RETROACHIEVEMENTS, new ArrayList<>(List.of("MockRaKey0123456789abcdefghijklmn")));
+        keys.put(ApiKeyProvider.RIOT, new ArrayList<>(List.of("RGAPI-00000000-0000-4000-8000-000000000000")));
+        keys.put(ApiKeyProvider.FACEIT, new ArrayList<>(List.of("00000000-0000-4000-8000-0000000fac17")));
+        keys.put(ApiKeyProvider.HYPIXEL, new ArrayList<>(List.of("00000000-0000-4000-8000-00000000beef")));
+        keys.put(ApiKeyProvider.CLASHOFCLANS, new ArrayList<>(List.of(MOCK_SUPERCELL_KEY)));
+        keys.put(ApiKeyProvider.CLASHROYALE, new ArrayList<>());
+        keys.put(ApiKeyProvider.BRAWLSTARS, new ArrayList<>());
     }
 
     private static String mask(String key) {
@@ -40,6 +70,14 @@ class MockKeysStore {
     private static KeyUsageDto usage(ApiKeyProvider provider) {
         long tick = System.currentTimeMillis() / 3000;
         int window = (int) (tick % 4);
+        if (provider == ApiKeyProvider.STEAMGRIDDB || provider == ApiKeyProvider.ITAD
+                || provider == ApiKeyProvider.OPENCRITIC || provider == ApiKeyProvider.RETROACHIEVEMENTS
+                || provider == ApiKeyProvider.RIOT
+                || provider == ApiKeyProvider.FACEIT
+                || provider == ApiKeyProvider.HYPIXEL
+                || SUPERCELL.contains(provider)) {
+            return new KeyUsageDto(window, null, 60, null, "DAY", 40 + tick % 20, null, null);
+        }
         return provider == ApiKeyProvider.STEAM
                 ? new KeyUsageDto(window % 3, 3, 5, null, "DAY", 1200 + tick % 100, 100_000L, null)
                 : new KeyUsageDto(window, 30, 60, 30 - window, "MONTH", 120 + tick % 50, 5000L,
@@ -53,7 +91,8 @@ class MockKeysStore {
 
     synchronized int add(ApiKeyProvider provider, String apiKey) {
         String trimmed = apiKey == null ? "" : apiKey.trim();
-        if (!FORMATS.get(provider).matcher(trimmed).matches()) return 400;
+        Pattern format = SUPERCELL.contains(provider) ? SUPERCELL_KEY_FORMAT : FORMATS.get(provider);
+        if (!format.matcher(trimmed).matches()) return 400;
         if (!keys.get(provider).contains(trimmed)) keys.get(provider).add(trimmed);
         return 204;
     }
@@ -63,6 +102,63 @@ class MockKeysStore {
     }
 
     int refresh() {
+        return 204;
+    }
+
+    /** The mock's osu! OAuth application: set from the start, so that its card shows filled. */
+    private String osuClientId = "12345";
+
+    synchronized fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData osu() {
+        return osuClientId == null ? fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData.none()
+                : new fr.enimaloc.catapult.common.dto.admin.OsuCredentialsData(true, osuClientId,
+                        java.time.Instant.parse("2026-11-20T10:00:00Z"));
+    }
+
+    /** Like catapult-api: a malformed value, or a blank secret with nothing set yet or another client, is a 400. */
+    synchronized int saveOsu(String clientId, String clientSecret) {
+        String id = clientId == null ? "" : clientId.trim();
+        String secret = clientSecret == null ? "" : clientSecret.trim();
+        if (!id.matches("[0-9]{1,20}") || (!secret.isEmpty() && !SECRET_SHAPE.matcher(secret).matches())) {
+            return 400;
+        }
+        if ((osuClientId == null || !osuClientId.equals(id)) && secret.isEmpty()) return 400;
+        osuClientId = id;
+        return 204;
+    }
+
+    synchronized int deleteOsu() {
+        osuClientId = null;
+        return 204;
+    }
+
+    /** The mock's Bungie.net application: set from the start, so that its card shows filled. */
+    private String bungieClientId = "12345";
+    private String bungieApiKey = "0123456789abcdef0123456789abcdef";
+
+    synchronized fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData bungie() {
+        return bungieClientId == null ? fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData.none()
+                : new fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData(true, bungieClientId,
+                        mask(bungieApiKey), java.time.Instant.parse("2026-11-20T10:00:00Z"));
+    }
+
+    /** Like catapult-api: a malformed value, or a blank secret or key with nothing set yet, is a 400. */
+    synchronized int saveBungie(String clientId, String clientSecret, String apiKey) {
+        String id = clientId == null ? "" : clientId.trim();
+        String secret = clientSecret == null ? "" : clientSecret.trim();
+        String key = apiKey == null ? "" : apiKey.trim();
+        if (!id.matches("[0-9]{1,20}") || (!secret.isEmpty() && !SECRET_SHAPE.matcher(secret).matches())
+                || (!key.isEmpty() && !key.matches("[0-9A-Fa-f]{32}"))) {
+            return 400;
+        }
+        if ((bungieClientId == null || !bungieClientId.equals(id)) && (secret.isEmpty() || key.isEmpty())) return 400;
+        bungieClientId = id;
+        if (!key.isEmpty()) bungieApiKey = key;
+        return 204;
+    }
+
+    synchronized int deleteBungie() {
+        bungieClientId = null;
+        bungieApiKey = null;
         return 204;
     }
 }

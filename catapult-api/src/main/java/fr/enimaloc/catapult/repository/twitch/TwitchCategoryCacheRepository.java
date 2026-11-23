@@ -13,6 +13,8 @@ public interface TwitchCategoryCacheRepository extends JpaRepository<TwitchCateg
     List<TwitchCategoryCache> findByNameContainingIgnoreCaseAndCachedAtAfter(
             String query, Instant since, Pageable pageable);
 
+    java.util.Optional<TwitchCategoryCache> findFirstByIgdbId(String igdbId);
+
     @Query(value = "SELECT COALESCE(MAX(CAST(id AS BIGINT)), 0) FROM twitch_category_cache WHERE id ~ '^[0-9]+$'",
            nativeQuery = true)
     long findMaxNumericId();

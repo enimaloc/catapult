@@ -13,6 +13,9 @@ import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.dtdd.DtddMappingService;
 import fr.enimaloc.catapult.service.dtdd.DtddService;
 import fr.enimaloc.catapult.service.dtdd.DtddSignalService;
+import fr.enimaloc.catapult.service.enrichment.GameEnrichment;
+import fr.enimaloc.catapult.service.enrichment.GameEnrichmentAssembler;
+import fr.enimaloc.catapult.service.enrichment.PersonalStatsEnrichment;
 import fr.enimaloc.catapult.service.igdb.IgdbGameDetailsService;
 import fr.enimaloc.catapult.service.igdb.IgdbService;
 import fr.enimaloc.catapult.service.link.ExternalLinks;
@@ -21,6 +24,7 @@ import fr.enimaloc.catapult.service.steam.SteamStoreService;
 import fr.enimaloc.catapult.service.tw.TwLabelService;
 import fr.enimaloc.catapult.service.xbox.XboxStoreService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 
@@ -30,6 +34,8 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
@@ -37,6 +43,7 @@ import java.util.stream.Collectors;
  * platform's own id: IGDB, Steam, Xbox, DTDD and the channel's own binding. Each answer is empty where its route
  * answers an empty 404. The "more" links follow the current request's origin ({@link PublicBaseUrl}).
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class GameInfoAssembler {
@@ -63,6 +70,11 @@ public class GameInfoAssembler {
     // "more" needs to be a full URL the client can follow directly, not a relative path: it follows the
     // caller's origin (the trusted proxies' X-Forwarded-*), app.base-url only outside a request.
     private final PublicBaseUrl publicBaseUrl;
+
+    // Optional, so the web slices that import this assembler without the enrichment beans still load; without it,
+    // v3 answers carry no enrichment object.
+    private final Optional<GameEnrichmentAssembler> gameEnrichmentAssembler;
+    private final AtomicBoolean missingEnrichmentLogged = new AtomicBoolean();
 
     /** Which generation of routes the "more" links of an aggregated answer point at. */
     public enum LinkStyle {
@@ -197,7 +209,11 @@ public class GameInfoAssembler {
     /** Every platform object resolvable for {@code detected}, each null when unavailable. */
     private GameInfoResponse aggregate(DetectedGame detected, Optional<UserAccount> user, Locale locale,
                                        String base, LinkStyle style) {
-        Optional<String> igdbId = resolveIgdbId(detected);
+        return aggregate(detected, resolveIgdbId(detected), user, locale, base, style);
+    }
+
+    private GameInfoResponse aggregate(DetectedGame detected, Optional<String> igdbId, Optional<UserAccount> user,
+                                       Locale locale, String base, LinkStyle style) {
         return new GameInfoResponse(true,
                 igdbId.flatMap(id -> igdbObject(id, base, style)).orElse(null),
                 steamObject(detected, locale, base, style),
@@ -287,6 +303,74 @@ public class GameInfoAssembler {
 
     private static String moreUrl(String base, LinkStyle style, MoreLinks.Kind kind, Object id) {
         return new MoreLinks(base, style).to(kind, id);
+    }
+
+    // ---------------------------------------------------------------- v3
+
+    /**
+     * The v3 aggregated game info of an already authenticated user: the v2 answer, linking to the current routes,
+     * completed with the enrichment sources (each null when unavailable or too slow). inGame=false while nothing
+     * is detected. {@code country} and {@code language} are the validated query parameters of the request, null
+     * when it gave none (the prices then default to France; the Twitch streams to any language). The speedrun.com
+     * object carries {@code user}'s own account, personal bests and pending runs, the stats object their own play
+     * time and achievements ({@code locale} names the achievements): this answer is personal.
+     */
+    public GameInfoV3Response gameInfoV3(UserAccount user, Locale locale, String country, String language) {
+        String base = publicBaseUrl.get();
+        return gameStateService.getLastKnownGame(user)
+                .map(detected -> aggregateV3(detected, user, locale, base, country, language))
+                .orElseGet(GameInfoV3Response::notInGame);
+    }
+
+    // The enrichment only needs the ids and the detected name: it runs while the v2 answer is built, so the v3
+    // answer takes about max(v2, aggregate timeout) rather than their sum.
+    private GameInfoV3Response aggregateV3(DetectedGame detected, UserAccount user, Locale locale, String base,
+                                          String country, String language) {
+        Optional<String> igdbId = resolveIgdbId(detected);
+        Optional<String> steamAppId = detected.getSourceType() == GameBinding.SourceType.STEAM
+                ? Optional.ofNullable(detected.getSourceId()) : Optional.empty();
+        MoreLinks links = new MoreLinks(base, LinkStyle.CURRENT);
+        CompletableFuture<GameEnrichment> enrichment = enrichAsync(detected, igdbId, steamAppId, country, language, links,
+                user, locale);
+        GameInfoResponse v2 = aggregate(detected, igdbId, Optional.of(user), locale, base, LinkStyle.CURRENT);
+        return GameInfoV3Response.of(v2, enrichment.join(), links, igdbId, country, language);
+    }
+
+    private CompletableFuture<GameEnrichment> enrichAsync(DetectedGame detected, Optional<String> igdbId,
+                                                          Optional<String> steamAppId, String country,
+                                                          String language, MoreLinks links, UserAccount user,
+                                                          Locale locale) {
+        if (gameEnrichmentAssembler.isEmpty()) {
+            if (!missingEnrichmentLogged.getAndSet(true)) {
+                log.warn("No GameEnrichmentAssembler: v3 game info answers carry no enrichment object");
+            }
+            return CompletableFuture.completedFuture(GameEnrichment.EMPTY);
+        }
+        // the detected name, not the localized store name: the sources search by a stable name
+        return gameEnrichmentAssembler.get().enrichAsync(detected, igdbId, steamAppId, detected.getSourceName(),
+                ApiV2.country(country), language, links, Optional.of(user), locale);
+    }
+
+    /**
+     * The member's own stats on the game their channel plays now, as the v3 game info carries them; inGame=false
+     * while nothing is detected, stats null when no platform applies. {@code locale} is the language of the
+     * achievements' names.
+     */
+    public MeStatsController.CurrentStats currentStats(UserAccount user, Locale locale) {
+        Optional<DetectedGame> playing = gameStateService.getLastKnownGame(user);
+        if (playing.isEmpty()) {
+            return new MeStatsController.CurrentStats(false, null);
+        }
+        if (gameEnrichmentAssembler.isEmpty()) {
+            return new MeStatsController.CurrentStats(true, null);
+        }
+        DetectedGame detected = playing.get();
+        Optional<String> steamAppId = detected.getSourceType() == GameBinding.SourceType.STEAM
+                ? Optional.ofNullable(detected.getSourceId()) : Optional.empty();
+        PersonalStatsEnrichment stats = gameEnrichmentAssembler.get().personalStats(detected,
+                resolveIgdbId(detected), steamAppId, detected.getSourceName(), user, locale);
+        return new MeStatsController.CurrentStats(true,
+                GameInfoV3Response.StatsObject.of(stats, new MoreLinks(publicBaseUrl.get(), LinkStyle.CURRENT)));
     }
 
     // ---------------------------------------------------------------- v1 (frozen schema)

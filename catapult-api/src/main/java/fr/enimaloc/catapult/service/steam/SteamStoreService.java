@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service.steam;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.web.util.HtmlUtils;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
@@ -177,6 +178,7 @@ public interface SteamStoreService {
                                boolean hidden, String name, String path) {}
         }
         @JsonIgnoreProperties(ignoreUnknown = true)
+        @Schema(name = "SteamStoreReleaseDate")
         public record ReleaseDate(@JsonAlias("coming_soon") boolean comingSoon, String date) {}
         @JsonIgnoreProperties(ignoreUnknown = true)
         public record SupportInfo(String url, String email) {}

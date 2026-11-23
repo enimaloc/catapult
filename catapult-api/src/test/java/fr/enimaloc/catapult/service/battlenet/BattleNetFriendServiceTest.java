@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.repository.battlenet.BattleNetFriendLinkRepository;
 import fr.enimaloc.catapult.repository.battlenet.BattleNetServiceAccountRepository;
 import fr.enimaloc.catapult.repository.binding.GetterConfigRepository;
 import fr.enimaloc.catapult.service.battlenet.BattleNetFriendService.BattleNetEnrollmentException;
+import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService;
 import fr.enimaloc.catapult.service.debug.SessionDebug;
 import fr.enimaloc.catapult.service.notification.ChannelEventPublisher;
 import org.junit.jupiter.api.AfterEach;
@@ -46,6 +47,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -65,6 +67,7 @@ class BattleNetFriendServiceTest {
     @Mock private ChannelEventPublisher publisher;
     @Mock private BattleNetSessionManager sessionManager;
     @Mock private BgsClient client;
+    @Mock private BlizzardAccountService blizzardAccounts;
 
     private BattleNetFriendService service;
     private UserAccount user;
@@ -108,7 +111,7 @@ class BattleNetFriendServiceTest {
     @BeforeEach
     void setUp() {
         service = new BattleNetFriendService(accountRepository, linkRepository, getterConfigRepository, publisher,
-                sessionManager, transactions, SessionDebug.OFF, Runnable::run);
+                sessionManager, transactions, SessionDebug.OFF, blizzardAccounts, Runnable::run);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         bot1 = bot("bot1", 1, "CatapultBot#1111");
@@ -276,6 +279,8 @@ class BattleNetFriendServiceTest {
 
         assertThat(bot1.isFriendLimitReached()).isTrue();
         assertThat(links).isEmpty();
+        // once by the unenroll that precedes the enrolment, once by the link dropped for lack of room
+        verify(blizzardAccounts, times(2)).forget(user.getId());
         assertThat(callsOn).containsExactly(bot1.getId());
         var order = inOrder(publisher);
         order.verify(publisher).battleNetLinkChanged(user.getId(), "PENDING", STREAMER_TAG, "CatapultBot#1111");
@@ -546,8 +551,32 @@ class BattleNetFriendServiceTest {
     }
 
     @Test
+    void unenrollDeletesAccountAndEvicts() {
+        link(bot1, Status.ACCEPTED, null);
+
+        service.unenroll(user);
+
+        assertThat(links).isEmpty();
+        verify(blizzardAccounts).forget(user.getId());
+    }
+
+    @Test
+    void unenrollSucceedsEvenWhenThePurgeFails() {
+        link(bot1, Status.ACCEPTED, null);
+        doThrow(new IllegalStateException("db")).when(blizzardAccounts).forget(any());
+
+        service.unenroll(user);
+
+        assertThat(links).isEmpty();
+        verify(publisher).battleNetLinkChanged(user.getId(), "NONE", null, null);
+    }
+
+    @Test
     void unenrollWithoutLinkDoesNothing() {
         service.unenroll(user);
+
+        // The settings are purged even when no link was left: the purge is idempotent
+        verify(blizzardAccounts).forget(user.getId());
 
         verify(sessionManager, never()).withClient(any(), any());
         verify(publisher, never()).battleNetLinkChanged(any(), any(), any(), any());

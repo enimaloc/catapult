@@ -1,5 +1,21 @@
 package fr.enimaloc.catapult.api.userapi;
 
+import fr.enimaloc.catapult.service.enrichment.IpFetchBudgets;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardGameDataService;
+import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStatsService;
+import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
+import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticService;
+import fr.enimaloc.catapult.service.enrichment.MemberFetchBudgets;
+import fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsStatsService;
+import fr.enimaloc.catapult.service.enrichment.speedrun.SpeedrunGameService;
+import fr.enimaloc.catapult.service.enrichment.steamstats.SteamStatsService;
+import fr.enimaloc.catapult.service.enrichment.xboxstats.XboxStatsService;
+import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiService;
+import fr.enimaloc.catapult.service.enrichment.prices.PricesService;
+import fr.enimaloc.catapult.service.enrichment.protondb.ProtonDbService;
+import fr.enimaloc.catapult.service.enrichment.steamdeck.SteamDeckService;
+import fr.enimaloc.catapult.service.enrichment.steamgriddb.SteamGridDbService;
+import fr.enimaloc.catapult.service.enrichment.twitch.TwitchActivityService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -47,7 +63,8 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @WebMvcTest(
         controllers = {MeGameController.class, MeBindingsController.class, MeCustomBindingsController.class,
-                GamesController.class, UserApiV1Controller.class, UserApiV2Controller.class},
+                MeStatsController.class,
+                GamesController.class, EnrichmentGamesController.class, UserApiV1Controller.class, UserApiV2Controller.class},
         excludeAutoConfiguration = ThymeleafAutoConfiguration.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
                 pattern = "fr\\.enimaloc\\.catapult\\.experiment\\.thymeleaf\\..*"))
@@ -60,7 +77,7 @@ import tools.jackson.databind.json.JsonMapper;
         org.springdoc.webmvc.core.configuration.SpringDocWebMvcConfiguration.class,
         org.springdoc.webmvc.core.configuration.MultipleOpenApiSupportConfiguration.class})
 @Import({I18nConfig.class, PublicBaseUrl.class, GameInfoAssembler.class, OpenApiConfig.class,
-        ApiVersionHeaderDefaultCustomizer.class, ApiUserResolver.class})
+        ApiVersionParameterCustomizer.class, ApiUserResolver.class})
 class OpenApiDocsTest {
 
     @Autowired MockMvc mvc;
@@ -84,6 +101,29 @@ class OpenApiDocsTest {
     @MockitoBean DtddApiClient dtddApiClient;
     @MockitoBean CustomBindingService customBindingService;
     @MockitoBean CustomBindingViews customBindingViews;
+    @MockitoBean IpFetchBudgets ipFetchBudgets;
+    @MockitoBean HltbService hltbService;
+    @MockitoBean ProtonDbService protonDbService;
+    @MockitoBean SteamDeckService steamDeckService;
+    @MockitoBean SteamGridDbService steamGridDbService;
+    @MockitoBean PcGamingWikiService pcGamingWikiService;
+    @MockitoBean PricesService pricesService;
+    @MockitoBean OpenCriticService openCriticService;
+    @MockitoBean TwitchActivityService twitchActivityService;
+    @MockitoBean SpeedrunGameService speedrunGameService;
+    @MockitoBean SteamStatsService steamStatsService;
+    @MockitoBean XboxStatsService xboxStatsService;
+    @MockitoBean RetroAchievementsStatsService retroAchievementsStatsService;
+    @MockitoBean MemberFetchBudgets memberFetchBudgets;
+    @MockitoBean BlizzardStatsService blizzardStatsService;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.chess.ChessStatsService chessStatsService;
+    @MockitoBean BlizzardGameDataService blizzardGameDataService;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService bungieStatsService;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService riotStatsService;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.faceit.FaceitStatsService faceitStatsService;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService osuStatsService;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService hypixelStatsService;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.supercell.SupercellStatsService supercellStatsService;
 
     private JsonNode docs() throws Exception {
         String body = mvc.perform(get("/api/v3/api-docs")).andExpect(status().isOk())
@@ -132,8 +172,8 @@ class OpenApiDocsTest {
                 assertThat(security).as("%s %s", operation.getKey(), path.getKey()).isNotNull();
                 List<String> alternatives = new ArrayList<>();
                 security.forEach(requirement -> alternatives.addAll(requirement.propertyNames()));
-                if (operation.getKey().equals("get")) {
-                    assertThat(alternatives).as("GET %s", path.getKey())
+                if (operation.getKey().equals("get") || operation.getKey().equals("head")) {
+                    assertThat(alternatives).as("%s %s", operation.getKey(), path.getKey())
                             .containsExactlyInAnyOrder("personalToken", "readToken");
                 } else {
                     assertThat(alternatives).as("%s %s", operation.getKey(), path.getKey())
@@ -178,6 +218,143 @@ class OpenApiDocsTest {
         List<String> names = new ArrayList<>();
         parameters.forEach(parameter -> names.add(parameter.get("name").asString()));
         assertThat(names).contains(ApiV2.VERSION_HEADER);
+    }
+
+    /** The version header lists the versions each route answers, with no fixed default: the server assigns it. */
+    @Test
+    void docs_listTheVersionsEachRouteAnswers_withoutAFixedDefault() throws Exception {
+        JsonNode docs = docs();
+
+        assertThat(versionHeader(docs, "/paths/~1api~1me~1game/get/parameters").get("schema").get("enum").toString())
+                .isEqualTo("[\"2\",\"3\"]");
+        assertThat(versionHeader(docs, "/paths/~1api~1games~1igdb~1{igdbId}/get/parameters").get("schema")
+                .get("enum").toString()).isEqualTo("[\"2\",\"3\"]");
+        JsonNode v3Only = versionHeader(docs, "/paths/~1api~1games~1protondb~1{appId}/get/parameters");
+        assertThat(v3Only.get("schema").get("enum").toString()).isEqualTo("[\"3\"]");
+        assertThat(v3Only.get("schema").has("default")).isFalse();
+        assertThat(v3Only.get("description").asString()).contains("assigns").contains("explicit value always wins");
+    }
+
+    /** The enrichment detail routes are documented, public, each with its version 3 header. */
+    @Test
+    void docs_listTheEnrichmentDetailRoutes() throws Exception {
+        List<String> paths = paths(docs());
+
+        assertThat(paths).contains("/api/games/hltb/{igdbId}", "/api/games/protondb/{appId}",
+                "/api/games/steamdeck/{appId}", "/api/games/steamgriddb/{sgdbGameId}",
+                "/api/games/pcgamingwiki/{pageId}", "/api/games/prices/{itadId}", "/api/games/opencritic/{ocId}",
+                "/api/games/twitch/{twitchGameId}", "/api/games/speedrun/{srcGameId}",
+                "/api/games/blizzard/hearthstone/deck/{code}", "/api/games/blizzard/wow/token/{region}");
+    }
+
+    /**
+     * The personal stats routes are documented, version 3 only; the achievement schema keeps its own name (the Steam
+     * store page has an {@code Achievement} too, which springdoc would otherwise merge it with).
+     */
+    @Test
+    void docs_listThePersonalStatsRoutes() throws Exception {
+        JsonNode docs = docs();
+
+        assertThat(paths(docs)).contains("/api/me/stats", "/api/me/stats/steam/{appId}",
+                "/api/me/stats/xbox/{titleId}", "/api/me/stats/retroachievements/{gameId}",
+                "/api/me/stats/retroachievements", "/api/me/stats/blizzard/{game}", "/api/me/stats/riot/{game}",
+                "/api/me/stats/faceit/{game}", "/api/me/stats/chess");
+        assertThat(versionHeader(docs, "/paths/~1api~1me~1stats~1steam~1{appId}/get/parameters").get("schema")
+                .get("enum").toString()).isEqualTo("[\"3\"]");
+        JsonNode schemas = docs.at("/components/schemas");
+        assertThat(schemas.has("PersonalAchievement")).isTrue();
+        assertThat(schemas.at("/Achievement/properties").has("highlighted")).isTrue();
+        assertThat(schemas.at("/StatsObject/properties").has("detectedOn")).isFalse();
+        // the detail routes answer the aggregate's objects, with every achievement
+        for (String name : List.of("SteamStats", "XboxStats", "RaStats")) {
+            assertThat(schemas.at("/" + name + "/properties").has("all")).as(name).isTrue();
+        }
+        assertThat(schemas.has("PlatformStats")).isFalse();
+        assertThat(docs.at("/paths/~1api~1me~1stats~1steam~1{appId}/get/responses/200/content").toString())
+                .contains("SteamStats");
+        // Blizzard: the detail answers the aggregate's own record; the public data has its own object
+        assertThat(docs.at("/paths/~1api~1me~1stats~1blizzard~1{game}/get/responses/200/content").toString())
+                .contains("BlizzardStats");
+        assertThat(schemas.at("/StatsObject/properties").has("blizzard")).isTrue();
+        assertThat(schemas.at("/BlizzardStats/properties").has("more")).isTrue();
+        // Riot: the same, the detail answering the aggregate's own record
+        assertThat(docs.at("/paths/~1api~1me~1stats~1riot~1{game}/get/responses/200/content").toString())
+                .contains("RiotStats");
+        assertThat(schemas.at("/StatsObject/properties").has("riot")).isTrue();
+        assertThat(schemas.at("/RiotStats/properties").has("more")).isTrue();
+        // FACEIT: the same, the detail answering the aggregate's own record
+        assertThat(docs.at("/paths/~1api~1me~1stats~1faceit~1{game}/get/responses/200/content").toString())
+                .contains("FaceitStats");
+        assertThat(schemas.at("/StatsObject/properties").has("faceit")).isTrue();
+        assertThat(schemas.at("/FaceitStats/properties").has("more")).isTrue();
+        // Hypixel: the same, the detail answering the aggregate's own record
+        assertThat(paths(docs)).contains("/api/me/stats/hypixel");
+        assertThat(docs.at("/paths/~1api~1me~1stats~1hypixel/get/responses/200/content").toString())
+                .contains("HypixelStats");
+        assertThat(schemas.at("/StatsObject/properties").has("hypixel")).isTrue();
+        // Supercell: the detail answers the aggregate's own record
+        assertThat(docs.at("/paths/~1api~1me~1stats~1supercell~1{game}/get/responses/200/content").toString())
+                .contains("SupercellStats");
+        assertThat(schemas.at("/StatsObject/properties").has("supercell")).isTrue();
+        assertThat(schemas.at("/SupercellStats/properties").has("more")).isTrue();
+        assertThat(schemas.at("/HypixelStats/properties").has("more")).isTrue();
+        assertThat(schemas.at("/PublisherObject/properties").has("hypixel")).isTrue();
+    }
+
+    /**
+     * The version 3 answer of {@code /api/me/game} is documented next to the version 2 one (springdoc merges the two
+     * versions of a path into one operation): an anyOf, with the enrichment objects and the version 3 parameters.
+     */
+    @Test
+    void docs_describeTheVersion3AnswerOfTheMemberGame() throws Exception {
+        JsonNode docs = docs();
+
+        JsonNode schema = docs.at("/paths/~1api~1me~1game/get/responses/200/content/application~1json/schema");
+        assertThat(schema.has("oneOf")).as("a v3 payload also fits the v2 schema: anyOf, not oneOf").isFalse();
+        assertThat(docs.at("/paths/~1api~1me~1game/get/responses/200/content/text~1plain/schema/type").asString())
+                .isEqualTo("string");
+        List<String> alternatives = new ArrayList<>();
+        schema.get("anyOf").forEach(alternative -> alternatives.add(alternative.get("$ref").asString()));
+        assertThat(alternatives).containsExactly("#/components/schemas/GameInfoResponse",
+                "#/components/schemas/GameInfoV3Response");
+        JsonNode v3 = docs.at("/components/schemas/GameInfoV3Response/properties");
+        assertThat(v3.propertyNames()).contains("inGame", "igdb", "hltb", "protondb", "steamgriddb", "steamDeck",
+                "pcgamingwiki", "prices", "opencritic", "twitch", "speedrun", "stats", "trailer");
+        assertThat(docs.at("/components/schemas/GameInfoResponse/properties").propertyNames())
+                .doesNotContain("hltb", "stats");
+        // the objects it nests are components of their own, every reference resolves
+        assertThat(v3.at("/hltb/$ref").asString()).isEqualTo("#/components/schemas/HltbObject");
+        assertThat(docs.at("/components/schemas").has("HltbObject")).isTrue();
+        assertThat(docs.at("/components/schemas").has("StatsObject")).isTrue();
+        List<String> parameters = new ArrayList<>();
+        docs.at("/paths/~1api~1me~1game/get/parameters").forEach(p -> parameters.add(p.get("name").asString()));
+        assertThat(parameters).contains("country", "language", "lang", "f", ApiV2.VERSION_HEADER);
+        for (JsonNode parameter : docs.at("/paths/~1api~1me~1game/get/parameters")) {
+            if ("language".equals(parameter.get("name").asString())) {
+                assertThat(parameter.at("/schema/type").asString()).isEqualTo("string");
+            }
+        }
+    }
+
+    /** The version 2 and summary operations keep their documentation. */
+    @Test
+    void docs_keepTheVersion2MemberGameDocumentation() throws Exception {
+        JsonNode docs = docs();
+
+        assertThat(docs.at("/paths/~1api~1me~1game/get/summary").asString()).contains("fully aggregated");
+        assertThat(docs.at("/paths/~1api~1me~1game/get/operationId").asString()).isEqualTo("gameInfo");
+        assertThat(docs.at("/paths/~1api~1me~1game~1summary/get/summary").asString()).contains("compact summary");
+        assertThat(docs.at("/paths/~1api~1me~1game/get/responses/200/description").asString())
+                .contains("GameInfoResponse for version 2");
+    }
+
+    private static JsonNode versionHeader(JsonNode docs, String parametersPointer) {
+        for (JsonNode parameter : docs.at(parametersPointer)) {
+            if (ApiV2.VERSION_HEADER.equals(parameter.get("name").asString())) {
+                return parameter;
+            }
+        }
+        throw new AssertionError("no " + ApiV2.VERSION_HEADER + " in " + parametersPointer);
     }
 
     @Test

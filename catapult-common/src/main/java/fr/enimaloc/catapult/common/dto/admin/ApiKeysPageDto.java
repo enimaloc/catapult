@@ -31,6 +31,38 @@ public record ApiKeysPageDto(boolean enabled, List<Key> keys) {
         return page == null ? null : new ApiKeysPageDto(page.dtddEnabled(), keys(page.keys()));
     }
 
+    public static ApiKeysPageDto of(SteamGridDbKeysPageData page) {
+        return page == null ? null : new ApiKeysPageDto(page.steamgriddbEnabled(), keys(page.keys()));
+    }
+
+    public static ApiKeysPageDto of(ItadKeysPageData page) {
+        return page == null ? null : new ApiKeysPageDto(page.itadEnabled(), keys(page.keys()));
+    }
+
+    public static ApiKeysPageDto of(OpenCriticKeysPageData page) {
+        return page == null ? null : new ApiKeysPageDto(page.opencriticEnabled(), keys(page.keys()));
+    }
+
+    public static ApiKeysPageDto of(RetroAchievementsKeysPageData page) {
+        return page == null ? null : new ApiKeysPageDto(page.retroachievementsEnabled(), keys(page.keys()));
+    }
+
+    public static ApiKeysPageDto of(RiotKeysPageData page) {
+        return page == null ? null : new ApiKeysPageDto(page.riotEnabled(), keys(page.keys()));
+    }
+
+    public static ApiKeysPageDto of(FaceitKeysPageData page) {
+        return page == null ? null : new ApiKeysPageDto(page.faceitEnabled(), keys(page.keys()));
+    }
+
+    public static ApiKeysPageDto of(HypixelKeysPageData page) {
+        return page == null ? null : new ApiKeysPageDto(page.hypixelEnabled(), keys(page.keys()));
+    }
+
+    public static ApiKeysPageDto of(SupercellKeysPageData page) {
+        return page == null ? null : new ApiKeysPageDto(page.supercellEnabled(), keys(page.keys()));
+    }
+
     private static List<Key> keys(List<KeyStatus> keys) {
         return keys == null ? List.of() : keys.stream()
                 .filter(Objects::nonNull)
