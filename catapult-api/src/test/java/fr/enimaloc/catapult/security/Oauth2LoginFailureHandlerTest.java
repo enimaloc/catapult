@@ -159,7 +159,7 @@ class Oauth2LoginFailureHandlerTest {
                     new OAuth2AuthenticationException(new OAuth2Error(code)));
 
             assertThat(response.getRedirectedUrl())
-                    .isEqualTo("http://localhost:8081/channel/jeb_?error=" + code + "#integrations");
+                    .isEqualTo("http://localhost:8081/channel/jeb_?error=" + code + "#api");
             assertThat(response.getCookie("catapult_oauth2_retry").getMaxAge()).isZero();
         }
     }
@@ -175,7 +175,7 @@ class Oauth2LoginFailureHandlerTest {
                     new OAuth2AuthenticationException(new OAuth2Error(code)));
 
             assertThat(response.getRedirectedUrl())
-                    .isEqualTo("http://localhost:8081/channel/jeb_?error=battlenet_stats_failed#integrations");
+                    .isEqualTo("http://localhost:8081/channel/jeb_?error=battlenet_stats_failed#api");
         }
     }
 
@@ -187,7 +187,7 @@ class Oauth2LoginFailureHandlerTest {
                 new OAuth2AuthenticationException(new OAuth2Error("access_denied")));
 
         assertThat(response.getRedirectedUrl())
-                .isEqualTo("http://localhost:8081/channel/jeb_?error=battlenet_stats_cancelled#integrations");
+                .isEqualTo("http://localhost:8081/channel/jeb_?error=battlenet_stats_cancelled#api");
     }
 
     @Test
@@ -208,21 +208,21 @@ class Oauth2LoginFailureHandlerTest {
             handler.onAuthenticationFailure(request, response,
                     new OAuth2AuthenticationException(new OAuth2Error(code)));
             assertThat(response.getRedirectedUrl())
-                    .isEqualTo("http://localhost:8081/channel/jeb_?error=" + code + "#integrations");
+                    .isEqualTo("http://localhost:8081/channel/jeb_?error=" + code + "#api");
         }
         request = callbackOf("bungie", "jeb_");
         response = new MockHttpServletResponse();
         handler.onAuthenticationFailure(request, response,
                 new OAuth2AuthenticationException(new OAuth2Error("invalid_token_response")));
         assertThat(response.getRedirectedUrl())
-                .isEqualTo("http://localhost:8081/channel/jeb_?error=bungie_failed#integrations");
+                .isEqualTo("http://localhost:8081/channel/jeb_?error=bungie_failed#api");
 
         request = callbackOf("bungie", "jeb_");
         response = new MockHttpServletResponse();
         handler.onAuthenticationFailure(request, response,
                 new OAuth2AuthenticationException(new OAuth2Error("access_denied")));
         assertThat(response.getRedirectedUrl())
-                .isEqualTo("http://localhost:8081/channel/jeb_?error=bungie_cancelled#integrations");
+                .isEqualTo("http://localhost:8081/channel/jeb_?error=bungie_cancelled#api");
     }
 
     @Test
@@ -233,20 +233,20 @@ class Oauth2LoginFailureHandlerTest {
             handler.onAuthenticationFailure(request, response,
                     new OAuth2AuthenticationException(new OAuth2Error(code)));
             assertThat(response.getRedirectedUrl())
-                    .isEqualTo("http://localhost:8081/channel/jeb_?error=" + code + "#integrations");
+                    .isEqualTo("http://localhost:8081/channel/jeb_?error=" + code + "#api");
         }
         request = callbackOf("osu", "jeb_");
         response = new MockHttpServletResponse();
         handler.onAuthenticationFailure(request, response,
                 new OAuth2AuthenticationException(new OAuth2Error("invalid_token_response")));
         assertThat(response.getRedirectedUrl())
-                .isEqualTo("http://localhost:8081/channel/jeb_?error=osu_failed#integrations");
+                .isEqualTo("http://localhost:8081/channel/jeb_?error=osu_failed#api");
 
         request = callbackOf("osu", "jeb_");
         response = new MockHttpServletResponse();
         handler.onAuthenticationFailure(request, response,
                 new OAuth2AuthenticationException(new OAuth2Error("access_denied")));
         assertThat(response.getRedirectedUrl())
-                .isEqualTo("http://localhost:8081/channel/jeb_?error=osu_cancelled#integrations");
+                .isEqualTo("http://localhost:8081/channel/jeb_?error=osu_cancelled#api");
     }
 }

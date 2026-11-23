@@ -20,7 +20,8 @@ public final class NewFeatures {
 
     static final Map<String, LocalDate> RELEASES = Map.of(
             "channel.commands", LocalDate.of(2026, 10, 21),
-            "channel.emergency-notice", LocalDate.of(2026, 11, 20));
+            "channel.emergency-notice", LocalDate.of(2026, 11, 20),
+            "channel.api", LocalDate.of(2026, 11, 23));
 
     static final Period SHOWN_FOR = Period.ofMonths(1);
 

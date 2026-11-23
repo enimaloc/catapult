@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static fr.enimaloc.catapult.dto.integration.Message.key;
@@ -57,7 +58,25 @@ public final class IntegrationCards {
     private static final Message CONNECTED = key(PREFIX + "connected");
     private static final Message NOT_CONNECTED = key(PREFIX + "not_connected");
 
+    /**
+     * The cards that only feed the member's personal stats on the API (v3), shown on the channel's API tab rather than
+     * on Integrations: the detection and presence services (Steam, Xbox, Battle.net, Epic, Ankama, Minecraft, OBS…)
+     * stay there. A card named here before it exists simply lands on the API tab once it does.
+     */
+    public static final Set<String> API_TAB = Set.of("speedrun", "retroachievements", "blizzard-stats", "bungie", "riot",
+            "faceit", "chess", "osu", "hypixel");
+
     private IntegrationCards() {
+    }
+
+    /** The cards of the Integrations tab: every one but {@link #API_TAB}'s, in their order. */
+    public static List<IntegrationDto> integrationsTab(List<IntegrationDto> cards) {
+        return cards.stream().filter(card -> !API_TAB.contains(card.id())).toList();
+    }
+
+    /** The cards of the API tab: {@link #API_TAB}'s, in their order. */
+    public static List<IntegrationDto> apiTab(List<IntegrationDto> cards) {
+        return cards.stream().filter(card -> API_TAB.contains(card.id())).toList();
     }
 
     public static List<IntegrationDto> of(ChannelPageData ch, Map<String, List<TwitchatEventActionDto>> twitchatEvents,

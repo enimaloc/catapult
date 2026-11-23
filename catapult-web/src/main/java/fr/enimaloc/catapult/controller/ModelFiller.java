@@ -315,7 +315,9 @@ public class ModelFiller {
             model.addAttribute("summaryUrl", summaryUrl);
             model.addAttribute("commandMigration", CommandMigration.of(commands, summaryUrl,
                     message("channel.commands.migration.empty", null, LocaleContextHolder.getLocale())));
-            model.addAttribute("integrations", IntegrationCards.of(channelPage, twitchatEvents, twitchatEventForms));
+            var cards = IntegrationCards.of(channelPage, twitchatEvents, twitchatEventForms);
+            model.addAttribute("integrations", IntegrationCards.integrationsTab(cards));
+            model.addAttribute("apiIntegrations", IntegrationCards.apiTab(cards));
             model.addAttribute("notificationChannels", apiService.notificationChannels());
             model.addAttribute("dangerZone",
                     DangerZoneView.of(apiService.accountInfo(), apiService.accountDeletionDelayDays()));

@@ -1665,28 +1665,28 @@ a[data-link].active {
 /* The cards with at most two buttons at once side by side, as many as fit (one on a phone); the wide ones
  * (IntegrationDto.wide: Steam, OBS, Twitchat) span the grid below them. A row's cards share its height,
  * their content kept at the top. */
-#channel-connections {
+.connection-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
     gap: 12px;
     margin-bottom: 56px;
 }
 
-#channel-connections > .connection-card {
+.connection-grid > .connection-card {
     align-content: start;
 }
 
-#channel-connections > .connection-card.wide {
+.connection-grid > .connection-card.wide {
     grid-column: 1 / -1;
 }
 
 /* A grid card's buttons sit at its foot, whatever its row's height: its header, then its body, then a last row
  * taking the room left, the actions at its bottom. */
-#channel-connections > .connection-card:not(.wide) {
+.connection-grid > .connection-card:not(.wide) {
     grid-template-rows: auto auto 1fr;
 }
 
-#channel-connections > .connection-card:not(.wide) > .card-actions {
+.connection-grid > .connection-card:not(.wide) > .card-actions {
     grid-row: 3;
     align-self: end;
 }

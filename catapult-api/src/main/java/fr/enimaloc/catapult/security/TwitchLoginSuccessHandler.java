@@ -100,11 +100,11 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                 }
             } else if ("battlenet-stats".equals(registrationId)) {
                 // The World of Warcraft import read the characters with this token: it is forgotten at once, and
-                // the card says the import is done.
+                // the card (on the API tab) says the import is done.
                 authorizedClientRepository.removeAuthorizedClient("battlenet-stats", authentication, request, response);
                 if (webUrl != null && !webUrl.isBlank()) {
                     boolean none = Integer.valueOf(0).equals(request.getAttribute(WOW_IMPORT_COUNT_ATTRIBUTE));
-                    response.sendRedirect(UriComponentsBuilder.fromUriString(channelIntegrationsUrl(catUser))
+                    response.sendRedirect(UriComponentsBuilder.fromUriString(channelApiUrl(catUser))
                             .replaceQueryParam("imported", none ? "wow-empty" : "wow").toUriString());
                     return;
                 }
@@ -113,7 +113,7 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                 // only known here, is written encrypted, then Spring's copy is forgotten at once.
                 boolean linked = completeOsuLink(request, response, authentication, catUser);
                 if (webUrl != null && !webUrl.isBlank()) {
-                    UriComponentsBuilder target = UriComponentsBuilder.fromUriString(channelIntegrationsUrl(catUser));
+                    UriComponentsBuilder target = UriComponentsBuilder.fromUriString(channelApiUrl(catUser));
                     target = linked ? target.replaceQueryParam("linked", "osu")
                             : target.replaceQueryParam("error", "osu_failed");
                     response.sendRedirect(target.toUriString());
@@ -124,7 +124,7 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                 // refresh token, only known here, is written encrypted, then Spring's copy is forgotten at once.
                 boolean linked = completeBungieLink(request, response, authentication, catUser);
                 if (webUrl != null && !webUrl.isBlank()) {
-                    UriComponentsBuilder target = UriComponentsBuilder.fromUriString(channelIntegrationsUrl(catUser));
+                    UriComponentsBuilder target = UriComponentsBuilder.fromUriString(channelApiUrl(catUser));
                     target = linked ? target.replaceQueryParam("linked", "bungie")
                             : target.replaceQueryParam("error", "bungie_failed");
                     response.sendRedirect(target.toUriString());
@@ -208,9 +208,18 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
     }
 
     private String channelIntegrationsUrl(CatapultOAuth2User catUser) {
+        return channelTabUrl(catUser, "integrations");
+    }
+
+    /** The channel's API tab, where the cards that only feed the personal stats are (Blizzard stats, Bungie, osu!). */
+    private String channelApiUrl(CatapultOAuth2User catUser) {
+        return channelTabUrl(catUser, "api");
+    }
+
+    private String channelTabUrl(CatapultOAuth2User catUser, String tab) {
         return UriComponentsBuilder.fromUriString(webUrl)
                 .path("/channel/{username}")
-                .fragment("integrations")
+                .fragment(tab)
                 .buildAndExpand(catUser.getUserAccount().getTwitchUsername())
                 .toUriString();
     }

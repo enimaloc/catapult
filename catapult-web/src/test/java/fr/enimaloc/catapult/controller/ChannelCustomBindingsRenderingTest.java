@@ -45,7 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * The custom bindings of the channel page: the overview's list (under the associations, shaped like them) and the
- * Account tab's API token card exist for the owner while the experiment is open to the channel, and nowhere else.
+ * API tab's API token card exist for the owner while the experiment is open to the channel, and nowhere else.
  */
 @WebMvcTest(controllers = {IndexController.class, SpaFragmentController.class})
 @Import({ModelFiller.class, WebSecurityConfig.class, TwitchatCatalogConfig.class})
@@ -327,13 +327,13 @@ class ChannelCustomBindingsRenderingTest {
     }
 
     @Test
-    void theOldCardsAreGone_andTheTokenCardStaysInTheAccountTab() throws Exception {
+    void theOldCardsAreGone_andTheTokenCardIsInTheApiTab() throws Exception {
         String html = render(true, state());
 
         assertThat(html).doesNotContain("channel-custom-bindings-card", "channel-custom-bindings-settings",
                 "custom-binding-row", "custom-binding-trigger");
         assertThat(panel(html, "settings")).doesNotContain("custom-binding");
-        assertThat(panel(html, "account")).contains("id=\"channel-api-token-card\"");
+        assertThat(panel(html, "api")).contains("id=\"channel-api-token-card\"");
         int token = html.indexOf("id=\"channel-api-token-card\"");
         assertThat(html.indexOf("id=\"channel-api-token-card\"", token + 1)).isNegative();
     }
@@ -344,22 +344,22 @@ class ChannelCustomBindingsRenderingTest {
         assertThat(html)
                 .doesNotContain("channel-custom-bindings-list").doesNotContain("custom-binding-new-btn")
                 .doesNotContain("channel-api-token-card").doesNotContain("custom-binding");
-        assertThat(panel(html, "account")).contains("id=\"channel-read-token-card\"", "id=\"read-token-generate-btn\"",
+        assertThat(panel(html, "api")).contains("id=\"channel-read-token-card\"", "id=\"read-token-generate-btn\"",
                 "id=\"read-token-confirm-dialog\"");
     }
 
     @Test
     void theReadOnlyTokenCard_isThereWithTheCustomBindingsToo() throws Exception {
-        String account = panel(render(true, state()), "account");
-        assertThat(account).contains("id=\"channel-read-token-card\"", "id=\"channel-api-token-card\"");
+        String api = panel(render(true, state()), "api");
+        assertThat(api).contains("id=\"channel-read-token-card\"", "id=\"channel-api-token-card\"");
     }
 
     /** A token shown once, and the links built on it, are plain text: Sentry Replay must never record them. */
     @Test
     void bothTokenCards_areBlockedFromSentryReplay() throws Exception {
-        String account = panel(render(true, state()), "account");
-        assertThat(byId(account, "channel-read-token-card").hasClass("sentry-block")).isTrue();
-        assertThat(byId(account, "channel-api-token-card").hasClass("sentry-block")).isTrue();
+        String api = panel(render(true, state()), "api");
+        assertThat(byId(api, "channel-read-token-card").hasClass("sentry-block")).isTrue();
+        assertThat(byId(api, "channel-api-token-card").hasClass("sentry-block")).isTrue();
     }
 
     @Test

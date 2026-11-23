@@ -337,6 +337,20 @@ class ModelFillerTest {
     }
 
     @Test
+    void channel_theOwnersCards_areSplitBetweenTheIntegrationsAndTheApiTabs() {
+        when(api.channelPage("enimaloc", 0, null, null)).thenReturn(new ChannelPageData(
+                new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, false, true, null,
+                new PagedBindings(0, 1, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.FaceitData("s1mple", null, true), null));
+
+        filler().channel(model, "enimaloc", 0, null, null);
+
+        assertThat((List<?>) model.get("integrations")).extracting("id").containsExactly("twitch");
+        assertThat((List<?>) model.get("apiIntegrations")).extracting("id").containsExactly("faceit");
+    }
+
+    @Test
     void channel_ownerGetsItsEmergencyView_aModeratorDoesNot() {
         var emergency = new fr.enimaloc.catapult.common.dto.emergency.ChannelEmergencyDto(false, List.of(), List.of());
         when(api.channelPage("enimaloc", 0, null, null)).thenReturn(page(true));
@@ -367,7 +381,7 @@ class ModelFillerTest {
         filler().channel(model, "enimaloc", 0, null, null);
 
         assertThat(model).containsEntry("channelSettings", settings).containsEntry("dtddMapping", dtdd)
-                .doesNotContainKey("integrations");
+                .doesNotContainKey("integrations").doesNotContainKey("apiIntegrations");
         verify(api).channelPage("enimaloc", 0, null, null);
         verify(api).channelSettings("enimaloc");
         verify(api).dtddMappingStatus("enimaloc");
