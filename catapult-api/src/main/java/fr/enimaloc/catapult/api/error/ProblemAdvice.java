@@ -47,12 +47,16 @@ public class ProblemAdvice extends ResponseEntityExceptionHandler {
     static final String INTERNAL_ERROR_DETAIL = "Internal error";
     static final String VERSIONS_PROPERTY = "versions";
 
-    private @Nullable RouteVersions routeVersions;
+    private final @Nullable RouteVersions routeVersions;
 
-    /** Optional: without it (a standalone test setup), a 404 says nothing of the versions. */
-    @Autowired(required = false)
-    public void setRouteVersions(@Nullable RouteVersions routeVersions) {
+    @Autowired
+    public ProblemAdvice(RouteVersions routeVersions) {
         this.routeVersions = routeVersions;
+    }
+
+    /** A standalone setup (a test) without the request mappings: a 404 says nothing of the versions. */
+    public ProblemAdvice() {
+        this.routeVersions = null;
     }
 
     /**
