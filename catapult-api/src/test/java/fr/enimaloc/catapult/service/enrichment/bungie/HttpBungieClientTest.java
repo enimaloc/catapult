@@ -211,14 +211,32 @@ class HttpBungieClientTest {
                 .andRespond(withSuccess("[]", MediaType.APPLICATION_JSON));
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(PROFILE)))
                 .andRespond(withSuccess("{\"Response\":{},\"ErrorCode\":1}", MediaType.APPLICATION_JSON));
+
+        for (int i = 0; i < 4; i++) {
+            assertThatThrownBy(() -> client.profile(3, "4611686018467284386", "t"))
+                    .isInstanceOf(BungieUnavailableException.class);
+        }
+        server.verify();
+    }
+
+    @Test
+    void aComponentWithoutDataThatIsNotPrivate_isEmpty_notAnError() throws IOException {
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith(PROFILE)))
+                .andRespond(withSuccess("{\"Response\":{\"profile\":{\"data\":{\"currentGuardianRank\":3},"
+                        + "\"privacy\":1},\"characters\":{\"privacy\":1},\"characterActivities\":{\"privacy\":1}},"
+                        + "\"ErrorCode\":1}", MediaType.APPLICATION_JSON));
         server.expect(requestTo(org.hamcrest.Matchers.startsWith(PROFILE)))
                 .andRespond(withSuccess("{\"Response\":{\"profile\":{\"privacy\":1}},\"ErrorCode\":1}",
                         MediaType.APPLICATION_JSON));
 
-        for (int i = 0; i < 5; i++) {
-            assertThatThrownBy(() -> client.profile(3, "4611686018467284386", "t"))
-                    .isInstanceOf(BungieUnavailableException.class);
-        }
+        BungieData.Profile noCharacters = client.profile(3, "4611686018467284386", "t");
+        assertThat(noCharacters.guardianRank()).isEqualTo(3);
+        assertThat(noCharacters.characters()).isEmpty();
+        assertThat(noCharacters.activity()).isNull();
+        assertThat(noCharacters.charactersPrivate()).isFalse();
+        BungieData.Profile noProfileData = client.profile(3, "4611686018467284386", "t");
+        assertThat(noProfileData.profilePrivate()).isFalse();
+        assertThat(noProfileData.guardianRank()).isNull();
         server.verify();
     }
 

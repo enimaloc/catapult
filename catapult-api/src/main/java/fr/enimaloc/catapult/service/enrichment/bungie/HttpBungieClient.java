@@ -52,7 +52,7 @@ public class HttpBungieClient implements BungieClient {
 
     static final String PLATFORM = "https://www.bungie.net/Platform";
     static final String TOKEN = "https://www.bungie.net/platform/app/oauth/token/";
-    static final String USER_AGENT = "Catapult/1.0 (+https://catapult.enimaloc.fr)";
+    static final String USER_AGENT = fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent.VALUE;
     static final int MAX_BYTES = 4 * 1024 * 1024;
     /** The records component lists every triumph of every character: larger than the others. */
     static final int MAX_RECORD_BYTES = 8 * 1024 * 1024;
@@ -398,15 +398,13 @@ public class HttpBungieClient implements BungieClient {
         return node;
     }
 
-    /** A component Bungie withholds: no {@code data}, {@code privacy} 2 (private). */
+    /**
+     * A component Bungie withholds: no {@code data}, {@code privacy} 2 (private). A component without {@code data}
+     * that is not private (Bungie omitting an empty one, an account without characters) is no data for that part
+     * only, not an unreadable answer: its fields stay null.
+     */
     private static boolean withheld(JsonNode component) {
-        if (component.path("data").isObject()) {
-            return false;
-        }
-        if (component.path("privacy").asInt(0) == 2) {
-            return true;
-        }
-        throw garbled();
+        return !component.path("data").isObject() && component.path("privacy").asInt(0) == 2;
     }
 
     private static String form(String value) {
