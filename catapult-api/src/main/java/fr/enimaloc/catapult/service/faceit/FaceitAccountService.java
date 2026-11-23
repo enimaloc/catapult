@@ -10,6 +10,8 @@ import fr.enimaloc.catapult.repository.faceit.FaceitAccountRepository;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentCache;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentProperties;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentSource;
+import fr.enimaloc.catapult.service.enrichment.FetchBudget;
+import fr.enimaloc.catapult.service.enrichment.MemberFetchBudgets;
 import fr.enimaloc.catapult.service.enrichment.faceit.FaceitClient;
 import fr.enimaloc.catapult.service.enrichment.faceit.FaceitModels.Player;
 import fr.enimaloc.catapult.service.enrichment.faceit.FaceitNotFoundException;
@@ -25,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Predicate;
@@ -33,7 +36,8 @@ import java.util.regex.Pattern;
 /**
  * A member's FACEIT settings: the nickname they declare. It is checked with FACEIT (which gives the player id later
  * calls use) before anything is written: an unknown nickname is a 400; FACEIT out of reach, the source off or the key
- * pool empty a 503. As for RetroAchievements, nothing stops a member from declaring someone else's nickname: the
+ * pool empty a 503. Each check takes one of the member's refreshes ({@link MemberFetchBudgets}, shared with the stats
+ * detail routes): spent, the save is a 429 and FACEIT is not asked. As for RetroAchievements, nothing stops a member from declaring someone else's nickname: the
  * stats are only ever served to the member themselves. Each write re-reads the row and is optimistically locked: one
  * that crosses another is redone once on the fresh row, then answers 409. A changed or removed nickname forgets what
  * the FACEIT sources cached for the member. Telling the owner's pages comes after the write and never fails it.
@@ -54,24 +58,26 @@ public class FaceitAccountService {
     private final EnrichmentProperties properties;
     private final EnrichmentCache cache;
     private final ChannelEventPublisher events;
+    private final MemberFetchBudgets budgets;
     private final Clock clock;
 
     @Autowired
     public FaceitAccountService(FaceitAccountRepository accounts, FaceitClient client, FaceitApiKeyRotator keys,
                                 EnrichmentProperties properties, EnrichmentCache cache,
-                                ChannelEventPublisher events) {
-        this(accounts, client, keys, properties, cache, events, Clock.systemUTC());
+                                ChannelEventPublisher events, MemberFetchBudgets budgets) {
+        this(accounts, client, keys, properties, cache, events, budgets, Clock.systemUTC());
     }
 
     FaceitAccountService(FaceitAccountRepository accounts, FaceitClient client, FaceitApiKeyRotator keys,
                          EnrichmentProperties properties, EnrichmentCache cache, ChannelEventPublisher events,
-                         Clock clock) {
+                         MemberFetchBudgets budgets, Clock clock) {
         this.accounts = accounts;
         this.client = client;
         this.keys = keys;
         this.properties = properties;
         this.cache = cache;
         this.events = events;
+        this.budgets = budgets;
         this.clock = clock;
     }
 
@@ -83,6 +89,11 @@ public class FaceitAccountService {
         }
         if (!properties.faceitEnabled() || !keys.hasKeys()) {
             throw unreachable();
+        }
+        FetchBudget budget = budgets.forMember(user.getId());
+        if (!budget.tryAcquire()) {
+            throw new ApiProblem(ErrorCode.TOO_MANY_REQUESTS, "Too many FACEIT checks for your account, try again later",
+                    Map.of("retryAfter", Math.max(1, budget.retryAfter().toSeconds())));
         }
         Player found;
         try {

@@ -57,6 +57,9 @@ class FaceitAccountServiceTest {
     private final FaceitApiKeyRepository keyRepository = mock(FaceitApiKeyRepository.class);
     private final EnrichmentCache cache = mock(EnrichmentCache.class);
     private final ChannelEventPublisher events = mock(ChannelEventPublisher.class);
+    private final fr.enimaloc.catapult.service.enrichment.MemberFetchBudgets budgets =
+            mock(fr.enimaloc.catapult.service.enrichment.MemberFetchBudgets.class);
+    private boolean budgetLeft = true;
     private final EnrichmentProperties properties = new EnrichmentProperties();
     private final AtomicReference<FaceitAccount> stored = new AtomicReference<>();
     private FaceitApiKeyRotator keys;
@@ -67,7 +70,18 @@ class FaceitAccountServiceTest {
     void setUp() {
         when(keyRepository.findByExclusiveFalse()).thenReturn(List.of(new FaceitApiKeyEntry("k")));
         keys = new FaceitApiKeyRotator(keyRepository, new SimpleMeterRegistry());
-        service = new FaceitAccountService(accounts, client, keys, properties, cache, events,
+        when(budgets.forMember(any())).thenReturn(new fr.enimaloc.catapult.service.enrichment.FetchBudget() {
+            @Override
+            public boolean tryAcquire() {
+                return budgetLeft;
+            }
+
+            @Override
+            public java.time.Duration retryAfter() {
+                return java.time.Duration.ofSeconds(42);
+            }
+        });
+        service = new FaceitAccountService(accounts, client, keys, properties, cache, events, budgets,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         user = new UserAccount();
         user.setId(UUID.randomUUID());
@@ -214,5 +228,22 @@ class FaceitAccountServiceTest {
         service.save(user, "Catapult");
 
         assertThat(stored.get()).isNotNull();
+    }
+
+    @Test
+    void aSpentMemberBudget_isA429_withoutAskingFaceit() {
+        budgetLeft = false;
+
+        assertThatThrownBy(() -> service.save(user, "Catapult")).isInstanceOfSatisfying(ApiProblem.class,
+                e -> assertThat(e.code()).isEqualTo(ErrorCode.TOO_MANY_REQUESTS));
+        verifyNoInteractions(client);
+        verify(budgets).forMember(user.getId());
+        assertThat(stored.get()).isNull();
+    }
+
+    @Test
+    void aMalformedNickname_spendsNoBudget() {
+        assertThatThrownBy(() -> service.save(user, "a")).isInstanceOf(ApiProblem.class);
+        verifyNoInteractions(budgets);
     }
 }
