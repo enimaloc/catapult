@@ -154,6 +154,15 @@ public interface ApiService {
     int saveBlizzardWowMain(String username, String region, long characterId);
     /** Forgets the owner's imported World of Warcraft characters and their main. */
     int deleteBlizzardWowCharacters(String username);
+    /**
+     * Declares {@code player} (a Minecraft name or UUID) as the channel owner's account for Hypixel; catapult-api's
+     * status: 400 when malformed, unknown or never on Hypixel, 429 when their refreshes are spent, 503 when Hypixel
+     * cannot be asked.
+     */
+    int saveHypixelAccount(String username, String player);
+
+    int deleteHypixelAccount(String username);
+
     /** Unlinks the owner's Bungie.net account and forgets their Destiny 2 stats. */
     int deleteBungieLink(String username);
     /**

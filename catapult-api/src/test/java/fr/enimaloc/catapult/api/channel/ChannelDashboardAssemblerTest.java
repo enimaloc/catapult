@@ -112,6 +112,8 @@ class ChannelDashboardAssemblerTest {
             mock(fr.enimaloc.catapult.service.blizzard.BlizzardAccountService.class);
     private final fr.enimaloc.catapult.service.faceit.FaceitAccountService faceitAccounts =
             mock(fr.enimaloc.catapult.service.faceit.FaceitAccountService.class);
+    private final fr.enimaloc.catapult.service.hypixel.HypixelAccountService hypixelAccounts =
+            mock(fr.enimaloc.catapult.service.hypixel.HypixelAccountService.class);
     private final fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinks =
             mock(fr.enimaloc.catapult.service.bungie.BungieLinkService.class);
     private final fr.enimaloc.catapult.service.riot.RiotAccountService riotAccounts =
@@ -154,7 +156,7 @@ class ChannelDashboardAssemblerTest {
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumService.class)), categoryCache,
                 streamTitle, dropsGate, dropsCatalog, speedrunAccounts, raAccounts, java.util.Optional.of(blizzardAccounts),
-                bungieLinks, riotAccounts, faceitAccounts, chessAccounts, osuLinks);
+                bungieLinks, riotAccounts, faceitAccounts, chessAccounts, osuLinks, hypixelAccounts);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }
@@ -648,6 +650,20 @@ class ChannelDashboardAssemblerTest {
             assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.FaceitData.class
                     .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
                     .containsExactly("nickname", "profileUrl", "available");
+        }
+
+        @Test
+        void dashboardCarriesTheHypixelSettingsForTheOwnerOnly() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.HypixelData("Notch",
+                    "069a79f444e94726a5befca90e38aaf5", true);
+            when(hypixelAccounts.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).hypixel()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).hypixel()).isNull();
+            verify(hypixelAccounts, never()).data(moderator);
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.HypixelData.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("name", "uuid", "available");
         }
 
         @Test

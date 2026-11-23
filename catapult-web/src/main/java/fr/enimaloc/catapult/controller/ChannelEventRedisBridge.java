@@ -24,6 +24,7 @@ import fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent;
 import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
 import fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent;
 import fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent;
+import fr.enimaloc.catapult.event.hypixel.HypixelAccountChangedEvent;
 import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
 import fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent;
 import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
@@ -186,6 +187,11 @@ public class ChannelEventRedisBridge {
                 var changed = read(data, ChannelEvents.BungieAccountChanged.class);
                 if (changed.account() == null) throw new IllegalArgumentException("no bungie account");
                 yield List.of(BungieAccountChangedEvent.of(login, changed.account()));
+            }
+            case ChannelEvents.HYPIXEL_ACCOUNT_CHANGED -> {
+                var changed = read(data, ChannelEvents.HypixelAccountChanged.class);
+                if (changed.account() == null) throw new IllegalArgumentException("no hypixel account");
+                yield List.of(HypixelAccountChangedEvent.of(login, changed.account()));
             }
             case ChannelEvents.RIOT_ACCOUNT_CHANGED -> {
                 var changed = read(data, ChannelEvents.RiotAccountChanged.class);

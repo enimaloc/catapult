@@ -22,6 +22,7 @@ import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.FaceitData;
 import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
 import fr.enimaloc.catapult.common.dto.channel.OsuAccountData;
+import fr.enimaloc.catapult.common.dto.channel.HypixelData;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
 import fr.enimaloc.catapult.common.dto.channel.RiotData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
@@ -157,6 +158,9 @@ public class MockData {
     private boolean bungieLinked = true;
     /** The osu! card too: linked. */
     private boolean osuLinked = true;
+    /** The Minecraft account the mock session declared for Hypixel (name, UUID). */
+    private String hypixelName;
+    private String hypixelUuid;
     private ObsData obsData;
     private String obsPassword;
     private String twitchatBranch = TwitchatData.AUTO;
@@ -404,7 +408,7 @@ public class MockData {
                 // drops: the mock has no experiments, they are offered
                 drops(), ankamaData(), epicData(), speedrunData(), retroAchievementsData(), blizzardStatsData(),
                 bungieData(),
-                riotData(), faceitData(), chessData(), osuData());
+                riotData(), faceitData(), chessData(), osuData(), hypixelData());
     }
 
     /** The mock's one running drops campaign, on the first binding's category. */
@@ -458,6 +462,21 @@ public class MockData {
         return new BlizzardStatsData(!List.of("NONE", "REMOVED").contains(battleNetLink.status()), blizzardRegion,
                 !blizzardCharacters.isEmpty(), blizzardCharacters, blizzardWowMain, true,
                 blizzardCharacters.isEmpty() ? null : java.time.Instant.parse("2026-11-20T10:00:00Z"));
+    }
+
+    /** The Hypixel card: the mock has a key in its pool, so the card is usable. */
+    public HypixelData hypixelData() {
+        return new HypixelData(hypixelName, hypixelUuid, true);
+    }
+
+    public void saveHypixelAccount(String name, String uuid) {
+        this.hypixelName = name;
+        this.hypixelUuid = uuid;
+    }
+
+    public void deleteHypixelAccount() {
+        hypixelName = null;
+        hypixelUuid = null;
     }
 
     public BungieAccountData bungieData() {

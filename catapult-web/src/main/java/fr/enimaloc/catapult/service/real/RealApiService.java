@@ -412,6 +412,18 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public int saveHypixelAccount(String username, String player) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/hypixel/account",
+                new fr.enimaloc.catapult.common.dto.channel.HypixelAccountRequest(player), id), status -> status);
+    }
+
+    @Override
+    public int deleteHypixelAccount(String username) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/hypixel/account", id),
+                status -> status);
+    }
+
+    @Override
     public int deleteRetroAchievementsUsername(String username) {
         return onChannel(username, id -> client.delete(
                 "/api/internal/users/{userId}/settings/retroachievements/username", id), status -> status);
