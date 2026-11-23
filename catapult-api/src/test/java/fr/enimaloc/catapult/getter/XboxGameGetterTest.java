@@ -231,6 +231,23 @@ class XboxGameGetterTest {
     }
 
     @Test
+    void getCurrentGame_unknownTitleWithoutName_skipsTheDetection() {
+        // Seen in prod: a new title the presence lists without a name, which Titlehub answers 404 with no titles
+        Map<String, Object> presence = presence(Map.of("id", "1800597931", "name", "", "state", "Active"));
+        when(responseSpec.body(Map.class)).thenReturn(presence).thenThrow(new RuntimeException("404 Not Found"));
+
+        assertThatThrownBy(() -> getter.getCurrentGame(user)).isInstanceOf(DetectionTimeoutException.class);
+    }
+
+    @Test
+    void getCurrentGame_titlehubWithoutTitlesAndNoName_skipsTheDetection() {
+        Map<String, Object> presence = presence(Map.of("id", "1800597931", "name", " ", "state", "Active"));
+        doReturn(presence, Map.of("xuid", "1", "titles", List.of())).when(responseSpec).body(Map.class);
+
+        assertThatThrownBy(() -> getter.getCurrentGame(user)).isInstanceOf(DetectionTimeoutException.class);
+    }
+
+    @Test
     void getCurrentGame_inactiveTitle_returnsEmpty() {
         Map<String, Object> response = Map.of("devices", List.of(
             Map.of("titles", List.of(
