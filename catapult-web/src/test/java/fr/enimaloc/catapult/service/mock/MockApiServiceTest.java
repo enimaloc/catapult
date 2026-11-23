@@ -514,14 +514,12 @@ class MockApiServiceTest {
 
     @Test
     void chessAccounts_followTheSettingsAndTellThePage() {
-        assertThat(data.chessData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.ChessData(null, null,
-                null, null));
+        assertThat(data.chessData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.ChessData(null, null));
 
         assertThat(service.saveChessUsername(username, "chesscom", " Hikaru ")).isEqualTo(204);
         assertThat(service.saveChessUsername(username, "lichess", "DrNykterstein")).isEqualTo(204);
         assertThat(service.saveChessUsername(username, "lichess", "gone")).isEqualTo(400);
-        assertThat(data.chessData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.ChessData("hikaru",
-                "https://www.chess.com/member/hikaru", "DrNykterstein", "https://lichess.org/@/DrNykterstein"));
+        assertThat(data.chessData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.ChessData("hikaru", "DrNykterstein"));
 
         assertThat(service.deleteChessUsername(username, "chesscom")).isEqualTo(204);
         assertThat(data.chessData().chesscomUsername()).isNull();
@@ -530,7 +528,7 @@ class MockApiServiceTest {
         assertThat(events).hasSize(3).allSatisfy(event -> assertThat(event)
                 .isInstanceOf(fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent.class));
         assertThat(events.getLast()).isEqualTo(new fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent(
-                username, null, null, "DrNykterstein", "https://lichess.org/@/DrNykterstein"));
+                username, null, "DrNykterstein"));
     }
 
     @Test

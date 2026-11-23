@@ -263,13 +263,12 @@ class ChessAccountServiceTest {
     void theCardDataGivesTheNamesAndProfilePagesOnly() {
         existing(true, true);
 
-        assertThat(service.data(user)).isEqualTo(new ChessData("hikaru", "https://www.chess.com/member/hikaru",
-                "DrNykterstein", "https://lichess.org/@/DrNykterstein"));
+        assertThat(service.data(user)).isEqualTo(new ChessData("hikaru", "DrNykterstein"));
         verifyNoInteractions(client);
     }
 
     @Test
     void theCardDataWithoutAccountIsEmpty() {
-        assertThat(service.data(user)).isEqualTo(new ChessData(null, null, null, null));
+        assertThat(service.data(user)).isEqualTo(new ChessData(null, null));
     }
 }

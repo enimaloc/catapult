@@ -26,8 +26,7 @@ class IntegrationCardsChessTest {
     private static final String PREFIX = "channel.connections.chess.";
 
     private static ChessData data(String chesscom, String lichess) {
-        return new ChessData(chesscom, chesscom == null ? null : "https://www.chess.com/member/" + chesscom,
-                lichess, lichess == null ? null : "https://lichess.org/@/" + lichess);
+        return new ChessData(chesscom, lichess);
     }
 
     private static List<IntegrationNode> all(List<IntegrationNode> nodes) {

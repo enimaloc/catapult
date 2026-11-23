@@ -176,8 +176,7 @@ class ChannelEventStreamControllerTest {
     void theChessAccountsGoToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
         MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
         MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
-        var changed = new fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent("enimaloc", "chessplayer",
-                "https://www.chess.com/member/chessplayer", null, null);
+        var changed = new fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent("enimaloc", "chessplayer", null);
 
         controller.onChannelUpdated(changed);
 

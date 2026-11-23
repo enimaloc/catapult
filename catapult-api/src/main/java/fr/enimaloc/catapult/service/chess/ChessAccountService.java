@@ -12,7 +12,6 @@ import fr.enimaloc.catapult.service.enrichment.FetchBudget;
 import fr.enimaloc.catapult.service.enrichment.MemberFetchBudgets;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessClient;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessNotFoundException;
-import fr.enimaloc.catapult.service.enrichment.chess.ChessProfiles;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessSite;
 import fr.enimaloc.catapult.service.enrichment.chess.ChesscomPlayer;
 import fr.enimaloc.catapult.service.enrichment.chess.LichessUser;
@@ -136,17 +135,15 @@ public class ChessAccountService {
         }
     }
 
-    /** The settings card's data; built from the row (read once) only, never calling a chess site. */
+    /** The settings card's data: the names, from the row (read once) only, never calling a chess site. */
     public ChessData data(UserAccount user) {
         return data(user.getId());
     }
 
     private ChessData data(UUID userId) {
         Optional<ChessAccount> row = accounts.findById(userId);
-        String chesscom = row.map(ChessAccount::getChesscomUsername).orElse(null);
-        String lichess = row.map(ChessAccount::getLichessUsername).orElse(null);
-        return new ChessData(chesscom, chesscom == null ? null : ChessProfiles.chesscom(chesscom),
-                lichess, lichess == null ? null : ChessProfiles.lichess(lichess));
+        return new ChessData(row.map(ChessAccount::getChesscomUsername).orElse(null),
+                row.map(ChessAccount::getLichessUsername).orElse(null));
     }
 
     /** The member's cached chess stats were read with the old accounts: forgotten; then the owner's pages are told. */

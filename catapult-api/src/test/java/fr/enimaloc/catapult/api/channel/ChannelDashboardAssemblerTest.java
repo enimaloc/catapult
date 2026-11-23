@@ -644,8 +644,7 @@ class ChannelDashboardAssemblerTest {
 
         @Test
         void dashboardCarriesTheChessAccountsForTheOwnerOnly() {
-            var account = new fr.enimaloc.catapult.common.dto.channel.ChessData("hikaru",
-                    "https://www.chess.com/member/hikaru", "DrNykterstein", "https://lichess.org/@/DrNykterstein");
+            var account = new fr.enimaloc.catapult.common.dto.channel.ChessData("hikaru", "DrNykterstein");
             when(chessAccounts.data(owner)).thenReturn(account);
 
             assertThat(assembler().page(owner, owner, "streamer", 0, null, null).chess()).isEqualTo(account);

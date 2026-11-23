@@ -142,11 +142,10 @@ class ChannelStateTest {
         ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
                 false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
                 null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                new fr.enimaloc.catapult.common.dto.channel.ChessData("hikaru", "https://www.chess.com/member/hikaru", "DrNykterstein", "https://lichess.org/@/DrNykterstein"));
+                new fr.enimaloc.catapult.common.dto.channel.ChessData("hikaru", "DrNykterstein"));
 
         assertThat(events(ChannelState.of(ch, SETTINGS, null)))
-                .contains(new fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent("enimaloc", "hikaru",
-                        "https://www.chess.com/member/hikaru", "DrNykterstein", "https://lichess.org/@/DrNykterstein"));
+                .contains(new fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent("enimaloc", "hikaru", "DrNykterstein"));
     }
 
     @Test

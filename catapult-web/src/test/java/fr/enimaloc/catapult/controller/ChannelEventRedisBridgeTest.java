@@ -276,11 +276,11 @@ class ChannelEventRedisBridgeTest {
 
     @Test
     void bridgeRelaysChessAccountChanged() {
-        var account = new fr.enimaloc.catapult.common.dto.channel.ChessData("hikaru", "https://www.chess.com/member/hikaru", "DrNykterstein", "https://lichess.org/@/DrNykterstein");
+        var account = new fr.enimaloc.catapult.common.dto.channel.ChessData("hikaru", "DrNykterstein");
 
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CHESS_ACCOUNT_CHANGED,
                 new ChannelEvents.ChessAccountChanged(owner.toString(), "streamer", account))))
-                .containsExactly(new fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent("streamer", "hikaru", "https://www.chess.com/member/hikaru", "DrNykterstein", "https://lichess.org/@/DrNykterstein"));
+                .containsExactly(new fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent("streamer", "hikaru", "DrNykterstein"));
     }
 
     @Test

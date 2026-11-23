@@ -514,9 +514,7 @@ public class MockData {
     }
 
     public ChessData chessData() {
-        return new ChessData(chesscomUsername,
-                chesscomUsername == null ? null : "https://www.chess.com/member/" + chesscomUsername,
-                lichessUsername, lichessUsername == null ? null : "https://lichess.org/@/" + lichessUsername);
+        return new ChessData(chesscomUsername, lichessUsername);
     }
 
     /** Declares {@code name} on {@code site} ({@code chesscom}, lowercased as Chess.com does, or {@code lichess}). */
