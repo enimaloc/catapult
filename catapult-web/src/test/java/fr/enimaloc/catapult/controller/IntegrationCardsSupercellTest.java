@@ -80,11 +80,24 @@ class IntegrationCardsSupercellTest {
     }
 
     @Test
-    void aMissingGame_isShownEmpty() {
-        List<IntegrationNode> nodes = game(new SupercellData(null, null, null), "clash-of-clans");
+    void aGameWithoutKeys_isOnlyOfferedWhenAPlayerIsDeclared() {
+        var unusable = new SupercellData.Game(null, null, false);
+        var declared = new SupercellData.Game("#9YY", null, false);
+        List<String> sections = IntegrationCards.supercell(new SupercellData(null, unusable, declared)).nodes()
+                .stream().map(node -> node.attrs().className()).filter(c -> c != null && c.contains("supercell-game"))
+                .toList();
 
-        assertThat(shown(byClass(nodes, "supercell-none"))).isTrue();
-        assertThat(shown(byClass(nodes, "supercell-unavailable"))).isTrue();
+        assertThat(sections).singleElement().asString().contains("supercell-brawl-stars");
+        // Declared but no longer usable: kept so the member can remove it, with the unavailable notice
+        assertThat(shown(byClass(game(new SupercellData(null, null, declared), "brawl-stars"),
+                "supercell-unavailable"))).isTrue();
+    }
+
+    @Test
+    void anApiCard_isOfferedWhenUsableOrWhenTheMemberSavedSomething() {
+        assertThat(IntegrationCards.offered(true, false)).isTrue();
+        assertThat(IntegrationCards.offered(false, true)).isTrue();
+        assertThat(IntegrationCards.offered(false, false)).isFalse();
     }
 
     @Test
