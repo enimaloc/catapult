@@ -1,9 +1,7 @@
 package fr.enimaloc.catapult.api.error;
 
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.server.PathContainer;
-import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
@@ -17,14 +15,13 @@ import java.util.TreeSet;
  * The API versions a route is served in, for a request no handler took: a versioned route asked in another version
  * finds no handler and falls through to the static resources, whose 404 says nothing of the version. Read from the
  * request mappings on demand (a 404 is rare), and lazily: the advice must not pull the handler mapping in early.
+ * Built by {@link ProblemAdvice}, not a bean of its own: the MVC test slices load the advice, not the components.
  */
-@Component
 public class RouteVersions {
 
     private final ObjectProvider<RequestMappingHandlerMapping> mapping;
 
-    public RouteVersions(@Qualifier("requestMappingHandlerMapping")
-                         ObjectProvider<RequestMappingHandlerMapping> mapping) {
+    public RouteVersions(ObjectProvider<RequestMappingHandlerMapping> mapping) {
         this.mapping = mapping;
     }
 

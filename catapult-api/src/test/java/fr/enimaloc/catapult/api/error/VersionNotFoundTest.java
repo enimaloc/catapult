@@ -26,7 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class VersionNotFoundTest {
 
     @Autowired WebApplicationContext wac;
-    @Autowired RouteVersions routeVersions;
+    @Autowired @org.springframework.beans.factory.annotation.Qualifier("requestMappingHandlerMapping")
+    org.springframework.beans.factory.ObjectProvider<org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping> mappings;
     @MockitoBean TwitchLoginSuccessHandler twitchLoginSuccessHandler;
 
     private MockMvc mvc() {
@@ -53,6 +54,7 @@ class VersionNotFoundTest {
 
     @Test
     void theVersionsOfARoute_onlyWhenAllMatchesAreVersioned() {
+        RouteVersions routeVersions = new RouteVersions(mappings);
         assertThat(routeVersions.of("/api/games/speedrun/o1y9j9v6", "GET")).containsExactly("3");
         assertThat(routeVersions.of("/api/games/speedrun/o1y9j9v6", "DELETE")).isEmpty();
         assertThat(routeVersions.of("/api/nothing", "GET")).isEmpty();

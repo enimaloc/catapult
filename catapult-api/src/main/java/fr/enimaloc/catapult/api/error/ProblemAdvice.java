@@ -15,7 +15,9 @@ import java.util.Set;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.MessageSource;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpHeaders;
@@ -32,6 +34,7 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.util.DisconnectedClientHelper;
 
@@ -50,8 +53,9 @@ public class ProblemAdvice extends ResponseEntityExceptionHandler {
     private final @Nullable RouteVersions routeVersions;
 
     @Autowired
-    public ProblemAdvice(RouteVersions routeVersions) {
-        this.routeVersions = routeVersions;
+    public ProblemAdvice(@Qualifier("requestMappingHandlerMapping")
+                         ObjectProvider<RequestMappingHandlerMapping> requestMappings) {
+        this.routeVersions = new RouteVersions(requestMappings);
     }
 
     /** A standalone setup (a test) without the request mappings: a 404 says nothing of the versions. */
