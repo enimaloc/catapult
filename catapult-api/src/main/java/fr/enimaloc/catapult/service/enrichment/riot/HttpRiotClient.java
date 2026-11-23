@@ -220,7 +220,8 @@ public class HttpRiotClient implements RiotClient {
         for (int attempt = 0; attempt < 2; attempt++) {
             String key = keys.nextKey(cluster)
                     .orElseThrow(() -> new RiotUnavailableException("no Riot API key serves this cluster"));
-            if (key.equals(tried)) {
+            if (key.equals(tried) || keys.blocked(key)) {
+                // every key that serves the cluster is set aside: nothing is sent
                 break;
             }
             tried = key;
@@ -237,7 +238,7 @@ public class HttpRiotClient implements RiotClient {
             }
             return interpret(bucket, answer);
         }
-        throw new RiotUnavailableException("Riot refused the API key");
+        throw new RiotUnavailableException("no usable Riot API key now");
     }
 
     private JsonNode ddragon(String url, int maxBytes) {

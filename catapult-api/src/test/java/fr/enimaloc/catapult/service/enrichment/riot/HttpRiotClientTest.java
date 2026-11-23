@@ -188,6 +188,16 @@ class HttpRiotClientTest {
     }
 
     @Test
+    void everyKeySetAside_sendsNothing() {
+        rotator.onKeyRejected(KEY, Duration.ofHours(1));
+
+        assertThatThrownBy(() -> client.lolSummoner(RiotPlatform.EUW1, PUUID))
+                .isInstanceOf(RiotUnavailableException.class);
+        assertThat(buckets).isEmpty();
+        server.verify();
+    }
+
+    @Test
     void noKeyForTheCluster_isAnOutage_withoutAnyRequest() {
         when(repository.findByExclusiveFalse()).thenReturn(List.of(new RiotApiKeyEntry(KEY, "americas")));
         rotator.refreshKeys();

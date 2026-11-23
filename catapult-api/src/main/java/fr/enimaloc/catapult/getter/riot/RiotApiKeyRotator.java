@@ -113,6 +113,11 @@ public class RiotApiKeyRotator {
         return keys.stream().anyMatch(k -> k.scope() == null || k.scope() == cluster);
     }
 
+    /** Whether {@code key} is set aside now (refused or rate limited). */
+    public boolean blocked(String key) {
+        return keyBlockedUntil.getOrDefault(key, 0L) > clock.millis();
+    }
+
     public Map<String, Long> getKeyBlockedUntil() {
         return Map.copyOf(keyBlockedUntil);
     }

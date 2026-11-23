@@ -87,6 +87,8 @@ class RiotApiKeyRotatorTest {
         rotator.onKeyRejected("A", Duration.ofHours(1));
 
         for (int i = 0; i < 4; i++) assertThat(rotator.nextKey(Cluster.EUROPE)).contains("B");
+        assertThat(rotator.blocked("A")).isTrue();
+        assertThat(rotator.blocked("B")).isFalse();
         assertThat(rotator.blockedKeyCount()).isEqualTo(1);
         assertThat(rotator.availableKeyCount()).isEqualTo(1);
 
