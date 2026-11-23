@@ -168,6 +168,9 @@ public class EnrichmentProperties {
     private Bungie bungie = new Bungie();
     private Riot riot = new Riot();
     private Faceit faceit = new Faceit();
+    private SourceSettings chessChesscomStats = new SourceSettings();
+    private SourceSettings chessChesscomGames = new SourceSettings();
+    private SourceSettings chessLichessUser = new SourceSettings();
     private Speedrun speedrun = new Speedrun();
     private RetroAchievements retroachievements = new RetroAchievements();
     private XboxStats xboxStats = new XboxStats();
@@ -325,6 +328,9 @@ public class EnrichmentProperties {
             case FACEIT_PLAYER -> faceitPlayer;
             case FACEIT_STATS -> faceitStats;
             case FACEIT_LAST_MATCH -> faceitLastMatch;
+            case CHESS_CHESSCOM_STATS -> chessChesscomStats;
+            case CHESS_CHESSCOM_GAMES -> chessChesscomGames;
+            case CHESS_LICHESS_USER -> chessLichessUser;
         };
     }
 
@@ -358,6 +364,8 @@ public class EnrichmentProperties {
             case RIOT_LOL_CHAMPIONS -> Duration.ofDays(1);
             case FACEIT_PLAYER, FACEIT_STATS -> Duration.ofMinutes(10);
             case FACEIT_LAST_MATCH -> Duration.ofMinutes(5);
+            case CHESS_CHESSCOM_STATS -> Duration.ofMinutes(10);
+            case CHESS_CHESSCOM_GAMES, CHESS_LICHESS_USER -> Duration.ofMinutes(2);
         };
     }
 }
