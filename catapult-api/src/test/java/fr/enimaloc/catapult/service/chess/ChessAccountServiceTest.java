@@ -7,6 +7,8 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.chess.ChessAccount;
 import fr.enimaloc.catapult.repository.chess.ChessAccountRepository;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentCache;
+import fr.enimaloc.catapult.service.enrichment.FetchBudget;
+import fr.enimaloc.catapult.service.enrichment.MemberFetchBudgets;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessClient;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessNotFoundException;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessUnavailableException;
@@ -19,6 +21,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.dao.OptimisticLockingFailureException;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Map;
@@ -50,6 +53,8 @@ class ChessAccountServiceTest {
     private final ChessClient client = mock(ChessClient.class);
     private final EnrichmentCache cache = mock(EnrichmentCache.class);
     private final ChannelEventPublisher events = mock(ChannelEventPublisher.class);
+    private final MemberFetchBudgets budgets = mock(MemberFetchBudgets.class);
+    private boolean budgetLeft = true;
     private final UserAccount user = new UserAccount();
     private ChessAccountService service;
 
@@ -57,7 +62,19 @@ class ChessAccountServiceTest {
     void setUp() {
         user.setId(UUID.randomUUID());
         when(accounts.findById(user.getId())).thenReturn(Optional.empty());
-        service = new ChessAccountService(accounts, client, cache, events, Clock.fixed(NOW, ZoneOffset.UTC));
+        when(budgets.forMember(user.getId())).thenReturn(new FetchBudget() {
+            @Override
+            public boolean tryAcquire() {
+                return budgetLeft;
+            }
+
+            @Override
+            public Duration retryAfter() {
+                return Duration.ofSeconds(42);
+            }
+        });
+        service = new ChessAccountService(accounts, client, cache, events, budgets,
+                Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private ChessAccount existing(boolean chesscom, boolean lichess) {
@@ -116,6 +133,29 @@ class ChessAccountServiceTest {
         }
         verifyNoInteractions(client);
         verify(accounts, never()).save(any());
+    }
+
+    @Test
+    void aSaveWithItsRefreshesSpentIsA429AndAsksNobody() {
+        budgetLeft = false;
+
+        assertThatThrownBy(() -> service.saveChesscom(user, "hikaru")).isInstanceOf(ApiProblem.class)
+                .satisfies(e -> {
+                    assertThat(((ApiProblem) e).code()).isEqualTo(ErrorCode.TOO_MANY_REQUESTS);
+                    assertThat(((ApiProblem) e).getBody().getProperties()).containsEntry("retryAfter", 42L);
+                });
+        assertThatThrownBy(() -> service.saveLichess(user, "DrNykterstein")).isInstanceOf(ApiProblem.class)
+                .extracting(e -> ((ApiProblem) e).code()).isEqualTo(ErrorCode.TOO_MANY_REQUESTS);
+        verifyNoInteractions(client);
+        verify(accounts, never()).save(any());
+    }
+
+    @Test
+    void aMalformedNameCostsNoRefresh() {
+        assertThatThrownBy(() -> service.saveChesscom(user, "a b")).isInstanceOf(ApiProblem.class);
+        assertThatThrownBy(() -> service.saveLichess(user, "-x")).isInstanceOf(ApiProblem.class);
+
+        verifyNoInteractions(budgets);
     }
 
     @Test

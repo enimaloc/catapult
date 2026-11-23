@@ -8,6 +8,8 @@ import fr.enimaloc.catapult.domain.chess.ChessAccount;
 import fr.enimaloc.catapult.repository.chess.ChessAccountRepository;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentCache;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentSource;
+import fr.enimaloc.catapult.service.enrichment.FetchBudget;
+import fr.enimaloc.catapult.service.enrichment.MemberFetchBudgets;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessClient;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessNotFoundException;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessProfiles;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Predicate;
@@ -32,7 +35,8 @@ import java.util.regex.Pattern;
 /**
  * A member's chess accounts: the Chess.com and the Lichess names they declare. Each name is checked with its site
  * before anything is written, which also gives the stable id kept next to it (an unknown or closed account is a
- * 400, the site out of reach or limited a 503). As with any declared name, nothing stops a member from declaring
+ * 400, the site out of reach or limited a 503). Each check takes one of the member's refreshes: spent, the save is a
+ * 429 and the site is not asked; a malformed name costs nothing. As with any declared name, nothing stops a member from declaring
  * someone else's account: what is read with it is only ever served to the member. The row exists only while it
  * holds one account. Each write re-reads the row and is optimistically locked: one that crosses another is redone
  * once on the fresh row, then answers 409. A change forgets the member's cached stats; telling the owner's pages
@@ -55,20 +59,22 @@ public class ChessAccountService {
     private final ChessClient client;
     private final EnrichmentCache cache;
     private final ChannelEventPublisher events;
+    private final MemberFetchBudgets budgets;
     private final Clock clock;
 
     @Autowired
     public ChessAccountService(ChessAccountRepository accounts, ChessClient client, EnrichmentCache cache,
-                               ChannelEventPublisher events) {
-        this(accounts, client, cache, events, Clock.systemUTC());
+                               ChannelEventPublisher events, MemberFetchBudgets budgets) {
+        this(accounts, client, cache, events, budgets, Clock.systemUTC());
     }
 
     ChessAccountService(ChessAccountRepository accounts, ChessClient client, EnrichmentCache cache,
-                        ChannelEventPublisher events, Clock clock) {
+                        ChannelEventPublisher events, MemberFetchBudgets budgets, Clock clock) {
         this.accounts = accounts;
         this.client = client;
         this.cache = cache;
         this.events = events;
+        this.budgets = budgets;
         this.clock = clock;
     }
 
@@ -78,6 +84,7 @@ public class ChessAccountService {
         if (!CHESSCOM_USERNAME.matcher(name).matches()) {
             throw new ApiProblem(ErrorCode.BAD_REQUEST, "Invalid Chess.com username");
         }
+        charge(user);
         ChesscomPlayer found = lookUp(ChessSite.CHESSCOM, () -> client.chesscomPlayer(name));
         write(user.getId(), true, row -> {
             row.setChesscomUsername(found.username());
@@ -106,6 +113,7 @@ public class ChessAccountService {
         if (!LICHESS_USERNAME.matcher(name).matches()) {
             throw new ApiProblem(ErrorCode.BAD_REQUEST, "Invalid Lichess username");
         }
+        charge(user);
         LichessUser found = lookUp(ChessSite.LICHESS, () -> client.lichessUser(name));
         write(user.getId(), true, row -> {
             row.setLichessId(found.id());
@@ -193,13 +201,25 @@ public class ChessAccountService {
         return true;
     }
 
+    /**
+     * Takes the check from the member's refreshes ({@link MemberFetchBudgets}, shared with the stats detail routes):
+     * spent, the save is a 429 and the site is not asked, so that one member cannot keep a site's only slot busy.
+     */
+    private void charge(UserAccount user) {
+        FetchBudget budget = budgets.forMember(user.getId());
+        if (!budget.tryAcquire()) {
+            throw new ApiProblem(ErrorCode.TOO_MANY_REQUESTS, "Too many chess name checks for your account, try "
+                    + "again later", Map.of("retryAfter", Math.max(1, budget.retryAfter().toSeconds())));
+        }
+    }
+
     /** One check with the site: its recognised "not found" is a 400, anything else that fails a 503. */
     private static <T> T lookUp(ChessSite site, Supplier<T> call) {
         String name = site == ChessSite.CHESSCOM ? "Chess.com" : "Lichess";
         try {
             return call.get();
         } catch (ChessNotFoundException e) {
-            throw new ApiProblem(ErrorCode.BAD_REQUEST, "Unknown " + name + " username");
+            throw new ApiProblem(ErrorCode.BAD_REQUEST, "Unknown or closed " + name + " account");
         } catch (RuntimeException e) {
             log.warn("{} settings check failed: {}", name, e.getClass().getSimpleName());
             throw new ApiProblem(ErrorCode.SERVICE_UNAVAILABLE, name + " cannot be reached right now");

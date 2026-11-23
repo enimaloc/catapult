@@ -574,7 +574,10 @@ public class ApiChannelActionsController {
         retroAchievementsAccountService.deleteApiKey(userResolver.user(userId));
     }
 
-    /** 400 when Chess.com does not know the name, 503 when it cannot be asked. */
+    /**
+     * 400 when Chess.com does not know the name (or the account is closed), 429 when the member's refreshes
+     * are spent, 503 when it cannot be asked.
+     */
     @PreAuthorize("@authz.ownsChannel(#userId)")
     @PutMapping("/settings/chess/chesscom")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -594,7 +597,10 @@ public class ApiChannelActionsController {
         chessAccountService.deleteChesscom(userResolver.user(userId));
     }
 
-    /** 400 when Lichess does not know the name (or the account is closed), 503 when it cannot be asked. */
+    /**
+     * 400 when Lichess does not know the name (or the account is closed), 429 when the member's refreshes
+     * are spent, 503 when it cannot be asked.
+     */
     @PreAuthorize("@authz.ownsChannel(#userId)")
     @PutMapping("/settings/chess/lichess")
     @ResponseStatus(HttpStatus.NO_CONTENT)
