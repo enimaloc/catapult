@@ -118,6 +118,10 @@ class GameEnrichmentAssemblerTest {
     private final RetroAchievementsStatsService raStats = mock(RetroAchievementsStatsService.class);
     private final BlizzardStatsService blizzardStats = mock(BlizzardStatsService.class);
     private final BlizzardGameDataService blizzardData = mock(BlizzardGameDataService.class);
+    private final fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService bungieStats =
+            mock(fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService.class);
+    private final fr.enimaloc.catapult.service.enrichment.bungie.BungieGameDataService bungieData =
+            mock(fr.enimaloc.catapult.service.enrichment.bungie.BungieGameDataService.class);
     private final EnrichmentProperties properties = new EnrichmentProperties();
 
     private GameEnrichmentAssembler assembler;
@@ -127,7 +131,8 @@ class GameEnrichmentAssemblerTest {
         properties.setAggregateTimeout(Duration.ofSeconds(2));
         assembler = new GameEnrichmentAssembler(hltb, protonDb, steamGridDb, steamDeck, pcgw, prices, openCritic,
                 twitch, speedrunGames, speedrunIdentity, speedrunPersonal, igdbService, igdbGameDetailsService,
-                trailers, steamStats, xboxStats, raStats, blizzardStats, blizzardData, properties);
+                trailers, steamStats, xboxStats, raStats, blizzardStats, blizzardData, bungieStats, bungieData,
+                properties);
         when(hltb.timeToBeat(any(), any())).thenReturn(Optional.of(TTB));
         when(protonDb.summary(anyString(), any())).thenReturn(Optional.of(PROTON));
         when(steamGridDb.bySteamAppId(anyString(), any())).thenReturn(Optional.of(SGDB));
@@ -370,6 +375,8 @@ class GameEnrichmentAssemblerTest {
                 .withBean(RetroAchievementsStatsService.class, () -> raStats)
                 .withBean(BlizzardStatsService.class, () -> blizzardStats)
                 .withBean(BlizzardGameDataService.class, () -> blizzardData)
+                .withBean(fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService.class, () -> bungieStats)
+                .withBean(fr.enimaloc.catapult.service.enrichment.bungie.BungieGameDataService.class, () -> bungieData)
                 .withBean(EnrichmentProperties.class)
                 .withUserConfiguration(GameEnrichmentAssembler.class)
                 .run(ctx -> assertThat(ctx).hasSingleBean(GameEnrichmentAssembler.class));
@@ -743,5 +750,46 @@ class GameEnrichmentAssemblerTest {
             Thread.sleep(delay.toMillis());
             return value;
         };
+    }
+
+    // ---------------------------------------------------------------- Bungie
+
+    private static final DetectedGame DESTINY2 = new DetectedGame("1085660", GameBinding.SourceType.STEAM,
+            "Destiny 2");
+    private static final fr.enimaloc.catapult.service.enrichment.bungie.BungiePublisher SEASON =
+            new fr.enimaloc.catapult.service.enrichment.bungie.BungiePublisher(
+                    fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BungieGame.DESTINY2,
+                    new fr.enimaloc.catapult.service.enrichment.bungie.BungiePublisher.Season(28, "Monument", null,
+                            null));
+    private static final fr.enimaloc.catapult.service.enrichment.bungie.BungieStats D2_STATS =
+            new fr.enimaloc.catapult.service.enrichment.bungie.BungieStats(Status.OK,
+                    fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BungieGame.DESTINY2,
+                    "Guardian#0042", null, null);
+
+    @Test
+    void publicAggregateHasNoBungieStats_butTheSeason() {
+        when(bungieData.forGame(eq(fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BungieGame.DESTINY2),
+                any(), any())).thenReturn(Optional.of(SEASON));
+
+        GameEnrichment result = assembler.enrich(DESTINY2, Optional.of("25657"), Optional.of("1085660"), "Destiny 2",
+                "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
+
+        assertThat(result.stats()).isNull();
+        verifyNoInteractions(bungieStats);
+        assertThat(result.publisher()).isEqualTo(new PublisherEnrichment(null, SEASON));
+    }
+
+    @Test
+    void memberBungieStats_onlyOnDestiny2() {
+        UserAccount user = member();
+        when(bungieStats.forDetected(eq(user), eq("25657"), eq(Locale.FRENCH), any()))
+                .thenReturn(Optional.of(D2_STATS));
+
+        GameEnrichment result = assembler.enrich(DESTINY2, Optional.of("25657"), Optional.of("1085660"), "Destiny 2",
+                "FR", null, LINKS, Optional.of(user), Locale.FRENCH);
+
+        assertThat(result.stats().bungie()).isEqualTo(D2_STATS);
+        // no Blizzard object on a Bungie game
+        assertThat(result.stats().blizzard()).isNull();
     }
 }

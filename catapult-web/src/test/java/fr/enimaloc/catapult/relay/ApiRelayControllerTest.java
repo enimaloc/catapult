@@ -254,7 +254,7 @@ class ApiRelayControllerTest {
     void relaysThePublicApiByResource() throws Exception {
         for (String path : List.of("/api/me/game", "/api/me/game/summary", "/api/me/bindings/x1",
                 "/api/games/igdb/1", "/api/games/steam/2", "/api/games/xbox/9N", "/api/games/dtdd/3",
-                "/api/me/stats/blizzard/wow", "/api/games/blizzard/wow/token/eu",
+                "/api/me/stats/blizzard/wow", "/api/me/stats/bungie/destiny2", "/api/games/blizzard/wow/token/eu",
                 "/api/games/blizzard/hearthstone/deck/AAECAR8GxwPJBLsF")) {
             mvc.perform(get(path).queryParam("token", "catr_READ")).andExpect(status().isOk());
             assertThat(RECEIVED.get().uri()).isEqualTo(path + "?token=catr_READ");

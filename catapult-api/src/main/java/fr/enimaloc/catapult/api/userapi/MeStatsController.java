@@ -10,6 +10,9 @@ import fr.enimaloc.catapult.service.enrichment.UpstreamBudgetExceededException;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStats;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStatsService;
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BlizzardGame;
+import fr.enimaloc.catapult.service.enrichment.bungie.BungieStats;
+import fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService;
+import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BungieGame;
 import fr.enimaloc.catapult.service.enrichment.rastats.RaAccountView;
 import fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsStatsService;
 import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.PlatformStats;
@@ -67,6 +70,7 @@ public class MeStatsController {
     private final XboxStatsService xboxStatsService;
     private final RetroAchievementsStatsService retroAchievementsStatsService;
     private final BlizzardStatsService blizzardStatsService;
+    private final BungieStatsService bungieStatsService;
     private final MemberFetchBudgets memberFetchBudgets;
     private final ApiUserResolver userResolver;
     private final PublicBaseUrl publicBaseUrl;
@@ -81,8 +85,8 @@ public class MeStatsController {
                     + "blizzard, each null when it does not apply (not linked, game not found there), each with its "
                     + "status and a \"more\" link to its detail; the platforms with their play time and "
                     + "achievements summary (unlocked, total, percent, the 5 latest, the rarest), blizzard with your "
-                    + "BattleTag, region and the game's object (wow main character, sc2 or d3 profile). stats is "
-                    + "null when nothing applies.")
+                    + "BattleTag, region and the game's object (wow main character, sc2 or d3 profile), bungie "
+                    + "with your Bungie Name and destiny2 profile. stats is null when nothing applies.")
     @ApiResponse(responseCode = "200", description = "inGame=false while no game is detected; otherwise your stats.")
     public CurrentStats current(
             @AuthenticationPrincipal UUID userId,
@@ -203,6 +207,35 @@ public class MeStatsController {
         BlizzardStats stats = detail(userId, notFound, (user, budget) -> blizzardStatsService.forGame(user,
                 blizzardGame, RequestLocale.parse(lang, acceptLanguage), budget, true));
         return GameInfoV3Response.blizzardStats(stats, links());
+    }
+
+    @GetMapping("/bungie/{game}")
+    @Operation(summary = "Get your stats on a Bungie game",
+            description = "The bungie object of GET /api/me/stats (status, game, account = your Bungie Name, and "
+                    + "destiny2: the platform your profile is read from, guardian rank, triumph score, last played, "
+                    + "the character you played last and the activity under way), plus what only the detail has: "
+                    + "destiny2.characters (every character, the one played last first). The season in progress is "
+                    + "public data, in publisher.bungie of GET /api/me/game." + STATUS_NOTE + BUDGET_NOTE)
+    @ApiResponse(responseCode = "200", description = "Your stats on the game.")
+    @ApiResponse(responseCode = "400", description = "Unknown game (destiny2).", content = @Content)
+    @ApiResponse(responseCode = "404", description = "No Bungie.net account linked (or Bungie refused the link "
+            + "since), or Bungie stats unavailable on this instance.", content = @Content)
+    @ApiResponse(responseCode = "429", description = "Your refreshes are spent; retry after Retry-After seconds.",
+            content = @Content)
+    public BungieStats bungie(
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "Bungie game: destiny2.", in = ParameterIn.PATH, example = "destiny2")
+            @PathVariable @Pattern(regexp = ApiV2.BUNGIE_GAME) String game,
+            @Parameter(description = LANG_DESCRIPTION, example = "fr", schema = @Schema(defaultValue = "en"))
+            @RequestParam(name = "lang", required = false) String lang,
+            @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER,
+                    example = "fr-FR,fr;q=0.9")
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        String notFound = "No Bungie stats for you: Bungie.net not linked (or the link has to be made again), or "
+                + "Bungie stats unavailable";
+        BungieStats stats = detail(userId, notFound, (user, budget) -> bungieStatsService.forGame(user,
+                BungieGame.DESTINY2, RequestLocale.parse(lang, acceptLanguage), budget, true));
+        return GameInfoV3Response.bungieStats(stats, links());
     }
 
     @GetMapping("/retroachievements")

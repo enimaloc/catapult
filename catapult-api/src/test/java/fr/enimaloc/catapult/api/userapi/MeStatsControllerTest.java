@@ -86,6 +86,7 @@ class MeStatsControllerTest {
     @MockitoBean RetroAchievementsStatsService raStats;
     @MockitoBean MemberFetchBudgets budgets;
     @MockitoBean BlizzardStatsService blizzardStats;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService bungieStats;
 
     private UserAccount user;
     private boolean budgetLeft = true;
@@ -334,6 +335,48 @@ class MeStatsControllerTest {
         }
         mvc.perform(v3(get(STATS + "/blizzard/wow")))
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("import")));
+    }
+
+    @Test
+    void bungieDetailIsTheSameProjection_withEveryCharacter() throws Exception {
+        var hunter = new fr.enimaloc.catapult.service.enrichment.bungie.BungieStats.Character("hunter", 2010, 61_440,
+                java.time.Instant.parse("2026-11-22T21:15:03Z"), null);
+        var titan = new fr.enimaloc.catapult.service.enrichment.bungie.BungieStats.Character("titan", 1990, 12_000,
+                null, null);
+        when(bungieStats.forGame(eq(user),
+                eq(fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BungieGame.DESTINY2),
+                eq(Locale.FRENCH), any(), eq(true)))
+                .thenReturn(Optional.of(new fr.enimaloc.catapult.service.enrichment.bungie.BungieStats(Status.OK,
+                        fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BungieGame.DESTINY2,
+                        "Guardian#0042", new fr.enimaloc.catapult.service.enrichment.bungie.BungieStats.Destiny2Stats(
+                        Status.OK, "steam", 8, 18_250, null, hunter, null, List.of(hunter, titan)), null)));
+
+        mvc.perform(v3(get(STATS + "/bungie/destiny2")).param("lang", "fr"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ok"))
+                .andExpect(jsonPath("$.game").value("destiny2"))
+                .andExpect(jsonPath("$.account").value("Guardian#0042"))
+                .andExpect(jsonPath("$.destiny2.guardianRank").value(8))
+                .andExpect(jsonPath("$.destiny2.characters[1].className").value("titan"))
+                .andExpect(jsonPath("$.more").value("http://localhost/api/me/stats/bungie/destiny2?version=3"));
+        org.assertj.core.api.Assertions.assertThat(MeStatsController.class.getMethod("bungie", UUID.class,
+                String.class, String.class, String.class).getReturnType())
+                .isEqualTo(fr.enimaloc.catapult.service.enrichment.bungie.BungieStats.class);
+    }
+
+    @Test
+    void bungieWithoutALink_is404_anUnknownGame400_andASpentBudget429() throws Exception {
+        when(bungieStats.forGame(any(), any(), any(), any(), anyBoolean())).thenReturn(Optional.empty());
+
+        mvc.perform(v3(get(STATS + "/bungie/destiny2")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("not_found"));
+        mvc.perform(v3(get(STATS + "/bungie/destiny1")))
+                .andExpect(status().isBadRequest());
+
+        budgetLeft = false;
+        mvc.perform(v3(get(STATS + "/bungie/destiny2")))
+                .andExpect(status().isTooManyRequests());
     }
 
     @TestConfiguration

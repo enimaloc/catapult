@@ -9,6 +9,8 @@ import fr.enimaloc.catapult.service.enrichment.PersonalStatsEnrichment;
 import fr.enimaloc.catapult.service.enrichment.PublisherEnrichment;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardPublisher;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStats;
+import fr.enimaloc.catapult.service.enrichment.bungie.BungiePublisher;
+import fr.enimaloc.catapult.service.enrichment.bungie.BungieStats;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
@@ -310,14 +312,21 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
      * data.
      */
     public record StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
-                              @JsonIgnore GameBinding.SourceType detectedOn) {
+                              @JsonIgnore GameBinding.SourceType detectedOn, BungieStats bungie) {
+
+        /** Without the Bungie stats. */
+        public StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
+                           GameBinding.SourceType detectedOn) {
+            this(steam, xbox, retroachievements, blizzard, detectedOn, null);
+        }
 
         static StatsObject of(PersonalStatsEnrichment s, MoreLinks links) {
             if (s == null) {
                 return null;
             }
             return new StatsObject(SteamStats.of(s.steam(), links), XboxStats.of(s.xbox(), links),
-                    RaStats.of(s.retroachievements(), links), blizzardStats(s.blizzard(), links), s.detectedOn());
+                    RaStats.of(s.retroachievements(), links), blizzardStats(s.blizzard(), links), s.detectedOn(),
+                    bungieStats(s.bungie(), links));
         }
 
         List<PlatformObject> platforms() {
@@ -410,10 +419,22 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
      * The publishers' public data on the game (Blizzard: WoW Token price, latest Hearthstone set, Diablo III
      * season), null when no publisher applies. Public game data: never anything about the member.
      */
-    public record PublisherObject(BlizzardPublisher blizzard) {
+    public record PublisherObject(BlizzardPublisher blizzard, BungiePublisher bungie) {
         static PublisherObject of(PublisherEnrichment p) {
-            return p == null ? null : new PublisherObject(p.blizzard());
+            return p == null ? null : new PublisherObject(p.blizzard(), p.bungie());
         }
+    }
+
+    /**
+     * The member's Bungie stats with the "more" link to {@code /api/me/stats/bungie/<game>}: the aggregate and the
+     * detail route serve this same record.
+     */
+    static BungieStats bungieStats(BungieStats s, MoreLinks links) {
+        if (s == null) {
+            return null;
+        }
+        return s.withMore(s.game() == null ? null
+                : links.toMe(ApiV2.ME_STATS_PATH + "/bungie/" + s.game().name().toLowerCase(Locale.ROOT)));
     }
 
     /** An Xbox gamerscore: earned on the title, out of its total. */

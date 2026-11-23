@@ -582,4 +582,58 @@ class GameInfoV3ResponseTest {
                 .isNull();
         assertThat(GameInfoV3Response.notInGame().publisher()).isNull();
     }
+
+    // --- Bungie ---
+
+    private static GameInfoV3Response withBungie(fr.enimaloc.catapult.service.enrichment.bungie.BungieStats bungie,
+                                                 fr.enimaloc.catapult.service.enrichment.bungie.BungiePublisher season) {
+        PersonalStatsEnrichment stats = PersonalStatsEnrichment.of(null, null, null, null,
+                GameBinding.SourceType.STEAM, bungie);
+        GameEnrichment enrichment = new GameEnrichment(null, null, null, null, null, null, null, null, null, null,
+                null, stats, PublisherEnrichment.of(null, season));
+        return GameInfoV3Response.of(BASE_V2, enrichment, LINKS, Optional.of("25657"));
+    }
+
+    @Test
+    void bungieStatsCarryTheirMoreLink_andTheSeasonNothingPersonal() {
+        var hunter = new fr.enimaloc.catapult.service.enrichment.bungie.BungieStats.Character("hunter", 2010, 61_440,
+                Instant.parse("2026-11-22T21:15:03Z"), null);
+        var stats = new fr.enimaloc.catapult.service.enrichment.bungie.BungieStats(Status.OK,
+                fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BungieGame.DESTINY2, "Guardian#0042",
+                new fr.enimaloc.catapult.service.enrichment.bungie.BungieStats.Destiny2Stats(Status.OK, "steam", 8,
+                        18_250, null, hunter, new fr.enimaloc.catapult.service.enrichment.bungie.BungieStats.Activity(
+                        "The Glassway", "Vanguard Ops", null), null), null);
+        var season = new fr.enimaloc.catapult.service.enrichment.bungie.BungiePublisher(
+                fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BungieGame.DESTINY2,
+                new fr.enimaloc.catapult.service.enrichment.bungie.BungiePublisher.Season(28, "Monument of Triumph",
+                        Instant.parse("2025-12-02T17:00:00Z"), null));
+
+        JsonNode json = MAPPER.readTree(MAPPER.writeValueAsString(withBungie(stats, season)));
+
+        JsonNode bungie = json.path("stats").path("bungie");
+        assertThat(bungie.path("status").asString()).isEqualTo("ok");
+        assertThat(bungie.path("game").asString()).isEqualTo("destiny2");
+        assertThat(bungie.path("destiny2").path("character").path("className").asString()).isEqualTo("hunter");
+        assertThat(bungie.path("destiny2").path("activity").path("name").asString()).isEqualTo("The Glassway");
+        assertThat(bungie.path("destiny2").has("characters")).isFalse();
+        assertThat(bungie.path("more").asString()).isEqualTo(BASE + "/api/me/stats/bungie/destiny2?version=3");
+        JsonNode publisher = json.path("publisher").path("bungie");
+        assertThat(publisher.path("season").path("number").asInt()).isEqualTo(28);
+        assertThat(publisher.toString()).doesNotContain("Guardian").doesNotContain("hunter")
+                .doesNotContain("account");
+        assertThat(json.path("publisher").path("blizzard").isNull()).isTrue();
+    }
+
+    @Test
+    void aPrivateDestiny2Profile_serializesItsStatus() {
+        var stats = new fr.enimaloc.catapult.service.enrichment.bungie.BungieStats(Status.PRIVATE,
+                fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BungieGame.DESTINY2, "G#1",
+                fr.enimaloc.catapult.service.enrichment.bungie.BungieStats.Destiny2Stats.of(Status.PRIVATE), null);
+
+        JsonNode bungie = MAPPER.readTree(MAPPER.writeValueAsString(withBungie(stats, null)))
+                .path("stats").path("bungie");
+
+        assertThat(bungie.path("status").asString()).isEqualTo("private");
+        assertThat(bungie.path("destiny2").path("guardianRank").isNull()).isTrue();
+    }
 }

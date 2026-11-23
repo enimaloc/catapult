@@ -531,4 +531,5 @@ GET,/api/me/stats/steam/{appId},appId=440;?version=3,,401,401,401,401,401,401,PA
 GET,/api/me/stats/xbox/{titleId},titleId=1144039928;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/retroachievements/{gameId},gameId=228;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/blizzard/{game},game=wow;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/bungie/{game},game=destiny2;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/retroachievements,?version=3,,401,401,401,401,401,401,PASS
