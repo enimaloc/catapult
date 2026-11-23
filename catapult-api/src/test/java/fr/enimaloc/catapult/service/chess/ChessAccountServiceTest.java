@@ -86,7 +86,7 @@ class ChessAccountServiceTest {
         assertThat(saved.getValue().getChesscomUsername()).isEqualTo("hikaru");
         assertThat(saved.getValue().getChesscomPlayerId()).isEqualTo(15448422L);
         assertThat(saved.getValue().getUpdatedAt()).isEqualTo(NOW);
-        verify(cache).evictUser(user.getId());
+        verify(cache).evictUser(user.getId(), ChessAccountService.CHESS_SOURCES);
         verify(events).chessAccountChanged(eq(user.getId()), any());
     }
 
@@ -101,7 +101,7 @@ class ChessAccountServiceTest {
         assertThat(row.getLichessId()).isEqualTo("drnykterstein");
         assertThat(row.getLichessUsername()).isEqualTo("DrNykterstein");
         assertThat(row.getChesscomUsername()).isEqualTo("hikaru");
-        verify(cache).evictUser(user.getId());
+        verify(cache).evictUser(user.getId(), ChessAccountService.CHESS_SOURCES);
     }
 
     @Test
@@ -153,7 +153,7 @@ class ChessAccountServiceTest {
         assertThat(row.getChesscomUsername()).isNull();
         assertThat(row.getChesscomPlayerId()).isNull();
         assertThat(row.getLichessId()).isEqualTo("drnykterstein");
-        verify(cache).evictUser(user.getId());
+        verify(cache).evictUser(user.getId(), ChessAccountService.CHESS_SOURCES);
         verify(events).chessAccountChanged(eq(user.getId()), any());
     }
 
@@ -165,7 +165,7 @@ class ChessAccountServiceTest {
 
         verify(accounts).delete(row);
         verify(accounts, never()).save(any());
-        verify(cache).evictUser(user.getId());
+        verify(cache).evictUser(user.getId(), ChessAccountService.CHESS_SOURCES);
     }
 
     @Test

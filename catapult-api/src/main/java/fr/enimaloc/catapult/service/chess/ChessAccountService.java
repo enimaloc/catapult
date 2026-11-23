@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.chess.ChessAccount;
 import fr.enimaloc.catapult.repository.chess.ChessAccountRepository;
 import fr.enimaloc.catapult.service.enrichment.EnrichmentCache;
+import fr.enimaloc.catapult.service.enrichment.EnrichmentSource;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessClient;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessNotFoundException;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessProfiles;
@@ -21,6 +22,7 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Predicate;
@@ -44,6 +46,10 @@ public class ChessAccountService {
     private static final Pattern CHESSCOM_USERNAME = Pattern.compile("[A-Za-z0-9_-]{3,25}");
     /** Lichess names: 2 to 30 letters, digits, {@code _} or {@code -}, starting with a letter or a digit. */
     private static final Pattern LICHESS_USERNAME = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]{1,29}");
+
+    /** What a change of the accounts makes stale; the member's other stats stay cached. */
+    static final List<EnrichmentSource> CHESS_SOURCES = List.of(EnrichmentSource.CHESS_CHESSCOM_STATS,
+            EnrichmentSource.CHESS_CHESSCOM_GAMES, EnrichmentSource.CHESS_LICHESS_USER);
 
     private final ChessAccountRepository accounts;
     private final ChessClient client;
@@ -135,9 +141,9 @@ public class ChessAccountService {
                 lichess, lichess == null ? null : ChessProfiles.lichess(lichess));
     }
 
-    /** The member's cached stats were read with the old accounts: forgotten; then the owner's pages are told. */
+    /** The member's cached chess stats were read with the old accounts: forgotten; then the owner's pages are told. */
     private void changed(UUID userId) {
-        cache.evictUser(userId);
+        cache.evictUser(userId, CHESS_SOURCES);
         try {
             events.chessAccountChanged(userId, data(userId));
         } catch (RuntimeException e) {
