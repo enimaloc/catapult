@@ -22,6 +22,7 @@ import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
 import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
 import fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent;
 import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
+import fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent;
 import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
 import fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent;
 import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
@@ -194,6 +195,11 @@ public class ChannelEventRedisBridge {
                 var changed = read(data, ChannelEvents.FaceitAccountChanged.class);
                 if (changed.account() == null) throw new IllegalArgumentException("no faceit account");
                 yield List.of(FaceitAccountChangedEvent.of(login, changed.account()));
+            }
+            case ChannelEvents.CHESS_ACCOUNT_CHANGED -> {
+                var changed = read(data, ChannelEvents.ChessAccountChanged.class);
+                if (changed.account() == null) throw new IllegalArgumentException("no chess account");
+                yield List.of(ChessAccountChangedEvent.of(login, changed.account()));
             }
             default -> List.of();
         };

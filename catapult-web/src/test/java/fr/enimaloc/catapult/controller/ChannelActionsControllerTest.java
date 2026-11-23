@@ -312,6 +312,30 @@ class ChannelActionsControllerTest {
     }
 
     @Test
+    void chessNames_areSavedAndRemovedThroughTheApi_andRefusalsKeepTheirStatus() throws Exception {
+        when(apiService.saveChessUsername("enimaloc", "lichess", "nobody")).thenReturn(400);
+        for (String site : List.of("chesscom", "lichess")) {
+            mvc.perform(post("/channel/enimaloc/settings/chess/" + site).with(csrf())
+                            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                            .content("{\"username\":\"hikaru\"}"))
+                    .andExpect(status().isNoContent());
+            mvc.perform(post("/channel/enimaloc/settings/chess/" + site + "/delete").with(csrf()))
+                    .andExpect(status().isNoContent());
+            verify(apiService).saveChessUsername("enimaloc", site, "hikaru");
+            verify(apiService).deleteChessUsername("enimaloc", site);
+        }
+        mvc.perform(post("/channel/enimaloc/settings/chess/lichess").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"nobody\"}"))
+                .andExpect(status().isBadRequest());
+        // only the two sites are relayed
+        mvc.perform(post("/channel/enimaloc/settings/chess/other").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"hikaru\"}"))
+                .andExpect(status().is4xxClientError());
+    }
+
+    @Test
     void blizzardSettings_areSavedAndForgottenThroughTheApi() throws Exception {
         mvc.perform(post("/channel/enimaloc/settings/blizzard/region").with(csrf())
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)

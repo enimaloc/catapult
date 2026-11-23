@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.common.dto.channel.EpicData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
+import fr.enimaloc.catapult.common.dto.channel.ChessData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
@@ -95,6 +96,9 @@ public final class IntegrationCards {
         }
         if (ch.faceit() != null) {
             cards.add(faceit(ch.faceit()));
+        }
+        if (ch.chess() != null) {
+            cards.add(chess(ch.chess()));
         }
         if (ch.obs() != null) {
             cards.add(obs(ch.obs()));
@@ -475,6 +479,42 @@ public final class IntegrationCards {
                                 key(PREFIX + "retroachievements.key.delete")))),
 
                 new Text(Attrs.cls("retroachievements-help"), true, key(PREFIX + "retroachievements.help")));
+    }
+
+    // Chess: the Chess.com and the Lichess names the member declares, each checked with its site on saving. Each
+    // account shows as a chip whose name is a part of its own so that ChessAccountChangedEvent replaces it in place.
+    // Wide: two forms.
+
+    private static final String CHESS_EVENT = "ChessAccountChangedEvent";
+
+    static IntegrationDto chess(ChessData chess) {
+        return wideCard("chess",
+                chessSite("chesscom", chess.chesscomUsername(), "chesscomUsername"),
+                chessSite("lichess", chess.lichessUsername(), "lichessUsername"),
+                new Text(Attrs.cls("chess-help"), true, key(PREFIX + "chess.help")));
+    }
+
+    /** One site's account chip (or "none"), name field and its save / remove buttons. */
+    private static Container chessSite(String site, String name, String field) {
+        boolean has = name != null && !name.isBlank();
+        String flag = "chess" + Character.toUpperCase(site.charAt(0)) + site.substring(1);
+        SpaState hasState = SpaState.flag(flag + "HasName", has, CHESS_EVENT + "." + field);
+        return new Container(Attrs.cls("chess-site").withClass("chess-" + site), Container.Kind.DIV, List.of(
+                new Container(Attrs.cls("chess-" + site + "-account").withState(hasState), Container.Kind.DIV,
+                        List.of(new Text(Attrs.NONE, false, key(PREFIX + "chess." + site + ".account")),
+                                new Chip(Attrs.cls("chess-" + site + "-account-name").withState(
+                                        SpaState.sync("textContent", CHESS_EVENT + "." + field)),
+                                        Message.literal(has ? name : "")))),
+                new Text(Attrs.cls("chess-" + site + "-none").withState(SpaState.flag(flag + "NoName", !has,
+                        CHESS_EVENT + ".!" + field)), false, key(PREFIX + "chess." + site + ".none")),
+                new Input(Attrs.id("chess-" + site + "-username-input").withState(SpaState.sync("value",
+                        CHESS_EVENT + "." + field)), "text", key(PREFIX + "chess." + site + ".placeholder"), null,
+                        name, null, null),
+                new Container(Attrs.id("chess-" + site + "-actions").withClass("card-actions"),
+                        Container.Kind.SEGMENTED_GROUP, List.of(
+                        segmented(Attrs.id("chess-" + site + "-save-btn"), key(PREFIX + "chess.save")),
+                        segmented(Attrs.id("chess-" + site + "-delete-btn").withState(hasState),
+                                key(PREFIX + "chess.delete"))))));
     }
 
     // Blizzard stats: the settings of the owner's Blizzard stats (the region of their Battle.net account, the imported

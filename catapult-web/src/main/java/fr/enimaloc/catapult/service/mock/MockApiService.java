@@ -107,6 +107,7 @@ import fr.enimaloc.catapult.event.battlenet.BattleNetLinkEvent;
 import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
 import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
 import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
+import fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent;
 import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
 import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
@@ -739,6 +740,29 @@ public class MockApiService implements ApiService {
         MockData data = currentData();
         data.unlinkBungie();
         eventPublisher.publishEvent(BungieAccountChangedEvent.of(username, data.bungieData()));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public int saveChessUsername(String username, String site, String name) {
+        log.trace("saveChessUsername({}, {}, {})", username, site, name);
+        // "gone" stands for a name the site does not know
+        if (name == null || name.isBlank() || "gone".equalsIgnoreCase(name.strip())) {
+            return BAD_REQUEST;
+        }
+        return chessChanged(username, data -> data.saveChessUsername(site, name.strip()));
+    }
+
+    @Override
+    public int deleteChessUsername(String username, String site) {
+        log.trace("deleteChessUsername({}, {})", username, site);
+        return chessChanged(username, data -> data.deleteChessUsername(site));
+    }
+
+    private int chessChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(ChessAccountChangedEvent.of(username, data.chessData()));
         return NO_CONTENT;
     }
 

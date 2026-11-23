@@ -173,6 +173,22 @@ class ChannelEventStreamControllerTest {
     }
 
     @Test
+    void theChessAccountsGoToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent("enimaloc", "chessplayer",
+                "https://www.chess.com/member/chessplayer", null, null);
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:ChessAccountChangedEvent",
+                "chessplayer");
+        assertThat(moderator.getResponse().getContentAsString())
+                .doesNotContain("ChessAccountChangedEvent").doesNotContain("chessplayer");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
+
+    @Test
     void theRetroAchievementsAccountGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
         MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
         MvcResult moderator = subscribe("enimaloc", member("a-moderator"));

@@ -156,6 +156,12 @@ public interface ApiService {
     int deleteBlizzardWowCharacters(String username);
     /** Unlinks the owner's Bungie.net account and forgets their Destiny 2 stats. */
     int deleteBungieLink(String username);
+    /**
+     * Declares {@code name} as the channel owner's account on chess site {@code site} ({@code chesscom} or
+     * {@code lichess}); catapult-api's status: 400 when the site does not know it, 503 when it cannot be asked.
+     */
+    int saveChessUsername(String username, String site, String name);
+    int deleteChessUsername(String username, String site);
     int refreshSteamProfileCache(String username);
     LinkStateResponse minecraftStatus(String username);
     int minecraftEnroll(String username, String name);
