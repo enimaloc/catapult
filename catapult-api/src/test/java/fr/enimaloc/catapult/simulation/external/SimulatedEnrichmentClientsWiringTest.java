@@ -7,6 +7,9 @@ import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRateLimiter;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
 import fr.enimaloc.catapult.service.enrichment.blizzard.HttpBlizzardClient;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardUnavailableException;
+import fr.enimaloc.catapult.service.enrichment.hypixel.HttpHypixelClient;
+import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelClient;
+import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelNotFoundException;
 import fr.enimaloc.catapult.service.enrichment.opencritic.HttpOpenCriticClient;
 import fr.enimaloc.catapult.service.enrichment.riot.HttpRiotClient;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotClient;
@@ -80,6 +83,7 @@ class SimulatedEnrichmentClientsWiringTest {
         }
         @Bean HttpRiotClient riot() { return mock(HttpRiotClient.class); }
         @Bean HttpFaceitClient faceit() { return mock(HttpFaceitClient.class); }
+        @Bean HttpHypixelClient hypixel() { return mock(HttpHypixelClient.class); }
         @Bean org.springframework.web.client.RestClient.Builder restClientBuilder() {
             return org.springframework.web.client.RestClient.builder();
         }
@@ -90,7 +94,7 @@ class SimulatedEnrichmentClientsWiringTest {
     @Configuration(proxyBeanMethods = false)
     @ComponentScan(basePackageClasses = SimulatedProtonDbClient.class, useDefaultFilters = false,
             includeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
-                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity|SteamStats|XboxStats|RetroAchievements|Blizzard|Bungie|Riot|Faceit|Osu)Client|.*SimulatedBlizzardAppTokenService"))
+                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity|SteamStats|XboxStats|RetroAchievements|Blizzard|Bungie|Riot|Faceit|Osu|Hypixel)Client|.*SimulatedBlizzardAppTokenService"))
     static class SimulatedClients {
     }
 
@@ -121,6 +125,7 @@ class SimulatedEnrichmentClientsWiringTest {
                     .isInstanceOf(SimulatedBungieClient.class);
             assertThat(ctx.getBean(fr.enimaloc.catapult.service.enrichment.osu.OsuClient.class))
                     .isInstanceOf(SimulatedOsuClient.class);
+            assertThat(ctx.getBean(HypixelClient.class)).isInstanceOf(SimulatedHypixelClient.class);
         });
     }
 
@@ -145,7 +150,22 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(FaceitClient.class)).isInstanceOf(HttpFaceitClient.class);
             assertThat(ctx.getBean(fr.enimaloc.catapult.service.enrichment.osu.OsuClient.class))
                     .isInstanceOf(fr.enimaloc.catapult.service.enrichment.osu.HttpOsuClient.class);
+            assertThat(ctx.getBean(HypixelClient.class)).isInstanceOf(HttpHypixelClient.class);
         });
+    }
+
+    @Test
+    void simulatedHypixel_answersDeterministically() {
+        var hypixel = new SimulatedHypixelClient();
+        var profile = hypixel.profileByName("Notch");
+        assertThat(profile.uuid()).matches("[0-9a-f]{32}").isEqualTo(SimulatedHypixelClient.uuidOf("notch"));
+        assertThatThrownBy(() -> hypixel.profileByName("ghost")).isInstanceOf(HypixelNotFoundException.class);
+        assertThatThrownBy(() -> hypixel.player(SimulatedHypixelClient.uuidOf("stranger")))
+                .isInstanceOf(HypixelNotFoundException.class);
+        assertThat(hypixel.player(profile.uuid()).onlineStatusHidden()).isFalse();
+        assertThat(hypixel.player(SimulatedHypixelClient.uuidOf("hidden")).onlineStatusHidden()).isTrue();
+        assertThat(hypixel.status(profile.uuid()).online()).isTrue();
+        assertThat(hypixel.games().names()).containsEntry("BEDWARS", "Bed Wars");
     }
 
     @Test

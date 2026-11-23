@@ -122,6 +122,13 @@ class HttpTraceLoggingInterceptorTest {
     }
 
     @Test
+    void hypixelApiKeyHeader_isReportedNeverEchoed() throws IOException {
+        interceptor.intercept(request("API-Key"), null, respondWith("{\"success\":true}"));
+
+        assertThat(messages()).contains("auth=ApiKey").doesNotContain("secret");
+    }
+
+    @Test
     void longBodies_areTruncated() throws IOException {
         String big = "x".repeat(HttpTraceLoggingInterceptor.MAX_BODY_CHARS + 10);
 
