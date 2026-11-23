@@ -85,12 +85,14 @@ public class MeStatsController {
 
     @GetMapping
     @Operation(summary = "Get your stats on the game your channel plays now",
-            description = "The stats object of GET /api/me/game (version 3): steam, xbox, retroachievements and "
-                    + "blizzard, each null when it does not apply (not linked, game not found there), each with its "
-                    + "status and a \"more\" link to its detail; the platforms with their play time and "
-                    + "achievements summary (unlocked, total, percent, the 5 latest, the rarest), blizzard with your "
-                    + "BattleTag, region and the game's object (wow main character, sc2 or d3 profile), bungie "
-                    + "with your Bungie Name and destiny2 profile. stats is null when nothing applies.")
+            description = "The stats object of GET /api/me/game (version 3): steam, xbox, retroachievements, "
+                    + "blizzard, bungie and riot, each null when it does not apply (not linked, game not found "
+                    + "there), each with its status and a \"more\" link to its detail; the platforms with their play "
+                    + "time and achievements summary (unlocked, total, percent, the 5 latest, the rarest), blizzard "
+                    + "with your BattleTag, region and the game's object (wow main character, sc2 or d3 profile), "
+                    + "bungie with your Bungie Name and destiny2 profile, riot with your Riot ID, platform and the "
+                    + "game's object (lol summoner, ranks and game in progress, tft rank). stats is null when "
+                    + "nothing applies.")
     @ApiResponse(responseCode = "200", description = "inGame=false while no game is detected; otherwise your stats.")
     public CurrentStats current(
             @AuthenticationPrincipal UUID userId,

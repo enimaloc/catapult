@@ -1,6 +1,7 @@
 package fr.enimaloc.catapult.service.enrichment.riot;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame;
 import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Status;
 
@@ -26,20 +27,24 @@ public record RiotStats(Status status, RiotGame game, String account, String pla
      * (its {@code solo} and {@code flex} are null when unranked there); {@code inGame} null when unknown, and the
      * {@code currentGame} when the member is in one.
      */
+    @Schema(name = "RiotLolStats")
     public record LolStats(Status status, Integer level, String profileIconUrl, Ranked ranked, Boolean inGame,
                            CurrentGame currentGame,
                            @JsonInclude(JsonInclude.Include.NON_NULL) List<Queue> queues) {
     }
 
     /** The solo / duo and flex ranks. */
+    @Schema(name = "RiotRanked")
     public record Ranked(Rank solo, Rank flex) {
     }
 
     /** A rank: tier ({@code GOLD}…), division ({@code II}; null for the apex tiers' single one), LP, wins, losses. */
+    @Schema(name = "RiotRank")
     public record Rank(String tier, String division, int leaguePoints, int wins, int losses) {
     }
 
     /** One ranked queue as Riot names it ({@code RANKED_SOLO_5x5}…), for the detail. */
+    @Schema(name = "RiotQueue")
     public record Queue(String queueType, Rank rank) {
     }
 
@@ -47,11 +52,13 @@ public record RiotStats(Status status, RiotGame game, String account, String pla
      * The game the member is in now: their champion (name in the asked language, Data Dragon image; null when the
      * champion list could not be read), the game mode, the queue id, and when it started.
      */
+    @Schema(name = "RiotCurrentGame")
     public record CurrentGame(Integer championId, String champion, String championIconUrl, String gameMode,
                               Integer queueId, Instant startedAt, Long lengthSeconds) {
     }
 
     /** Teamfight Tactics: the ranked rank, null when unranked. */
+    @Schema(name = "RiotTftStats")
     public record TftStats(Status status, Rank rank,
                            @JsonInclude(JsonInclude.Include.NON_NULL) List<Queue> queues) {
     }
