@@ -67,6 +67,8 @@ class SupercellApiKeyRotatorTest {
         assertThat(rotator.nextKey(SupercellGame.BRAWL_STARS)).contains("BS-1");
         assertThat(rotator.hasKeys(SupercellGame.CLASH_ROYALE)).isFalse();
         assertThat(rotator.availableKeyCount()).isEqualTo(3);
+        assertThat(rotator.keyCount(SupercellGame.CLASH_OF_CLANS)).isEqualTo(2);
+        assertThat(rotator.keyCount(SupercellGame.CLASH_ROYALE)).isZero();
     }
 
     @Test
@@ -104,6 +106,9 @@ class SupercellApiKeyRotatorTest {
 
         var usage = rotator.usage("COC-1");
         assertThat(usage.windowCalls()).isEqualTo(2);
+        // the window follows the rotator's clock
+        clock.advance(Duration.ofMinutes(2));
+        assertThat(rotator.usage("COC-1").windowCalls()).isZero();
         assertThat(usage.windowSeconds()).isEqualTo(60);
         assertThat(usage.periodCalls()).isEqualTo(2);
     }

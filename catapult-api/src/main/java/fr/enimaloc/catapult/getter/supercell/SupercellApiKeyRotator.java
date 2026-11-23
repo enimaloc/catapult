@@ -77,6 +77,11 @@ public class SupercellApiKeyRotator {
         return keys.size() - blockedKeyCount();
     }
 
+    /** How many keys {@code game} has, refused or not. */
+    public int keyCount(SupercellGame game) {
+        return (int) keys.stream().filter(k -> k.game() == game).count();
+    }
+
     /** Whether {@code game} has any key, refused or not: without one its source is off. */
     public boolean hasKeys(SupercellGame game) {
         return keys.stream().anyMatch(k -> k.game() == game);
@@ -134,12 +139,12 @@ public class SupercellApiKeyRotator {
 
     /** A call about to be sent with {@code key}: counted for the admin Keys tab. */
     public void onCall(String key) {
-        calls.record(key, Instant.now());
+        calls.record(key, clock.instant());
     }
 
     /** What {@code key} was used for on this instance: its calls of the last minute and of the day (UTC). */
     public KeyUsageDto usage(String key) {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         return new KeyUsageDto(calls.inWindow(key, now), null, 60, null, "DAY", calls.inPeriod(key, now), null,
                 null);
     }

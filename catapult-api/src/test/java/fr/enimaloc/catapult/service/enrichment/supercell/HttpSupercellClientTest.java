@@ -280,6 +280,31 @@ class HttpSupercellClientTest {
     }
 
     @Test
+    void aKeyTheLimiterRefusesNow_isPassedOverForAnotherKeyOfTheGame() throws IOException {
+        pool(new SupercellApiKeyEntry(KEY, "clash-of-clans"), new SupercellApiKeyEntry(OTHER, "clash-of-clans"));
+        String paused = "key:" + fr.enimaloc.catapult.service.ApiKeyHasher.id(KEY);
+        when(limiter.acquire(anyString())).thenAnswer(inv -> !paused.equals(inv.getArgument(0)));
+        answer(COC, OTHER, HttpStatus.OK, "coc-player.json");
+        answer(COC, OTHER, HttpStatus.OK, "coc-player.json");
+
+        // whichever key the rotation starts with, the paused one is never sent
+        assertThat(client.player(SupercellGame.CLASH_OF_CLANS, "#2PP").name()).isEqualTo("Chief");
+        assertThat(client.player(SupercellGame.CLASH_OF_CLANS, "#2PP").name()).isEqualTo("Chief");
+        server.verify();
+    }
+
+    @Test
+    void whenTheLimiterRefusesEveryKey_nothingIsSent() {
+        pool(new SupercellApiKeyEntry(KEY, "clash-of-clans"), new SupercellApiKeyEntry(OTHER, "clash-of-clans"));
+        when(limiter.acquire(anyString())).thenReturn(false);
+        server.expect(org.springframework.test.web.client.ExpectedCount.never(), requestTo(COC));
+
+        assertThatThrownBy(() -> client.player(SupercellGame.CLASH_OF_CLANS, "#2PP"))
+                .isInstanceOf(SupercellUnavailableException.class).hasMessageContaining("rate limit");
+        server.verify();
+    }
+
+    @Test
     void aGameWithoutKey_sendsNothing() {
         pool(new SupercellApiKeyEntry(KEY, "clash-of-clans"));
 

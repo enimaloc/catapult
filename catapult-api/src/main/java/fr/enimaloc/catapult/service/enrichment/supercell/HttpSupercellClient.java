@@ -11,6 +11,8 @@ import fr.enimaloc.catapult.service.enrichment.supercell.SupercellModels.CrPlaye
 import fr.enimaloc.catapult.service.enrichment.supercell.SupercellModels.Group;
 import fr.enimaloc.catapult.service.enrichment.supercell.SupercellModels.Hero;
 import fr.enimaloc.catapult.service.enrichment.supercell.SupercellModels.SupercellPlayer;
+import fr.enimaloc.catapult.service.supercell.SupercellKeys;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.ClientHttpRequestFactory;
@@ -28,8 +30,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * {@link SupercellClient} over each game's {@code https://api.<game>.com/v1}, with a key of that game's pool. The key
@@ -37,10 +42,12 @@ import java.util.Locale;
  * put in an exception message or a log. Redirects are never followed and any 3xx is an error; a 2xx that is not JSON
  * or not of the expected shape (no tag, another tag, no trophies) is an error, never "absent"; only Supercell's JSON
  * 404 {@code {"reason":"notFound"}} means "not found". A key Supercell refuses from this server's IP
- * ({@code 403 accessDenied.invalidIp}) is set aside for its game and the call is tried once more with another key; any
- * other 403 fails that call alone and the key stays in use. A 429 pauses that key's bucket (its {@code Retry-After},
- * at most 10 minutes). A key set aside is never sent. Every request asks the {@link SupercellRateLimiter} first.
+ * ({@code 403 accessDenied.invalidIp}) is set aside for its game and the call goes on with another key; any other 403
+ * fails that call alone (logged with the masked key) and the key stays in use. A 429 pauses that key's bucket (its
+ * {@code Retry-After}, at most 10 minutes). A key set aside is never sent. Every request asks the
+ * {@link SupercellRateLimiter} first; a key it refuses now is passed over for another key of the game.
  */
+@Slf4j
 @Component
 public class HttpSupercellClient implements SupercellClient {
 
@@ -103,36 +110,52 @@ public class HttpSupercellClient implements SupercellClient {
 
     // --- HTTP ---
 
-    /** GET with a key of {@code game}'s pool; a key refused from this IP is set aside and another one tried once. */
+    /**
+     * GET with a key of {@code game}'s pool. A key whose bucket the limiter refuses now (paused by a 429, or its
+     * minute full) is passed over for the next one, and so is a key refused from this IP (set aside first); each key
+     * is tried at most once per call.
+     */
     private JsonNode get(SupercellGame game, URI uri) {
-        String tried = null;
-        for (int attempt = 0; attempt < 2; attempt++) {
-            String key = keys.nextKey(game)
-                    .orElseThrow(() -> new SupercellUnavailableException("no usable Supercell key for this game"));
-            if (key.equals(tried)) {
+        Set<String> tried = new HashSet<>();
+        boolean limited = false;
+        boolean ipRefused = false;
+        int rounds = 2 * Math.max(1, keys.keyCount(game));
+        for (int attempt = 0; attempt < rounds; attempt++) {
+            Optional<String> next = keys.nextKey(game);
+            if (next.isEmpty()) {
                 break;
             }
-            tried = key;
+            String key = next.get();
+            if (!tried.add(key)) {
+                continue;
+            }
             String bucket = "key:" + ApiKeyHasher.id(key);
-            Answer answer = send(bucket, uri, key);
+            if (!limiter.acquire(bucket)) {
+                limited = true;
+                continue;
+            }
+            Answer answer = send(uri, key);
             if (answer.status() == 403) {
-                if (!INVALID_IP.equals(reason(answer))) {
+                String reason = reason(answer);
+                if (!INVALID_IP.equals(reason)) {
                     // a refusal of this call only: the key stays in use for the others
+                    log.warn("Supercell {} key {} refused (403 {})", game.key(), SupercellKeys.mask(key), reason);
                     throw new SupercellUnavailableException("Supercell refused the request (403)");
                 }
                 keys.onIpRefused(game, key);
+                ipRefused = true;
                 continue;
             }
             return interpret(bucket, answer);
         }
-        throw new SupercellUnavailableException("Supercell refused this server's IP address for every key tried");
+        throw new SupercellUnavailableException(ipRefused
+                ? "Supercell refused this server's IP address for every key tried"
+                : limited ? "the Supercell rate limit does not allow a request now"
+                : "no usable Supercell key for this game");
     }
 
-    /** Charges the limiter, then sends; the key is only ever put in the {@code Authorization} header. */
-    private Answer send(String bucket, URI uri, String key) {
-        if (!limiter.acquire(bucket)) {
-            throw new SupercellUnavailableException("the Supercell rate limit does not allow a request now");
-        }
+    /** Sends, once the limiter gave a slot; the key is only ever put in the {@code Authorization} header. */
+    private Answer send(URI uri, String key) {
         keys.onCall(key);
         try {
             return restClient.get().uri(uri)
