@@ -60,6 +60,9 @@ public class ExternalServices {
         if (within(host, "hypixel.net")) {
             return "hypixel";
         }
+        if (within(host, "clashofclans.com") || within(host, "clashroyale.com") || within(host, "brawlstars.com")) {
+            return "supercell";
+        }
         if (within(host, "ankama.com")) {
             return "ankama";
         }
