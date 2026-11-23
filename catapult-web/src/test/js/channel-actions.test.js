@@ -560,6 +560,14 @@ describe("channel-connections", () => {
             expect(posts()).toEqual([]);
         });
 
+        it("tells a tag that cannot be one, without asking", async () => {
+            document.getElementById("supercell-brawl-stars-input").value = "#ABC";
+            await click("#supercell-brawl-stars-save-btn");
+
+            expect(posts()).toEqual([]);
+            expect(snackbars()).toEqual(["A player tag is # then 3 to 12 of 0289PYLQGRJCUV."]);
+        });
+
         it("tells a tag no player has, and that Supercell cannot be reached", async () => {
             posted.mockResolvedValueOnce(response(400));
             await click("#supercell-clash-of-clans-save-btn");

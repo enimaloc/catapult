@@ -100,6 +100,9 @@ window.CatapultConnections = (function () {
         }
     }
 
+    // A Supercell player tag as typed: an optional #, then 3 to 12 of its characters (O is read as 0).
+    const SUPERCELL_TAG = /^#?[0289PYLQGRJCUVO]{3,12}$/i;
+
     // Why catapult-api refused an Epic login, which it sends back to this tab as ?error=<code>.
     const EPIC_LINK_ERRORS = {
         epic_full: ["labelEpicFull", "Every Catapult Epic Games account is full for now: linking will be possible again soon."],
@@ -292,11 +295,17 @@ window.CatapultConnections = (function () {
         });
         on("hypixel-delete-btn", "click", () => postJson(`${baseUrl}/settings/hypixel/account/delete`, {}));
 
-        // Supercell: one player tag per game, checked by that game's API first; the card follows from
-        // SupercellAccountChangedEvent.
+        // Supercell: one player tag per game, checked by that game's API first (a tag that cannot be one is told
+        // here, without asking); the card follows from SupercellAccountChangedEvent.
         for (const game of ["clash-of-clans", "clash-royale", "brawl-stars"]) {
             on(`supercell-${game}-save-btn`, "click", async () => {
                 const input = document.getElementById(`supercell-${game}-input`);
+                const typed = input.value.replace(/\s+/g, "");
+                if (typed && !SUPERCELL_TAG.test(typed)) {
+                    CatapultChannel.showError(pageLabel("labelSupercellFormat",
+                        "A player tag is # then 3 to 12 of 0289PYLQGRJCUV."));
+                    return;
+                }
                 await saveSpeedrun(`${baseUrl}/settings/supercell/${game}`, { tag: input.value.trim() }, input,
                     ["labelSupercellRefused", "No player has this tag in this game."],
                     ["labelSupercellUnavailable", "Supercell cannot be reached right now: try again later."]);
