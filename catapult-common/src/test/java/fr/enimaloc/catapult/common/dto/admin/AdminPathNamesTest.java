@@ -29,6 +29,8 @@ class AdminPathNamesTest {
         assertThat(ApiKeyProvider.RIOT.pathName()).isEqualTo("riot");
         assertThat(ApiKeyProvider.FACEIT.apiPath()).isEqualTo("faceit-keys");
         assertThat(ApiKeyProvider.FACEIT.pathName()).isEqualTo("faceit");
+        assertThat(ApiKeyProvider.HYPIXEL.apiPath()).isEqualTo("hypixel-keys");
+        assertThat(ApiKeyProvider.HYPIXEL.pathName()).isEqualTo("hypixel");
     }
 
     @ParameterizedTest

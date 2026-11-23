@@ -125,6 +125,27 @@ public class EnrichmentProperties {
         private int perMinute = 50;
     }
 
+    /**
+     * Hypixel API settings that are not a source's own ({@code catapult.enrichment.hypixel.*}). The window cap is a
+     * margin under a development key's 300 calls per 5 minutes (not checked live); a {@code RateLimit-Remaining: 0}
+     * answer pauses the key until {@code RateLimit-Reset}. The IGDB ids are those of Minecraft (Hypixel is a
+     * Minecraft server); a Minecraft presence detection maps too.
+     */
+    @Getter
+    @Setter
+    public static class Hypixel {
+        /** The whole Hypixel source; it also stays off while the key pool is empty. */
+        private boolean enabled = true;
+        /** Calls per second, per key (the spacing waits). */
+        private int perSecond = 4;
+        /** Calls per five minutes, per key (refused beyond). */
+        private int perFiveMinutes = 240;
+        /** Calls per minute to Mojang's public profile lookup (no key). */
+        private int mojangPerMinute = 60;
+        /** IGDB ids of the game Hypixel is played on (comma separated). */
+        private List<String> igdbIds = List.of("121");
+    }
+
     private SourceSettings hltb = new SourceSettings();
     private SourceSettings protondb = new SourceSettings();
     private SourceSettings steamgriddb = new SourceSettings();
@@ -182,6 +203,7 @@ public class EnrichmentProperties {
     private SourceSettings osuProfile = new SourceSettings();
     private SourceSettings osuRecent = new SourceSettings();
     private Osu osu = new Osu();
+    private Hypixel hypixel = new Hypixel();
     private Speedrun speedrun = new Speedrun();
     private RetroAchievements retroachievements = new RetroAchievements();
     private XboxStats xboxStats = new XboxStats();
@@ -280,6 +302,10 @@ public class EnrichmentProperties {
 
     public boolean faceitEnabled() {
         return faceit.isEnabled();
+    }
+
+    public boolean hypixelEnabled() {
+        return hypixel.isEnabled();
     }
 
     public int speedrunPerMinute() {
