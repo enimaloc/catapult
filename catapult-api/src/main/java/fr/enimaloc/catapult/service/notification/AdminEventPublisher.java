@@ -26,6 +26,7 @@ public class AdminEventPublisher {
     public static final String PROVIDER_OPENCRITIC = "opencritic";
     public static final String PROVIDER_RETROACHIEVEMENTS = "retroachievements";
     public static final String PROVIDER_RIOT = "riot";
+    public static final String PROVIDER_FACEIT = "faceit";
 
     private final RedisEventPublisher redisPublisher;
 

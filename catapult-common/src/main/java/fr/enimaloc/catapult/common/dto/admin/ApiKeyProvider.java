@@ -2,7 +2,7 @@ package fr.enimaloc.catapult.common.dto.admin;
 
 /**
  * The providers whose shared API keys an admin manages: the path segment of catapult-api's
- * {@code /api/internal/admin/{apiPath}} routes, and the {@code steam}, {@code dtdd}, {@code steamgriddb}, {@code itad}, {@code opencritic}, {@code retroachievements} or {@code riot} one catapult-web uses.
+ * {@code /api/internal/admin/{apiPath}} routes, and the {@code steam}, {@code dtdd}, {@code steamgriddb}, {@code itad}, {@code opencritic}, {@code retroachievements}, {@code riot} or {@code faceit} one catapult-web uses.
  */
 public enum ApiKeyProvider {
     STEAM("steam-keys", "steam"),
@@ -11,7 +11,8 @@ public enum ApiKeyProvider {
     ITAD("itad-keys", "itad"),
     OPENCRITIC("opencritic-keys", "opencritic"),
     RETROACHIEVEMENTS("retroachievements-keys", "retroachievements"),
-    RIOT("riot-keys", "riot");
+    RIOT("riot-keys", "riot"),
+    FACEIT("faceit-keys", "faceit");
 
     private final String apiPath;
     private final String pathName;
@@ -29,7 +30,7 @@ public enum ApiKeyProvider {
         return pathName;
     }
 
-    /** The provider named {@code steam}, {@code dtdd}, {@code steamgriddb}, {@code itad}, {@code opencritic}, {@code retroachievements} or {@code riot}; null else. */
+    /** The provider named {@code steam}, {@code dtdd}, {@code steamgriddb}, {@code itad}, {@code opencritic}, {@code retroachievements}, {@code riot} or {@code faceit}; null else. */
     public static ApiKeyProvider of(String pathName) {
         for (ApiKeyProvider provider : values()) {
             if (provider.pathName.equals(pathName)) return provider;

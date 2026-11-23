@@ -230,4 +230,15 @@ class HttpTraceLoggingInterceptorTest {
         assertThat(messages()).contains("auth=ApiKey").doesNotContain("12345678-abcd").doesNotContain("12345678-ABCD")
                 .contains("echo ***");
     }
+
+    @Test
+    void theFaceitKeyHeader_isOnlyReportedAsPresent() throws IOException {
+        MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET,
+                URI.create("https://open.faceit.com/data/v4/players?nickname=Catapult"));
+        request.getHeaders().add("Authorization", "Bearer 12345678-abcd-4ef0-9abc-0123456789ab");
+
+        interceptor.intercept(request, new byte[0], respondWith("{\"player_id\":\"p\"}"));
+
+        assertThat(messages()).contains("auth=Bearer").contains("nickname=Catapult").doesNotContain("12345678-abcd");
+    }
 }

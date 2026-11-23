@@ -265,4 +265,17 @@ class ChannelStateTest {
                 .contains(new fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent("enimaloc", "Catapult#EUW",
                         "euw1", true));
     }
+
+    @Test
+    void faceitSettings_asItsEvent() {
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.FaceitData("Catapult",
+                        "https://www.faceit.com/en/players/Catapult", true));
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null)))
+                .contains(new fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent("enimaloc", "Catapult",
+                        "https://www.faceit.com/en/players/Catapult", true));
+    }
 }

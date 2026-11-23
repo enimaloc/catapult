@@ -406,4 +406,22 @@ class ChannelEventRedisBridgeTest {
                 .containsExactly(new fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent("streamer", "", "",
                         false));
     }
+
+    @Test
+    void bridgeRelaysFaceitAccountChanged_andDropsItWithoutItsData() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.FaceitData("Catapult",
+                "https://www.faceit.com/en/players/Catapult", true);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.FACEIT_ACCOUNT_CHANGED,
+                new ChannelEvents.FaceitAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent("streamer",
+                        "Catapult", "https://www.faceit.com/en/players/Catapult", true));
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.FACEIT_ACCOUNT_CHANGED,
+                new ChannelEvents.FaceitAccountChanged(owner.toString(), "streamer",
+                        new fr.enimaloc.catapult.common.dto.channel.FaceitData(null, null, false)))))
+                .containsExactly(new fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent("streamer", "", "",
+                        false));
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.FACEIT_ACCOUNT_CHANGED,
+                new ChannelEvents.FaceitAccountChanged(owner.toString(), "streamer", null)))).isEmpty();
+    }
 }

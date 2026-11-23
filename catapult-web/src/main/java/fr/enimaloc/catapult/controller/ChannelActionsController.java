@@ -19,6 +19,7 @@ import fr.enimaloc.catapult.common.dto.channel.BlizzardRegionRequest;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardWowMainRequest;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
+import fr.enimaloc.catapult.common.dto.channel.FaceitNicknameRequest;
 import fr.enimaloc.catapult.common.dto.channel.RiotAccountRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunUsernameRequest;
@@ -182,6 +183,19 @@ public class ChannelActionsController {
     @PostMapping("/channel/{username}/settings/speedrun/api-key/delete")
     public ResponseEntity<Void> deleteSpeedrunApiKey(@PathVariable String username) {
         return ApiStatus.answer(apiService.deleteSpeedrunApiKey(username));
+    }
+
+    // The member's FACEIT nickname: 400 for a malformed or unknown nickname, 503 when FACEIT cannot be asked.
+
+    @PostMapping("/channel/{username}/settings/faceit/nickname")
+    public ResponseEntity<Void> saveFaceitNickname(@PathVariable String username,
+                                                   @RequestBody FaceitNicknameRequest body) {
+        return ApiStatus.answer(apiService.saveFaceitNickname(username, body.nickname()));
+    }
+
+    @PostMapping("/channel/{username}/settings/faceit/nickname/delete")
+    public ResponseEntity<Void> deleteFaceitNickname(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteFaceitNickname(username));
     }
 
     // The member's RetroAchievements account, answered like speedrun.com's: 400 for a name or key RetroAchievements

@@ -301,6 +301,9 @@ describe("channel-connections", () => {
               <input id="retroachievements-key-input" value=" abc123 ">
               <button id="retroachievements-key-save-btn"></button>
               <button id="retroachievements-key-delete-btn"></button>
+              <input id="faceit-nickname-input" value="  Catapult ">
+              <button id="faceit-save-btn"></button>
+              <button id="faceit-delete-btn"></button>
               <input id="riot-id-input" value="  Catapult#EUW ">
               <select id="riot-platform-select"><option value="euw1">EUW1</option><option value="na1">NA1</option></select>
               <button id="riot-save-btn"></button>
@@ -480,6 +483,40 @@ describe("channel-connections", () => {
             expect(snackbars()).toEqual([
                 "Riot does not know this Riot ID on that server",
                 "Riot cannot be reached right now: try again later.",
+            ]);
+        });
+    });
+
+    describe("the FACEIT nickname", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
+        it("saves the trimmed nickname, and removes it with a post", async () => {
+            await click("#faceit-save-btn");
+            await click("#faceit-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/faceit/nickname", { nickname: "Catapult" }],
+                ["/channel/enimaloc/settings/faceit/nickname/delete", {}],
+            ]);
+            expect(snackbars()).toEqual([]);
+        });
+
+        it("sends nothing for an empty nickname", async () => {
+            document.getElementById("faceit-nickname-input").value = "  ";
+            await click("#faceit-save-btn");
+
+            expect(posts()).toEqual([]);
+        });
+
+        it("tells a nickname FACEIT does not know, and that FACEIT cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(400));
+            await click("#faceit-save-btn");
+            posted.mockResolvedValueOnce(response(503));
+            await click("#faceit-save-btn");
+
+            expect(snackbars()).toEqual([
+                "FACEIT does not know this nickname",
+                "FACEIT cannot be reached right now: try again later.",
             ]);
         });
     });

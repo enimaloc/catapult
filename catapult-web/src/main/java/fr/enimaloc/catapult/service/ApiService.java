@@ -130,6 +130,14 @@ public interface ApiService {
     int saveRetroAchievementsUsername(String username, String raName);
 
     /**
+     * Declares {@code nickname} as the channel owner's FACEIT nickname; catapult-api's status: 400 when malformed or
+     * unknown to FACEIT, 503 when FACEIT cannot be asked.
+     */
+    int saveFaceitNickname(String username, String nickname);
+
+    int deleteFaceitNickname(String username);
+
+    /**
      * Declares {@code riotId} ({@code gameName#tagLine}) on the League of Legends {@code platform} as the channel
      * owner's; catapult-api's status: 400 when malformed or unknown to Riot, 503 when Riot cannot be asked.
      */

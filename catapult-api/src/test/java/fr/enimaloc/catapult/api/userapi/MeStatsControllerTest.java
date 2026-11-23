@@ -88,6 +88,7 @@ class MeStatsControllerTest {
     @MockitoBean BlizzardStatsService blizzardStats;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService bungieStats;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService riotStats;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.faceit.FaceitStatsService faceitStats;
 
     private UserAccount user;
     private boolean budgetLeft = true;
@@ -425,5 +426,42 @@ class MeStatsControllerTest {
 
         budgetLeft = false;
         mvc.perform(v3(get(STATS + "/riot/lol"))).andExpect(status().isTooManyRequests());
+    }
+
+    // ---------------------------------------------------------------- FACEIT
+
+    @Test
+    void faceitDetailIsTheSameProjection_withTheRecentResults() throws Exception {
+        var cs2 = new fr.enimaloc.catapult.service.enrichment.faceit.FaceitStats.Cs2Stats(Status.OK, 8, 1850, "EU",
+                420, 231, 55, 1.12, 48, 2, 9, null, List.of(true, false));
+        when(faceitStats.forGame(eq(user),
+                eq(fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.FaceitGame.CS2), any(), eq(true)))
+                .thenReturn(Optional.of(new fr.enimaloc.catapult.service.enrichment.faceit.FaceitStats(Status.OK,
+                        fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.FaceitGame.CS2,
+                        "Catapult", cs2, null)));
+
+        mvc.perform(v3(get(STATS + "/faceit/cs2")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ok"))
+                .andExpect(jsonPath("$.game").value("cs2"))
+                .andExpect(jsonPath("$.account").value("Catapult"))
+                .andExpect(jsonPath("$.cs2.elo").value(1850))
+                .andExpect(jsonPath("$.cs2.recentResults[0]").value(true))
+                .andExpect(jsonPath("$.more").value("http://localhost/api/me/stats/faceit/cs2?version=3"));
+        org.assertj.core.api.Assertions.assertThat(MeStatsController.class.getMethod("faceit", UUID.class,
+                String.class).getReturnType())
+                .isEqualTo(fr.enimaloc.catapult.service.enrichment.faceit.FaceitStats.class);
+    }
+
+    @Test
+    void faceitBudgetSpentIs429_unknownGame400_noNickname404() throws Exception {
+        mvc.perform(v3(get(STATS + "/faceit/csgo"))).andExpect(status().isBadRequest());
+        verifyNoInteractions(faceitStats);
+
+        when(faceitStats.forGame(any(), any(), any(), anyBoolean())).thenReturn(Optional.empty());
+        mvc.perform(v3(get(STATS + "/faceit/cs2"))).andExpect(status().isNotFound());
+
+        budgetLeft = false;
+        mvc.perform(v3(get(STATS + "/faceit/cs2"))).andExpect(status().isTooManyRequests());
     }
 }

@@ -14,6 +14,8 @@ import fr.enimaloc.catapult.service.enrichment.bungie.BungieGameDataService;
 import fr.enimaloc.catapult.service.enrichment.bungie.BungiePublisher;
 import fr.enimaloc.catapult.service.enrichment.bungie.BungieStats;
 import fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService;
+import fr.enimaloc.catapult.service.enrichment.faceit.FaceitStats;
+import fr.enimaloc.catapult.service.enrichment.faceit.FaceitStatsService;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticService;
@@ -123,6 +125,7 @@ public class GameEnrichmentAssembler {
     private final BungieGameDataService bungieGameDataService;
     private final RiotStatsService riotStatsService;
     private final RiotGameDataService riotGameDataService;
+    private final FaceitStatsService faceitStatsService;
     private final EnrichmentProperties properties;
 
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -225,8 +228,9 @@ public class GameEnrichmentAssembler {
 
     /**
      * Starts the member's stats lookups: Steam once {@code appId} is known, Xbox (its title found by the detected
-     * id, the Store id IGDB gives, else by name), RetroAchievements (among the games played lately) and Blizzard (by
-     * the Battle.net product code, else the IGDB id) at once.
+     * id, the Store id IGDB gives, else by name), RetroAchievements (among the games played lately), Blizzard (by
+     * the Battle.net product code, else the IGDB id) and FACEIT (Counter-Strike 2 by its Steam app id, else the IGDB
+     * id) at once.
      */
     private Stats stats(DetectedGame detected, String igdb, CompletableFuture<String> appId, String searched,
                         Locale locale, UserAccount user) {
@@ -242,7 +246,9 @@ public class GameEnrichmentAssembler {
                 .forDetected(user, igdb, locale, FetchBudget.UNLIMITED).orElse(null));
         CompletableFuture<RiotStats> riot = supply("riot stats", () -> riotStatsService
                 .forDetected(user, igdb, locale, FetchBudget.UNLIMITED).orElse(null));
-        return new Stats(steam, xbox, retro, blizzard, detected.getSourceType(), bungie, riot);
+        CompletableFuture<FaceitStats> faceit = supply("faceit stats", () -> faceitStatsService
+                .forDetected(user, detected, igdb, FetchBudget.UNLIMITED).orElse(null));
+        return new Stats(steam, xbox, retro, blizzard, detected.getSourceType(), bungie, riot, faceit);
     }
 
     private PlatformStats xboxStats(UserAccount user, DetectedGame detected, String igdb, String searched,
@@ -275,7 +281,8 @@ public class GameEnrichmentAssembler {
     private record Stats(CompletableFuture<PlatformStats> steam, CompletableFuture<PlatformStats> xbox,
                          CompletableFuture<PlatformStats> retroachievements,
                          CompletableFuture<BlizzardStats> blizzard, GameBinding.SourceType detectedOn,
-                         CompletableFuture<BungieStats> bungie, CompletableFuture<RiotStats> riot) {
+                         CompletableFuture<BungieStats> bungie, CompletableFuture<RiotStats> riot,
+                         CompletableFuture<FaceitStats> faceit) {
 
         /** What arrived before {@code deadline}; null when no platform applies. */
         PersonalStatsEnrichment await(long deadline) {
@@ -285,7 +292,8 @@ public class GameEnrichmentAssembler {
                     GameEnrichmentAssembler.await(blizzard, deadline, "blizzard stats"),
                     detectedOn,
                     GameEnrichmentAssembler.await(bungie, deadline, "bungie stats"),
-                    GameEnrichmentAssembler.await(riot, deadline, "riot stats"));
+                    GameEnrichmentAssembler.await(riot, deadline, "riot stats"),
+                    GameEnrichmentAssembler.await(faceit, deadline, "faceit stats"));
         }
     }
 

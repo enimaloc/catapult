@@ -6,6 +6,7 @@ import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
 import fr.enimaloc.catapult.common.dto.channel.RiotData;
+import fr.enimaloc.catapult.common.dto.channel.FaceitData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
@@ -174,6 +175,12 @@ public class ChannelEventPublisher {
     public void riotAccountChanged(UUID channelOwnerId, RiotData account) {
         publish(channelOwnerId, ChannelEvents.RIOT_ACCOUNT_CHANGED,
                 (id, login) -> new ChannelEvents.RiotAccountChanged(id, login, account));
+    }
+
+    /** The owner's FACEIT settings now stand as {@code account} (the nickname only). */
+    public void faceitAccountChanged(UUID channelOwnerId, FaceitData account) {
+        publish(channelOwnerId, ChannelEvents.FACEIT_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.FaceitAccountChanged(id, login, account));
     }
 
     /** The owner's RetroAchievements settings now stand as {@code account} (the name only, never the key). */

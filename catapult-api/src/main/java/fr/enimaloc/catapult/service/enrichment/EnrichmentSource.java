@@ -45,7 +45,10 @@ public enum EnrichmentSource {
     RIOT_LOL_LIVE("riot-lol-live"),
     RIOT_TFT_LEAGUE("riot-tft-league"),
     RIOT_LOL_PATCH("riot-lol-patch"),
-    RIOT_LOL_CHAMPIONS("riot-lol-champions");
+    RIOT_LOL_CHAMPIONS("riot-lol-champions"),
+    FACEIT_PLAYER("faceit-player"),
+    FACEIT_STATS("faceit-stats"),
+    FACEIT_LAST_MATCH("faceit-last-match");
 
     private final String key;
 
@@ -60,8 +63,8 @@ public enum EnrichmentSource {
 
     /**
      * Whether the source holds one member's own stats (keyed {@code u:<userId>...}): the Steam, Xbox and
-     * RetroAchievements sources, the Blizzard character, achievement and profile ones and the Bungie profile and
-     * triumphs and the Riot summoner, league and live game ones, except the Steam schema and rarity, which are the same for everyone.
+     * RetroAchievements sources, the Blizzard character, achievement and profile ones, the Bungie profile and
+     * triumphs, the Riot summoner, league and live game ones and the FACEIT ones, except the Steam schema and rarity, which are the same for everyone.
      */
     public boolean personal() {
         return switch (this) {
@@ -69,6 +72,7 @@ public enum EnrichmentSource {
                  RA_PROGRESS, RA_RECENT, BLIZZARD_WOW_CHARACTER, BLIZZARD_WOW_ACHIEVEMENTS, BLIZZARD_SC2_PROFILE,
                  BLIZZARD_D3_PROFILE, BUNGIE_PROFILE, BUNGIE_TRIUMPHS -> true;
             case RIOT_LOL_SUMMONER, RIOT_LOL_LEAGUE, RIOT_LOL_LIVE, RIOT_TFT_LEAGUE -> true;
+            case FACEIT_PLAYER, FACEIT_STATS, FACEIT_LAST_MATCH -> true;
             default -> false;
         };
     }

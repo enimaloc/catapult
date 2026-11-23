@@ -192,6 +192,17 @@ class ChannelEventPublisherTest {
     }
 
     @Test
+    void faceitAccountChanged_publishesTheCardsData() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.FaceitData("Catapult",
+                "https://www.faceit.com/en/players/Catapult", true);
+
+        publisher.faceitAccountChanged(ownerId, account);
+
+        assertThat(published(ChannelEvents.FACEIT_ACCOUNT_CHANGED)).isEqualTo(
+                new ChannelEvents.FaceitAccountChanged(ownerId.toString(), "streamername", account));
+    }
+
+    @Test
     void speedrunAccountChanged_publishesTheCardsData() {
         var account = new fr.enimaloc.catapult.common.dto.channel.SpeedrunData("n1", true, false, "KeyOwner",
                 "KeyOwner", "https://www.speedrun.com/users/KeyOwner", "api_key");

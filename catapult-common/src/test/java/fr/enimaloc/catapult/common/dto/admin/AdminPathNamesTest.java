@@ -27,6 +27,8 @@ class AdminPathNamesTest {
         assertThat(ApiKeyProvider.OPENCRITIC.pathName()).isEqualTo("opencritic");
         assertThat(ApiKeyProvider.RIOT.apiPath()).isEqualTo("riot-keys");
         assertThat(ApiKeyProvider.RIOT.pathName()).isEqualTo("riot");
+        assertThat(ApiKeyProvider.FACEIT.apiPath()).isEqualTo("faceit-keys");
+        assertThat(ApiKeyProvider.FACEIT.pathName()).isEqualTo("faceit");
     }
 
     @ParameterizedTest

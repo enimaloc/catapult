@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelPageData;
 import fr.enimaloc.catapult.common.dto.channel.AnkamaData;
 import fr.enimaloc.catapult.common.dto.channel.BattleNetData;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
+import fr.enimaloc.catapult.common.dto.channel.FaceitData;
 import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
 import fr.enimaloc.catapult.common.dto.channel.RiotData;
 import fr.enimaloc.catapult.common.dto.channel.EpicData;
@@ -91,6 +92,9 @@ public final class IntegrationCards {
         }
         if (ch.riot() != null) {
             cards.add(riot(ch.riot()));
+        }
+        if (ch.faceit() != null) {
+            cards.add(faceit(ch.faceit()));
         }
         if (ch.obs() != null) {
             cards.add(obs(ch.obs()));
@@ -601,6 +605,36 @@ public final class IntegrationCards {
                                 segmented(Attrs.id("riot-delete-btn").withState(hasIdState),
                                         key(RIOT_PREFIX + "delete")))),
                 new Text(Attrs.cls("riot-help"), true, key(RIOT_PREFIX + "help")));
+    }
+
+    // FACEIT: the nickname the member declares; FACEIT checks it before anything is kept. The declared one shows as a
+    // chip that FaceitAccountChangedEvent replaces in place. Without a key in the shared pool the card says the stats
+    // are off on this instance (a save would be refused). Wide: a form. No secret is ever held for a member.
+
+    private static final String FACEIT_EVENT = "FaceitAccountChangedEvent";
+    private static final String FACEIT_PREFIX = PREFIX + "faceit.";
+
+    static IntegrationDto faceit(FaceitData faceit) {
+        boolean hasName = faceit.nickname() != null && !faceit.nickname().isBlank();
+        SpaState hasNameState = SpaState.flag("faceitHasName", hasName, FACEIT_EVENT + ".nickname");
+        return wideCard("faceit",
+                new Container(Attrs.cls("faceit-account").withState(hasNameState), Container.Kind.DIV, List.of(
+                        new Text(Attrs.NONE, false, key(FACEIT_PREFIX + "account")),
+                        new Chip(Attrs.cls("faceit-account-name").withState(
+                                SpaState.sync("textContent", FACEIT_EVENT + ".nickname")),
+                                Message.literal(hasName ? faceit.nickname() : "")))),
+                new Text(Attrs.cls("faceit-none").withState(SpaState.flag("faceitNoName", !hasName,
+                        FACEIT_EVENT + ".!nickname")), false, key(FACEIT_PREFIX + "none")),
+                new Text(Attrs.cls("faceit-unavailable").withState(SpaState.flag("faceitUnavailable",
+                        !faceit.available(), FACEIT_EVENT + ".!available")), true, key(FACEIT_PREFIX + "unavailable")),
+                new Input(Attrs.id("faceit-nickname-input").withState(SpaState.sync("value",
+                        FACEIT_EVENT + ".nickname")), "text", key(FACEIT_PREFIX + "nickname.placeholder"), null,
+                        faceit.nickname(), null, null, "off"),
+                new Container(Attrs.id("faceit-actions").withClass("card-actions"), Container.Kind.SEGMENTED_GROUP,
+                        List.of(segmented(Attrs.id("faceit-save-btn"), key(FACEIT_PREFIX + "save")),
+                                segmented(Attrs.id("faceit-delete-btn").withState(hasNameState),
+                                        key(FACEIT_PREFIX + "delete")))),
+                new Text(Attrs.cls("faceit-help"), true, key(FACEIT_PREFIX + "help")));
     }
 
     // Epic: one sub-view and button per status, driven by the status field of EpicLinkEvent, which carries NONE too.

@@ -2901,4 +2901,32 @@ class RealApiServiceTest {
         assertThat(service.deleteRiotAccount("enimaloc")).isEqualTo(204);
         assertThat(service.saveRiotAccount("enimaloc", "Down#EUW", "euw1")).isEqualTo(503);
     }
+
+    @Test
+    void faceitKeys_areReadAndManagedThroughTheirRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.FACEIT;
+        respond(HttpMethod.GET, "/api/internal/admin/faceit-keys", "{\"keys\":[],\"faceitEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/faceit-keys")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/faceit-keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/faceit-keys/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
+    }
+
+    @Test
+    void faceitNickname_isSavedAndRemovedOnTheChannel_andRefusalsKeepTheirStatus() {
+        expectPut(channel("enimaloc") + "/settings/faceit/nickname", "{\"nickname\":\"Catapult\"}");
+        expectDelete(channel("enimaloc") + "/settings/faceit/nickname");
+        expect(HttpMethod.PUT, channel("enimaloc") + "/settings/faceit/nickname")
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
+                        org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThat(service.saveFaceitNickname("enimaloc", "Catapult")).isEqualTo(204);
+        assertThat(service.deleteFaceitNickname("enimaloc")).isEqualTo(204);
+        assertThat(service.saveFaceitNickname("enimaloc", "Down")).isEqualTo(503);
+    }
 }
