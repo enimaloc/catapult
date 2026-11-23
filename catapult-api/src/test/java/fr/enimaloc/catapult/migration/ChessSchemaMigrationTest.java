@@ -15,7 +15,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-/** V133's cascade and its "a site is whole or absent" checks, which the H2 tests never execute. */
+/** V134's cascade and its "a site is whole or absent" checks, which the H2 tests never execute. */
 @Testcontainers
 class ChessSchemaMigrationTest {
 
