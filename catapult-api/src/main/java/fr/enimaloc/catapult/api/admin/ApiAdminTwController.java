@@ -24,6 +24,7 @@ import java.util.Optional;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -181,5 +182,13 @@ public class ApiAdminTwController {
     private TwBackfillService backfill() {
         return backfillService.orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The TW backfill is not available"));
+    }
+
+    /** The service refuses an unknown TW or a malformed value: a 404 or a 400, never a 500. */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> refused(IllegalArgumentException e) {
+        String message = String.valueOf(e.getMessage());
+        HttpStatus status = message.startsWith("Unknown TW") ? HttpStatus.NOT_FOUND : HttpStatus.BAD_REQUEST;
+        return ResponseEntity.status(status).body(Map.of("error", message));
     }
 }

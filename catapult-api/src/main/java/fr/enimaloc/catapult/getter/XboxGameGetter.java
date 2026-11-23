@@ -97,6 +97,12 @@ public class XboxGameGetter implements GameGetter {
                 skipped.add(title.titleId() + " (" + detail.type() + ")");
                 continue;
             }
+            if (detail.productId().isEmpty() && (title.titleName() == null || title.titleName().isBlank())) {
+                // No Store id and no name: the raw titleId would match nothing and switch the channel to the
+                // unknown-game category in the middle of a stream, so this pass is dropped instead
+                log.warn("Xbox title {} has neither a Titlehub detail nor a name: detection skipped", title.titleId());
+                throw DetectionTimeoutException.unidentified(name(), "title " + title.titleId());
+            }
             String productId = detail.productId().orElse(title.titleId());
             return Optional.of(new DetectedGame(productId, GameBinding.SourceType.XBOX, title.titleName()));
         }

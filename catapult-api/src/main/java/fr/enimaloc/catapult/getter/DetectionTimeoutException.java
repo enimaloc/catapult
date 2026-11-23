@@ -23,6 +23,14 @@ public class DetectionTimeoutException extends RuntimeException {
         return new DetectionTimeoutException(provider, "is unavailable", cause);
     }
 
+    /**
+     * The provider says something is being played but names nothing the detection can look up: guessing would switch
+     * the channel to an unknown game, so the pass is dropped just like a timeout.
+     */
+    public static DetectionTimeoutException unidentified(String provider, String what) {
+        return new DetectionTimeoutException(provider, "could not identify " + what, null);
+    }
+
     /** Whether {@code e}, or anything it wraps, is a timeout (a future's, a socket's or the HTTP client's). */
     public static boolean isTimeout(Throwable e) {
         for (Throwable t = e; t != null; t = t.getCause() == t ? null : t.getCause()) {
