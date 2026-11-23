@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.enrichment.riot;
 
 import fr.enimaloc.catapult.getter.riot.RiotApiKeyRotator;
 import fr.enimaloc.catapult.service.ApiKeyHasher;
+import fr.enimaloc.catapult.service.enrichment.EnrichmentUserAgent;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotModels.Champion;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotModels.Champions;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotModels.LeagueEntry;
@@ -45,7 +46,7 @@ public class HttpRiotClient implements RiotClient {
 
     static final String DDRAGON = "https://ddragon.leagueoflegends.com";
     static final String TOKEN_HEADER = "X-Riot-Token";
-    static final String USER_AGENT = "Catapult/1.0 (+https://catapult.enimaloc.fr)";
+    static final String USER_AGENT = EnrichmentUserAgent.VALUE;
     static final int MAX_BYTES = 1024 * 1024;
     /** Data Dragon's champion list is about 160 kB in 2026. */
     static final int MAX_DDRAGON_BYTES = 4 * 1024 * 1024;
