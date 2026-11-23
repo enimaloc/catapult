@@ -42,6 +42,8 @@ class SystemMentionCommandsTest {
     private final ActivityLogService activityLog = mock(ActivityLogService.class);
     private final TwitchChatService chat = mock(TwitchChatService.class);
     private final MessageSource messages = mock(MessageSource.class);
+    private final fr.enimaloc.catapult.service.binding.ChannelDashboardActions dashboardActions =
+            mock(fr.enimaloc.catapult.service.binding.ChannelDashboardActions.class);
     private SystemMentionCommands commands;
     private UserAccount channel;
     private UserAccount fresh;
@@ -49,8 +51,9 @@ class SystemMentionCommandsTest {
     @BeforeEach
     void setUp() {
         commands = new SystemMentionCommands(users, botToggle, emergency, collector, gameState, activityLog,
-                chat, messages, new EmergencyProperties());
+                chat, messages, new EmergencyProperties(), dashboardActions);
         ReflectionTestUtils.setField(commands, "ownerId", "owner-1");
+        ReflectionTestUtils.setField(commands, "refreshExecutor", (java.util.concurrent.Executor) Runnable::run);
         UUID id = UUID.randomUUID();
         channel = new UserAccount();
         channel.setId(id);
@@ -272,5 +275,57 @@ class SystemMentionCommandsTest {
         commands.handle(channel, sender("owner-1", SenderRole.VIEWERS), mention("emergency", "status"));
 
         repliedWith("bot.mention.status.none");
+    }
+
+    @Test
+    void refresh_forgetsTheGameThenChecksAgain_andNamesWhatIsDetected() {
+        DetectedGame game = new DetectedGame("271590", GameBinding.SourceType.XBOX, "Grand Theft Auto VI");
+        when(gameState.getLastKnownGame(fresh)).thenReturn(Optional.of(game));
+
+        commands.handle(channel, sender("mod-1", SenderRole.MODERATOR), mention("refresh"));
+
+        InOrder order = inOrder(gameState, dashboardActions);
+        order.verify(gameState).forgetLastKnownGame(fresh.getId());
+        order.verify(dashboardActions).recheckGame(fresh);
+        repliedWith("bot.mention.refresh.done[Grand Theft Auto VI]");
+        verify(activityLog).addEntry(eq(fresh.getId()), eq("INFO"), anyString());
+    }
+
+    @Test
+    void refresh_withNothingDetected_saysSo() {
+        when(gameState.getLastKnownGame(fresh)).thenReturn(Optional.empty());
+
+        commands.handle(channel, sender("mod-1", SenderRole.MODERATOR), mention("refresh"));
+
+        verify(dashboardActions).recheckGame(fresh);
+        repliedWith("bot.mention.refresh.none");
+    }
+
+    @Test
+    void refresh_failing_repliesWithAnError() {
+        org.mockito.Mockito.doThrow(new IllegalStateException("boom")).when(dashboardActions).recheckGame(fresh);
+
+        commands.handle(channel, sender("mod-1", SenderRole.MODERATOR), mention("refresh"));
+
+        repliedWith("bot.mention.refresh.error");
+        verify(activityLog, never()).addEntry(any(), anyString(), anyString());
+    }
+
+    @Test
+    void refresh_onAnInactiveAccount_detectsNothing() {
+        fresh.setStatus(UserAccount.Status.INACTIVE);
+
+        commands.handle(channel, sender("mod-1", SenderRole.MODERATOR), mention("refresh"));
+
+        verifyNoInteractions(dashboardActions);
+        repliedWith("bot.mention.refresh.inactive");
+    }
+
+    @Test
+    void refresh_byViewer_isIgnored() {
+        commands.handle(channel, sender("viewer-1", SenderRole.VIEWERS), mention("refresh"));
+
+        verifyNoInteractions(dashboardActions);
+        verify(gameState, never()).forgetLastKnownGame(any());
     }
 }

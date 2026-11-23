@@ -35,7 +35,8 @@ class SystemMentionRepliesTest {
     private final EmergencyContextCollector collector = mock(EmergencyContextCollector.class);
     private final SystemMentionCommands commands = new SystemMentionCommands(users, mock(BotToggleService.class),
             emergency, collector, mock(GameStateService.class), mock(ActivityLogService.class), chat,
-            new I18nConfig().messageSource(), new EmergencyProperties());
+            new I18nConfig().messageSource(), new EmergencyProperties(),
+            mock(fr.enimaloc.catapult.service.binding.ChannelDashboardActions.class));
     private final UserAccount channel = new UserAccount();
 
     private List<String> repliesTo(SenderRole role, String senderId, SystemMention mention) {
