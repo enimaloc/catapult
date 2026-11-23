@@ -255,6 +255,38 @@ class BungieTokenServiceTest {
     }
 
     @Test
+    void aSuspectApplication_staysSuspectPastTheWindow_noLinkIsSweptLater() {
+        when(client.refresh(anyString())).thenThrow(new BungieExceptions.RefreshRefused());
+        for (int i = 0; i < BungieTokenService.SWEEP_THRESHOLD; i++) {
+            UUID other = UUID.randomUUID();
+            rows.put(other, account(other, "m" + i, "r" + i));
+            tokens.accessToken(other);
+        }
+        assertThatThrownBy(() -> tokens.accessToken(USER)).isInstanceOf(BungieUnavailableException.class);
+
+        now.set(now.get().plus(BungieTokenService.SWEEP_WINDOW).plusSeconds(60));
+
+        assertThatThrownBy(() -> tokens.accessToken(USER)).isInstanceOf(BungieUnavailableException.class);
+        assertThat(row().usable()).isTrue();
+    }
+
+    @Test
+    void anUnwrittenRotatedToken_isDropped_whenTheRowWasLinkedAgain() {
+        when(client.refresh("refresh-1")).thenReturn(grant("access-1", "refresh-2", "14982373"));
+        when(client.refresh("relinked")).thenReturn(grant("access-9", "refresh-9", "14982373"));
+        doThrow(new DataAccessResourceFailureException("down")).when(accounts).save(any());
+        tokens.accessToken(USER);
+
+        BungieAccount relinked = account(USER, "14982373", "relinked");
+        relinked.setVersion(2L);
+        rows.put(USER, relinked);
+        now.set(now.get().plusSeconds(3600));
+
+        assertThat(tokens.accessToken(USER)).contains("access-9");
+        verify(client, never()).refresh("refresh-2");
+    }
+
+    @Test
     void aRefusedDatabaseWrite_keepsTheRotatedTokenInMemory_andWritesItAgain() {
         when(client.refresh("refresh-1")).thenReturn(grant("access-1", "refresh-2", "14982373"));
         org.mockito.Mockito.doThrow(new DataAccessResourceFailureException("down")).doAnswer(i -> {

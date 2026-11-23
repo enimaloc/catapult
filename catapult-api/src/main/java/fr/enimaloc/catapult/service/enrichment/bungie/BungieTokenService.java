@@ -51,6 +51,8 @@ public class BungieTokenService {
     /** This many members' refresh tokens refused within {@link #SWEEP_WINDOW}: the application is suspect. */
     static final int SWEEP_THRESHOLD = 3;
     static final Duration SWEEP_WINDOW = Duration.ofMinutes(10);
+    /** Once suspect, the application stays so this long after the last refusal: no link is invalidated meanwhile. */
+    static final Duration SUSPECT_FOR = Duration.ofHours(1);
 
     /**
      * Published once a link was marked invalid (a refused refresh): the card asks to link again. An event, not a
@@ -86,6 +88,7 @@ public class BungieTokenService {
     private final Map<UUID, Instant> cooldown = new ConcurrentHashMap<>();
     private final Map<UUID, Object> locks = new ConcurrentHashMap<>();
     private final Deque<Instant> refusals = new ArrayDeque<>();
+    private Instant suspectUntil;
 
     @Autowired
     public BungieTokenService(BungieAccountRepository accounts, BungieClient client, TokenEncryptionService encryption,
@@ -145,6 +148,12 @@ public class BungieTokenService {
             Unsaved pending = unsaved.get(userId);
             String refreshToken;
             try {
+                if (pending != null && !(Objects.equals(pending.expectedVersion(), read.getVersion())
+                        && Objects.equals(pending.expectedEnc(), read.getRefreshTokenEnc()))) {
+                    // The row changed since this token was rotated (linked again elsewhere): it is not this row's
+                    unsaved.remove(userId);
+                    pending = null;
+                }
                 refreshToken = encryption.decrypt(pending != null ? pending.refreshEnc() : read.getRefreshTokenEnc());
             } catch (RuntimeException e) {
                 log.warn("The Bungie refresh token of {} cannot be decrypted", userId);
@@ -207,7 +216,7 @@ public class BungieTokenService {
         held.remove(userId);
         unsaved.remove(userId);
         cooldown.remove(userId);
-        locks.remove(userId);
+        // The lock entry stays: evict runs under it, and a fresh one would let two renewals race on one token
     }
 
     private Object lock(UUID userId) {
@@ -231,10 +240,15 @@ public class BungieTokenService {
 
     private synchronized boolean applicationSuspect() {
         Instant now = clock.instant();
+        if (suspectUntil != null && suspectUntil.isAfter(now)) {
+            suspectUntil = now.plus(SUSPECT_FOR);
+            return true;
+        }
         while (!refusals.isEmpty() && refusals.peekFirst().plus(SWEEP_WINDOW).isBefore(now)) {
             refusals.removeFirst();
         }
         if (refusals.size() >= SWEEP_THRESHOLD) {
+            suspectUntil = now.plus(SUSPECT_FOR);
             return true;
         }
         refusals.addLast(now);
