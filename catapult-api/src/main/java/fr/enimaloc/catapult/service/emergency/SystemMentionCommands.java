@@ -18,12 +18,17 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -60,6 +65,14 @@ public class SystemMentionCommands {
      */
     private Executor refreshExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
+    /**
+     * A check holds the instance-wide detection lock: a channel gets at most one refresh per {@link #REFRESH_COOLDOWN},
+     * counted from when it was asked, so a burst of mentions cannot pile up checks that delay every other channel.
+     */
+    static final Duration REFRESH_COOLDOWN = Duration.ofSeconds(30);
+    private final Map<UUID, Instant> lastRefresh = new ConcurrentHashMap<>();
+    private Clock clock = Clock.systemUTC();
+
     @Value("${app.owner-id:}")
     private String ownerId;
 
@@ -85,7 +98,14 @@ public class SystemMentionCommands {
             case "off" -> off(current, sender);
             case "on" -> on(current, sender);
             case "emergency" -> emergency(current, sender, mention.args(), owner);
-            case "refresh" -> refreshExecutor.execute(() -> refresh(current, sender));
+            case "refresh" -> {
+                if (claimRefresh(current.getId())) {
+                    refreshExecutor.execute(() -> refresh(current, sender));
+                } else {
+                    log.debug("Refresh by {} ignored in {}: one was asked less than {} ago", sender.login(),
+                            current.getId(), REFRESH_COOLDOWN);
+                }
+            }
             default -> log.debug("Ignoring unknown mention command '{}' in {}", mention.command(), current.getId());
         }
     }
@@ -106,6 +126,20 @@ public class SystemMentionCommands {
         emergencyStopService.liftChannel(channel, sender.login());
         reply(channel, "bot.mention.on", sender.login());
         activityLog.addEntry(channel.getId(), "INFO", "Bot enabled from the chat by " + sender.login());
+    }
+
+    /** True, and the channel's cooldown started, when no refresh was asked there within the cooldown. */
+    private boolean claimRefresh(UUID channelId) {
+        Instant now = clock.instant();
+        Instant[] claimed = new Instant[1];
+        lastRefresh.compute(channelId, (id, last) -> {
+            if (last != null && last.plus(REFRESH_COOLDOWN).isAfter(now)) {
+                return last;
+            }
+            claimed[0] = now;
+            return now;
+        });
+        return claimed[0] != null;
     }
 
     /**

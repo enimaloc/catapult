@@ -328,4 +328,20 @@ class SystemMentionCommandsTest {
         verifyNoInteractions(dashboardActions);
         verify(gameState, never()).forgetLastKnownGame(any());
     }
+
+    @Test
+    void refresh_isIgnoredWithinTheCooldown_thenHeardAgain() {
+        java.time.Instant start = java.time.Instant.parse("2026-11-23T20:00:00Z");
+        ReflectionTestUtils.setField(commands, "clock", java.time.Clock.fixed(start, java.time.ZoneOffset.UTC));
+        MentionSender mod = sender("mod-1", SenderRole.MODERATOR);
+
+        commands.handle(channel, mod, mention("refresh"));
+        commands.handle(channel, mod, mention("refresh"));
+        verify(dashboardActions, org.mockito.Mockito.times(1)).recheckGame(fresh);
+
+        ReflectionTestUtils.setField(commands, "clock", java.time.Clock.fixed(
+                start.plus(SystemMentionCommands.REFRESH_COOLDOWN), java.time.ZoneOffset.UTC));
+        commands.handle(channel, mod, mention("refresh"));
+        verify(dashboardActions, org.mockito.Mockito.times(2)).recheckGame(fresh);
+    }
 }
