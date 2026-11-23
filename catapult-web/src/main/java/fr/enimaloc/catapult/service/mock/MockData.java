@@ -18,6 +18,7 @@ import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
+import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
@@ -140,6 +141,8 @@ public class MockData {
     private String blizzardRegion = "eu";
     private List<BlizzardStatsData.WowCharacterOption> blizzardCharacters = MOCK_WOW_CHARACTERS;
     private String blizzardWowMain = "eu:1001";
+    /** The Bungie card too: linked to a Steam Destiny 2 profile. */
+    private boolean bungieLinked = true;
     private ObsData obsData;
     private String obsPassword;
     private String twitchatBranch = TwitchatData.AUTO;
@@ -385,7 +388,8 @@ public class MockData {
                 obsData == null ? null : TwitchatData.of(twitchatBranch),
                 username.equals(channelDto.twitchUsername()) ? customBindings.state() : null,
                 // drops: the mock has no experiments, they are offered
-                drops(), ankamaData(), epicData(), speedrunData(), retroAchievementsData(), blizzardStatsData());
+                drops(), ankamaData(), epicData(), speedrunData(), retroAchievementsData(), blizzardStatsData(),
+                bungieData());
     }
 
     /** The mock's one running drops campaign, on the first binding's category. */
@@ -439,6 +443,15 @@ public class MockData {
         return new BlizzardStatsData(!List.of("NONE", "REMOVED").contains(battleNetLink.status()), blizzardRegion,
                 !blizzardCharacters.isEmpty(), blizzardCharacters, blizzardWowMain, true,
                 blizzardCharacters.isEmpty() ? null : java.time.Instant.parse("2026-11-20T10:00:00Z"));
+    }
+
+    public BungieAccountData bungieData() {
+        return bungieLinked ? new BungieAccountData(true, "Simulated#0042", "steam", false, true,
+                java.time.Instant.parse("2026-11-20T10:00:00Z")) : BungieAccountData.unlinked(true);
+    }
+
+    public void unlinkBungie() {
+        bungieLinked = false;
     }
 
     public void saveBlizzardRegion(String region) {

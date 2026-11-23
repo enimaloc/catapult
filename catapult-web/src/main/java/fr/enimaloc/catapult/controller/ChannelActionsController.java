@@ -228,6 +228,12 @@ public class ChannelActionsController {
         return ApiStatus.answer(apiService.deleteBlizzardWowCharacters(username));
     }
 
+    // Unlinking Bungie.net; linking is a login (/oauth2/authorization/bungie), not a route here.
+    @PostMapping("/channel/{username}/settings/bungie/delete")
+    public ResponseEntity<Void> deleteBungieLink(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteBungieLink(username));
+    }
+
     @PostMapping("/channel/{username}/steam/refresh-profile-cache")
     public ResponseEntity<Void> refreshSteamProfileCache(@PathVariable String username) {
         return ApiStatus.answer(apiService.refreshSteamProfileCache(username));

@@ -256,6 +256,16 @@ class ChannelEventRedisBridgeTest {
     }
 
     @Test
+    void bridgeRelaysBungieAccountChanged() {
+        var account = fr.enimaloc.catapult.common.dto.channel.BungieAccountData.unlinked(true);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.BUNGIE_ACCOUNT_CHANGED,
+                new ChannelEvents.BungieAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent("streamer", false,
+                        false, "", false, false, true, true));
+    }
+
+    @Test
     void bridgeRelaysBlizzardAccountChanged() {
         var account = new fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData(true, "eu", false, List.of(), null, true);
 

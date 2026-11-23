@@ -57,10 +57,11 @@ public class MeGameController {
                     + "play time and achievements on the game on steam, xbox and retroachievements, and "
                     + "stats.blizzard: your BattleTag, region and main WoW character, StarCraft II or Diablo III "
                     + "profile (each null when it does not apply, each with a status and a \"more\" link to its "
-                    + "detail) — personal data, never served on a public route; and publisher: the publishers' "
-                    + "public game data (publisher.blizzard: WoW Token price, latest Hearthstone set, Diablo III "
-                    + "season, in your Blizzard region else eu; null when no publisher applies) — public game "
-                    + "data, nothing about you.")
+                    + "detail), stats.bungie: your Bungie Name and Destiny 2 profile — personal data, never served "
+                    + "on a public route; and publisher: the publishers' public game data (publisher.blizzard: WoW "
+                    + "Token price, latest Hearthstone set, Diablo III season, in your Blizzard region else eu; "
+                    + "publisher.bungie: the Destiny 2 season in progress; null when no publisher applies) — public "
+                    + "game data, nothing about you.")
     @Parameter(name = "country", in = ParameterIn.QUERY, description = "Version 3 only: the ISO 3166 country the "
             + "store prices are asked for.", example = "FR", schema = @Schema(defaultValue = "FR"))
     @Parameter(name = "language", in = ParameterIn.QUERY, description = "Version 3 only: the two-letter language "

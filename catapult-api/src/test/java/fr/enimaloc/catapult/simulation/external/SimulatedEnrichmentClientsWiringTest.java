@@ -65,6 +65,9 @@ class SimulatedEnrichmentClientsWiringTest {
         @Bean HttpXboxStatsClient xboxStats() { return mock(HttpXboxStatsClient.class); }
         @Bean HttpRetroAchievementsClient raStats() { return mock(HttpRetroAchievementsClient.class); }
         @Bean HttpBlizzardClient blizzard() { return mock(HttpBlizzardClient.class); }
+        @Bean fr.enimaloc.catapult.service.enrichment.bungie.HttpBungieClient bungie() {
+            return mock(fr.enimaloc.catapult.service.enrichment.bungie.HttpBungieClient.class);
+        }
         @Bean org.springframework.web.client.RestClient.Builder restClientBuilder() {
             return org.springframework.web.client.RestClient.builder();
         }
@@ -75,7 +78,7 @@ class SimulatedEnrichmentClientsWiringTest {
     @Configuration(proxyBeanMethods = false)
     @ComponentScan(basePackageClasses = SimulatedProtonDbClient.class, useDefaultFilters = false,
             includeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
-                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity|SteamStats|XboxStats|RetroAchievements|Blizzard)Client|.*SimulatedBlizzardAppTokenService"))
+                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity|SteamStats|XboxStats|RetroAchievements|Blizzard|Bungie)Client|.*SimulatedBlizzardAppTokenService"))
     static class SimulatedClients {
     }
 
@@ -100,6 +103,8 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(BlizzardClient.class)).isInstanceOf(SimulatedBlizzardClient.class);
             assertThat(ctx.getBean(BlizzardAppTokenService.class))
                     .isInstanceOf(SimulatedBlizzardAppTokenService.class);
+            assertThat(ctx.getBean(fr.enimaloc.catapult.service.enrichment.bungie.BungieClient.class))
+                    .isInstanceOf(SimulatedBungieClient.class);
         });
     }
 
@@ -118,6 +123,8 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(XboxStatsClient.class)).isInstanceOf(HttpXboxStatsClient.class);
             assertThat(ctx.getBean(RetroAchievementsClient.class)).isInstanceOf(HttpRetroAchievementsClient.class);
             assertThat(ctx.getBean(BlizzardClient.class)).isInstanceOf(HttpBlizzardClient.class);
+            assertThat(ctx.getBean(fr.enimaloc.catapult.service.enrichment.bungie.BungieClient.class))
+                    .isInstanceOf(fr.enimaloc.catapult.service.enrichment.bungie.HttpBungieClient.class);
         });
     }
 
@@ -223,6 +230,20 @@ class SimulatedEnrichmentClientsWiringTest {
         assertThatThrownBy(() -> ra.profile("simulated", new RaCredentials("other", false)))
                 .isInstanceOf(RaKeyRejectedException.class);
         assertThat(new SimulatedRetroAchievementsClient()).isNotNull();
+    }
+
+    @Test
+    void simulatedBungie_answersDeterministically() {
+        var bungie = new SimulatedBungieClient();
+        assertThat(bungie.refresh("any").membershipId()).isEqualTo(SimulatedBungieClient.MEMBERSHIP_ID);
+        assertThat(bungie.currentUser("t").destiny().membershipId()).isEqualTo(SimulatedBungieClient.DESTINY_ID);
+        assertThat(bungie.profile(3, SimulatedBungieClient.DESTINY_ID, "t").characters()).hasSize(2);
+        assertThatThrownBy(() -> bungie.profile(3, "0", "t"))
+                .isInstanceOf(fr.enimaloc.catapult.service.enrichment.bungie.BungieExceptions.NotFound.class);
+        assertThat(bungie.triumphScore(3, SimulatedBungieClient.DESTINY_ID, "t")).isPositive();
+        assertThat(bungie.definition("DestinyActivityModeDefinition", 2_222L, "en").name()).isEqualTo("Vanguard Ops");
+        assertThat(bungie.definition("DestinyActivityDefinition", 1_111L, "en").name()).isNotBlank();
+        assertThat(bungie.season(bungie.currentSeasonHash(), "en").number()).isEqualTo(28);
     }
 
     @Test

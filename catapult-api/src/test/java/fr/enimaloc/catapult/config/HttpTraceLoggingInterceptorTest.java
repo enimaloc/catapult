@@ -190,4 +190,31 @@ class HttpTraceLoggingInterceptorTest {
                 .doesNotContain("QSECRET").doesNotContain("BSECRET").doesNotContain("RSECRET")
                 .doesNotContain("ATOKEN").doesNotContain("RTOKEN");
     }
+
+    @Test
+    void bungiesTokenRefreshIsMasked() throws IOException {
+        MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.POST,
+                URI.create("https://www.bungie.net/platform/app/oauth/token/"));
+        request.getHeaders().set("Authorization", "Basic QkFTSUNTRUNSRVQ=");
+
+        interceptor.intercept(request, "grant_type=refresh_token&refresh_token=RSECRET".getBytes(),
+                respondWith("{\"access_token\":\"ATOKEN\",\"token_type\":\"Bearer\",\"expires_in\":3600,"
+                        + "\"refresh_token\":\"RTOKEN\",\"refresh_expires_in\":7776000,\"membership_id\":\"42\"}"));
+
+        assertThat(messages()).contains("refresh_token=***").contains("membership_id")
+                .doesNotContain("RSECRET").doesNotContain("ATOKEN").doesNotContain("RTOKEN")
+                .doesNotContain("QkFTSUNTRUNSRVQ=");
+    }
+
+    @Test
+    void bungiesApiKeyHeaderIsNeverEchoed() throws IOException {
+        MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET,
+                URI.create("https://www.bungie.net/Platform/Destiny2/3/Profile/1/?components=100"));
+        request.getHeaders().set("X-API-Key", "0123456789abcdef0123456789abcdef");
+        request.getHeaders().set("Authorization", "Bearer MEMBERTOKEN");
+
+        interceptor.intercept(request, new byte[0], respondWith("{\"ErrorCode\":1}"));
+
+        assertThat(messages()).doesNotContain("0123456789abcdef0123456789abcdef").doesNotContain("MEMBERTOKEN");
+    }
 }

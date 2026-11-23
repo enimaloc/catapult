@@ -842,6 +842,13 @@ class RealApiServiceTest {
     }
 
     @Test
+    void bungieLink_isDeletedOnTheChannel() {
+        expectDelete(channel("enimaloc") + "/settings/bungie");
+
+        assertThat(service.deleteBungieLink("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
     void blizzardRefusals_keepTheirStatus() {
         expect(HttpMethod.PUT, channel("enimaloc") + "/settings/blizzard/region")
                 .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withStatus(
@@ -2059,6 +2066,23 @@ class RealApiServiceTest {
         assertThat(service.adminAddApiKey(steam, "abc")).isEqualTo(400);
         assertThat(service.adminDeleteApiKey(dtdd, "id/1 é")).isEqualTo(204);
         assertThat(service.adminRefreshApiKeys(dtdd)).isEqualTo(204);
+    }
+
+    @Test
+    void bungieCredentials_readSetAndRemove() {
+        respond(HttpMethod.GET, "/api/internal/admin/bungie-credentials",
+                "{\"configured\":true,\"clientId\":\"12345\",\"apiKeyMasked\":\"abcd…wxyz\",\"updatedAt\":null}");
+        expect(HttpMethod.PUT, "/api/internal/admin/bungie-credentials")
+                .andExpect(content().json("{\"clientId\":\"12345\",\"clientSecret\":\"s\",\"apiKey\":\"\"}", true))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST));
+        expect(HttpMethod.DELETE, "/api/internal/admin/bungie-credentials").andRespond(withNoContent());
+
+        var page = service.adminBungieCredentials();
+        assertThat(page.configured()).isTrue();
+        assertThat(page.clientId()).isEqualTo("12345");
+        assertThat(page.apiKeyMasked()).isEqualTo("abcd…wxyz");
+        assertThat(service.adminSaveBungieCredentials("12345", "s", "")).isEqualTo(400);
+        assertThat(service.adminDeleteBungieCredentials()).isEqualTo(204);
     }
 
     @Test

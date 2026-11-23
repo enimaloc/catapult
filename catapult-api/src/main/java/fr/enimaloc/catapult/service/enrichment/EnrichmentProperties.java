@@ -71,6 +71,16 @@ public class EnrichmentProperties {
         private BlizzardRegion defaultRegion = BlizzardRegion.EU;
     }
 
+    /** Bungie.net API settings that are not a source's own ({@code catapult.enrichment.bungie.*}). */
+    @Getter
+    @Setter
+    public static class Bungie {
+        /** Upstream calls per hour: Bungie documents no limit, this one stays well under what it is known to allow. */
+        private int perHour = 30_000;
+        /** Upstream calls per second (Bungie is known to throttle above about 25). */
+        private int perSecond = 20;
+    }
+
     private SourceSettings hltb = new SourceSettings();
     private SourceSettings protondb = new SourceSettings();
     private SourceSettings steamgriddb = new SourceSettings();
@@ -106,6 +116,11 @@ public class EnrichmentProperties {
     private SourceSettings blizzardHsDeck = new SourceSettings();
     private SourceSettings blizzardD3Season = new SourceSettings();
     private Blizzard blizzard = new Blizzard();
+    private SourceSettings bungieProfile = new SourceSettings();
+    private SourceSettings bungieTriumphs = new SourceSettings();
+    private SourceSettings bungieDefinitions = new SourceSettings();
+    private SourceSettings bungieSeason = new SourceSettings();
+    private Bungie bungie = new Bungie();
     private Speedrun speedrun = new Speedrun();
     private RetroAchievements retroachievements = new RetroAchievements();
     private XboxStats xboxStats = new XboxStats();
@@ -186,6 +201,14 @@ public class EnrichmentProperties {
         return blizzard.getDefaultRegion();
     }
 
+    public int bungiePerHour() {
+        return bungie.getPerHour();
+    }
+
+    public int bungiePerSecond() {
+        return bungie.getPerSecond();
+    }
+
     public int speedrunPerMinute() {
         return speedrun.getPerMinute();
     }
@@ -234,6 +257,10 @@ public class EnrichmentProperties {
             case BLIZZARD_HS_SETS -> blizzardHsSets;
             case BLIZZARD_HS_DECK -> blizzardHsDeck;
             case BLIZZARD_D3_SEASON -> blizzardD3Season;
+            case BUNGIE_PROFILE -> bungieProfile;
+            case BUNGIE_TRIUMPHS -> bungieTriumphs;
+            case BUNGIE_DEFINITIONS -> bungieDefinitions;
+            case BUNGIE_SEASON -> bungieSeason;
         };
     }
 
@@ -258,6 +285,9 @@ public class EnrichmentProperties {
             case BLIZZARD_WOW_TOKEN -> Duration.ofMinutes(20);
             case BLIZZARD_HS_SETS, BLIZZARD_D3_SEASON -> Duration.ofDays(1);
             case BLIZZARD_HS_DECK -> Duration.ofDays(7);
+            case BUNGIE_PROFILE -> Duration.ofMinutes(2);
+            case BUNGIE_TRIUMPHS -> Duration.ofMinutes(30);
+            case BUNGIE_DEFINITIONS, BUNGIE_SEASON -> Duration.ofDays(1);
         };
     }
 }

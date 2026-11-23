@@ -46,6 +46,8 @@ class TokenKeyRotationRunnerTest {
     @BeforeEach
     void clean() {
         jdbc.update("DELETE FROM oauth_token");
+        // Not tied to an account (one application row): left over, it would be seen by every other test
+        jdbc.update("DELETE FROM bungie_app_credentials");
         jdbc.update("DELETE FROM user_account");
     }
 
@@ -158,5 +160,27 @@ class TokenKeyRotationRunnerTest {
         new TokenKeyRotationRunner(current, untouched).run(null);
 
         verifyNoInteractions(untouched);
+    }
+
+    @Test
+    void theBungieSecrets_moveToTheCurrentKey() {
+        assertThat(TokenKeyRotationRunner.SECRETS).contains(
+                new TokenKeyRotationRunner.Secret("bungie_app_credentials", "id", "client_secret_enc"),
+                new TokenKeyRotationRunner.Secret("bungie_app_credentials", "id", "api_key_enc"),
+                new TokenKeyRotationRunner.Secret("bungie_account", "user_id", "refresh_token_enc"));
+        UUID user = user(null);
+        jdbc.update("INSERT INTO bungie_app_credentials (id, client_id, client_secret_enc, api_key_enc, updated_at)"
+                + " VALUES (1, '12345', ?, ?, now())", old.encrypt("client-secret"), old.encrypt("api-key"));
+        jdbc.update("INSERT INTO bungie_account (user_id, membership_id, refresh_token_enc, linked_at, updated_at)"
+                + " VALUES (?, '42', ?, now(), now())", user, old.encrypt("bungie-refresh"));
+
+        runner.run(null);
+
+        Map<String, Object> app = jdbc.queryForMap("SELECT client_secret_enc, api_key_enc FROM bungie_app_credentials");
+        assertThat(current.decrypt((String) app.get("client_secret_enc"))).isEqualTo("client-secret");
+        assertThat(current.decrypt((String) app.get("api_key_enc"))).isEqualTo("api-key");
+        String refresh = jdbc.queryForObject("SELECT refresh_token_enc FROM bungie_account WHERE user_id = ?",
+                String.class, user);
+        assertThat(current.decrypt(refresh)).isEqualTo("bungie-refresh");
     }
 }

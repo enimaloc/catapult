@@ -101,6 +101,7 @@ public class ApiChannelActionsController {
     private final RetroAchievementsAccountService retroAchievementsAccountService;
     /** Absent unless {@code battlenet.enabled}: the Blizzard routes are then a 404. */
     private final Optional<BlizzardAccountService> blizzardAccountService;
+    private final fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinkService;
 
 
     // ── Binding actions ───────────────────────────────────────────────────────
@@ -461,6 +462,16 @@ public class ApiChannelActionsController {
             @PathVariable UUID userId) {
 
         blizzard().deleteWowCharacters(userResolver.user(userId));
+    }
+
+    /** Unlinks the owner's Bungie.net account (nothing linked: nothing to do), and forgets their cached stats. */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/bungie")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteBungieLink(
+            @PathVariable UUID userId) {
+
+        bungieLinkService.unlink(userResolver.user(userId));
     }
 
     private BlizzardAccountService blizzard() {

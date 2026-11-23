@@ -138,6 +138,8 @@ public interface ApiService {
     int saveBlizzardWowMain(String username, String region, long characterId);
     /** Forgets the owner's imported World of Warcraft characters and their main. */
     int deleteBlizzardWowCharacters(String username);
+    /** Unlinks the owner's Bungie.net account and forgets their Destiny 2 stats. */
+    int deleteBungieLink(String username);
     int refreshSteamProfileCache(String username);
     LinkStateResponse minecraftStatus(String username);
     int minecraftEnroll(String username, String name);
@@ -599,6 +601,13 @@ public interface ApiService {
     int adminDeleteApiKey(ApiKeyProvider provider, String keyId);
     /** Reloads the provider's keys into its rotator; catapult-api's status (204), 502 when unreachable. */
     int adminRefreshApiKeys(ApiKeyProvider provider);
+
+    /** The Bungie.net application set on catapult-api (client id, key masked, never the secret); null when it fails. */
+    fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData adminBungieCredentials();
+    /** Sets it (a blank secret or key keeps the one set); catapult-api's status (204; 400 malformed), 502 when unreachable. */
+    int adminSaveBungieCredentials(String clientId, String clientSecret, String apiKey);
+    /** Removes it (the Bungie source and login go off); catapult-api's status (204), 502 when unreachable. */
+    int adminDeleteBungieCredentials();
 
     /** The Minecraft service accounts; null when catapult-api fails (Minecraft disabled included). */
     List<AccountDto> adminMinecraftAccounts();

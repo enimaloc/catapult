@@ -51,6 +51,9 @@ public class ExternalServices {
         if (within(host, "battle.net") || within(host, "blizzard.com")) {
             return "battlenet";
         }
+        if (within(host, "bungie.net")) {
+            return "bungie";
+        }
         if (within(host, "ankama.com")) {
             return "ankama";
         }

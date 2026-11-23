@@ -4,6 +4,7 @@ import fr.enimaloc.catapult.common.dto.binding.CustomBindingDto;
 import fr.enimaloc.catapult.common.dto.connect.AnkamaLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
+import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
@@ -160,6 +161,12 @@ public class ChannelEventPublisher {
     public void blizzardAccountChanged(UUID channelOwnerId, BlizzardStatsData account) {
         publish(channelOwnerId, ChannelEvents.BLIZZARD_ACCOUNT_CHANGED,
                 (id, login) -> new ChannelEvents.BlizzardAccountChanged(id, login, account));
+    }
+
+    /** The owner's Bungie.net link now stands as {@code account} (names only, never a token). */
+    public void bungieAccountChanged(UUID channelOwnerId, BungieAccountData account) {
+        publish(channelOwnerId, ChannelEvents.BUNGIE_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.BungieAccountChanged(id, login, account));
     }
 
     /** The owner's RetroAchievements settings now stand as {@code account} (the name only, never the key). */

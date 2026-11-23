@@ -419,6 +419,12 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public int deleteBungieLink(String username) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/bungie", id),
+                status -> status);
+    }
+
+    @Override
     public int refreshSteamProfileCache(String username) {
         return onChannel(username, id -> client.postVoid("/api/internal/users/{userId}/steam-profile/refresh", null, id),
                 status -> status);
@@ -1606,6 +1612,24 @@ public class RealApiService implements ApiService {
             case RETROACHIEVEMENTS -> client.call(HttpMethod.POST, "/api/internal/admin/retroachievements-keys/refresh", null, Void.class);
         };
         return result.status();
+    }
+
+    @Override
+    public fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData adminBungieCredentials() {
+        return client.get("/api/internal/admin/bungie-credentials",
+                fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData.class);
+    }
+
+    @Override
+    public int adminSaveBungieCredentials(String clientId, String clientSecret, String apiKey) {
+        return client.call(HttpMethod.PUT, "/api/internal/admin/bungie-credentials",
+                new fr.enimaloc.catapult.common.dto.admin.BungieCredentialsRequest(clientId, clientSecret, apiKey),
+                Void.class).status();
+    }
+
+    @Override
+    public int adminDeleteBungieCredentials() {
+        return client.call(HttpMethod.DELETE, "/api/internal/admin/bungie-credentials", null, Void.class).status();
     }
 
     @Override

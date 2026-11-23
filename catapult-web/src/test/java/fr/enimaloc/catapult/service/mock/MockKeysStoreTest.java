@@ -49,4 +49,24 @@ class MockKeysStoreTest {
         assertThat(store.delete(ApiKeyProvider.STEAM, id)).isEqualTo(404);
         assertThat(store.page(ApiKeyProvider.STEAM).keys()).noneMatch(k -> k.id().equals(id));
     }
+
+    @Test
+    void bungie_isSetFromTheStart_masked_andRefusesWhatCatapultApiRefuses() {
+        assertThat(store.bungie().configured()).isTrue();
+        assertThat(store.bungie().apiKeyMasked()).isEqualTo("0123…cdef");
+
+        assertThat(store.saveBungie("abc", "", "")).isEqualTo(400);
+        assertThat(store.saveBungie("42", "short", "")).isEqualTo(400);
+        assertThat(store.saveBungie("42", "", "nothex")).isEqualTo(400);
+        assertThat(store.saveBungie(" 42 ", "", RAW)).isEqualTo(400);
+        assertThat(store.saveBungie(" 42 ", "a-long-enough-secret", RAW)).isEqualTo(204);
+        assertThat(store.saveBungie("42", "", "")).isEqualTo(204);
+        assertThat(store.bungie().clientId()).isEqualTo("42");
+        assertThat(store.bungie().toString()).doesNotContain(RAW);
+
+        assertThat(store.deleteBungie()).isEqualTo(204);
+        assertThat(store.bungie().configured()).isFalse();
+        assertThat(store.saveBungie("42", "", RAW)).isEqualTo(400);
+        assertThat(store.saveBungie("42", "a-long-enough-secret", RAW)).isEqualTo(204);
+    }
 }

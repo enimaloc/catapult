@@ -10,6 +10,10 @@ import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardPublisher;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStats;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStatsService;
+import fr.enimaloc.catapult.service.enrichment.bungie.BungieGameDataService;
+import fr.enimaloc.catapult.service.enrichment.bungie.BungiePublisher;
+import fr.enimaloc.catapult.service.enrichment.bungie.BungieStats;
+import fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticService;
@@ -111,6 +115,8 @@ public class GameEnrichmentAssembler {
     private final RetroAchievementsStatsService retroAchievementsStatsService;
     private final BlizzardStatsService blizzardStatsService;
     private final BlizzardGameDataService blizzardGameDataService;
+    private final BungieStatsService bungieStatsService;
+    private final BungieGameDataService bungieGameDataService;
     private final EnrichmentProperties properties;
 
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -148,6 +154,8 @@ public class GameEnrichmentAssembler {
         Stats stats = member.map(user -> stats(detected, igdb, appId, searched, locale, user)).orElse(null);
         var blizzardPublisher = supply("blizzard publisher", () -> blizzardPublisher(detected, igdb, member,
                 locale));
+        var bungiePublisher = supply("bungie publisher", () -> PublisherGames.bungie(igdb)
+                .flatMap(game -> bungieGameDataService.forGame(game, locale, FetchBudget.UNLIMITED)).orElse(null));
 
         return new GameEnrichment(
                 await(hltb, deadline, "hltb"),
@@ -162,7 +170,8 @@ public class GameEnrichmentAssembler {
                 await(twitch, deadline, "twitch"),
                 speedrun.await(deadline),
                 stats == null ? null : stats.await(deadline),
-                PublisherEnrichment.of(await(blizzardPublisher, deadline, "blizzard publisher")));
+                PublisherEnrichment.of(await(blizzardPublisher, deadline, "blizzard publisher"),
+                        await(bungiePublisher, deadline, "bungie publisher")));
     }
 
     /**
@@ -215,7 +224,9 @@ public class GameEnrichmentAssembler {
                 searched));
         CompletableFuture<BlizzardStats> blizzard = supply("blizzard stats", () -> blizzardStatsService
                 .forDetected(user, detected, igdb, locale, FetchBudget.UNLIMITED).orElse(null));
-        return new Stats(steam, xbox, retro, blizzard, detected.getSourceType());
+        CompletableFuture<BungieStats> bungie = supply("bungie stats", () -> bungieStatsService
+                .forDetected(user, igdb, locale, FetchBudget.UNLIMITED).orElse(null));
+        return new Stats(steam, xbox, retro, blizzard, detected.getSourceType(), bungie);
     }
 
     private PlatformStats xboxStats(UserAccount user, DetectedGame detected, String igdb, String searched,
@@ -247,7 +258,8 @@ public class GameEnrichmentAssembler {
     /** The member's stats lookups under way. */
     private record Stats(CompletableFuture<PlatformStats> steam, CompletableFuture<PlatformStats> xbox,
                          CompletableFuture<PlatformStats> retroachievements,
-                         CompletableFuture<BlizzardStats> blizzard, GameBinding.SourceType detectedOn) {
+                         CompletableFuture<BlizzardStats> blizzard, GameBinding.SourceType detectedOn,
+                         CompletableFuture<BungieStats> bungie) {
 
         /** What arrived before {@code deadline}; null when no platform applies. */
         PersonalStatsEnrichment await(long deadline) {
@@ -255,7 +267,8 @@ public class GameEnrichmentAssembler {
                     GameEnrichmentAssembler.await(xbox, deadline, "xbox stats"),
                     GameEnrichmentAssembler.await(retroachievements, deadline, "retroachievements stats"),
                     GameEnrichmentAssembler.await(blizzard, deadline, "blizzard stats"),
-                    detectedOn);
+                    detectedOn,
+                    GameEnrichmentAssembler.await(bungie, deadline, "bungie stats"));
         }
     }
 

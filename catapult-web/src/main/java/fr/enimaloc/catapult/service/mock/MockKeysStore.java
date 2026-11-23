@@ -78,4 +78,35 @@ class MockKeysStore {
     int refresh() {
         return 204;
     }
+
+    /** The mock's Bungie.net application: set from the start, so that its card shows filled. */
+    private String bungieClientId = "12345";
+    private String bungieApiKey = "0123456789abcdef0123456789abcdef";
+
+    synchronized fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData bungie() {
+        return bungieClientId == null ? fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData.none()
+                : new fr.enimaloc.catapult.common.dto.admin.BungieCredentialsData(true, bungieClientId,
+                        mask(bungieApiKey), java.time.Instant.parse("2026-11-20T10:00:00Z"));
+    }
+
+    /** Like catapult-api: a malformed value, or a blank secret or key with nothing set yet, is a 400. */
+    synchronized int saveBungie(String clientId, String clientSecret, String apiKey) {
+        String id = clientId == null ? "" : clientId.trim();
+        String secret = clientSecret == null ? "" : clientSecret.trim();
+        String key = apiKey == null ? "" : apiKey.trim();
+        if (!id.matches("[0-9]{1,20}") || (!secret.isEmpty() && !secret.matches("[A-Za-z0-9._~+/=-]{16,128}"))
+                || (!key.isEmpty() && !key.matches("[0-9A-Fa-f]{32}"))) {
+            return 400;
+        }
+        if ((bungieClientId == null || !bungieClientId.equals(id)) && (secret.isEmpty() || key.isEmpty())) return 400;
+        bungieClientId = id;
+        if (!key.isEmpty()) bungieApiKey = key;
+        return 204;
+    }
+
+    synchronized int deleteBungie() {
+        bungieClientId = null;
+        bungieApiKey = null;
+        return 204;
+    }
 }

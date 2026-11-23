@@ -95,6 +95,7 @@ class AccountResolutionPerRequestTest {
     @MockitoBean TokenEncryptionService tokenEncryptionService;
     @MockitoBean SteamApiKeyRepository steamApiKeyRepository;
     @MockitoBean ChannelEventPublisher channelEventPublisher;
+    @MockitoBean fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinkService;
     @MockitoBean SchedulerService schedulerService;
     @MockitoBean TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     @MockitoBean TwitchatEventActionService twitchatEventActionService;

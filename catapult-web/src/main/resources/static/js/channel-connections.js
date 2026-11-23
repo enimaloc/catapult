@@ -111,9 +111,15 @@ window.CatapultConnections = (function () {
             "This is not the Battle.net account linked to Catapult: sign in with the same account."],
         battlenet_stats_failed: ["labelBlizzardStatsFailed", "Importing your characters failed: try again later."],
         battlenet_stats_cancelled: ["labelBlizzardStatsCancelled", "Import cancelled."],
+        // The Bungie.net link (Bungie card) too.
+        bungie_unavailable: ["labelBungieUnavailable", "Linking Bungie.net is not available for now: try again later."],
+        bungie_mismatch: ["labelBungieMismatch",
+            "Bungie answered for another account than the one you signed in with: try again."],
+        bungie_failed: ["labelBungieFailed", "Linking your Bungie.net account failed: try again later."],
+        bungie_cancelled: ["labelBungieCancelled", "Bungie.net linking cancelled."],
     };
     // What is not a failure: shown as a plain message, not an error.
-    const NEUTRAL_LINK_CODES = new Set(["battlenet_stats_cancelled"]);
+    const NEUTRAL_LINK_CODES = new Set(["battlenet_stats_cancelled", "bungie_cancelled"]);
 
     // Tells a refused Epic login or World of Warcraft import once, or a finished import (?imported=wow): the code
     // leaves the address, so neither a reload nor binding again repeats it.
@@ -129,6 +135,10 @@ window.CatapultConnections = (function () {
             url.searchParams.delete("imported");
             history.replaceState(history.state, "", url);
             CatapultChannel.showMessage(pageLabel("labelBlizzardStatsDone", "World of Warcraft characters imported."));
+        } else if (url.searchParams.get("linked") === "bungie") {
+            url.searchParams.delete("linked");
+            history.replaceState(history.state, "", url);
+            CatapultChannel.showMessage(pageLabel("labelBungieDone", "Bungie.net account linked."));
         } else if (url.searchParams.get("imported") === "wow-empty") {
             url.searchParams.delete("imported");
             history.replaceState(history.state, "", url);
@@ -266,6 +276,10 @@ window.CatapultConnections = (function () {
         on("blizzard-import-btn", "click", () => location.assign("/oauth2/authorization/battlenet-stats"));
         on("blizzard-reimport-btn", "click", () => location.assign("/oauth2/authorization/battlenet-stats"));
         on("blizzard-forget-btn", "click", () => postJson(`${baseUrl}/settings/blizzard/wow-characters/delete`, {}));
+
+        // Bungie. Linking leaves for Bungie's login, which sends the member back to this tab.
+        on("bungie-connect-btn", "click", () => location.assign("/oauth2/authorization/bungie"));
+        on("bungie-disconnect-btn", "click", () => postJson(`${baseUrl}/settings/bungie/delete`, {}));
         localizeBlizzardImportDate();
 
         // OBS: connecting and disconnecting both save the whole form, only `enabled` differs.

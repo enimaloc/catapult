@@ -47,4 +47,14 @@ class PublisherGamesTest {
         assertThat(JsonMapper.builder().build().writeValueAsString(BlizzardGame.HEARTHSTONE))
                 .isEqualTo("\"hearthstone\"");
     }
+
+    @Test
+    void destiny2_isRecognisedByItsIgdbIdOnly() {
+        assertThat(PublisherGames.bungie("25657")).contains(PublisherGames.BungieGame.DESTINY2);
+        // The expansions are other IGDB games: not the game being played
+        assertThat(PublisherGames.bungie("250645")).isEmpty();
+        assertThat(PublisherGames.bungie(null)).isEmpty();
+        assertThat(JsonMapper.builder().build().writeValueAsString(PublisherGames.BungieGame.DESTINY2))
+                .isEqualTo("\"destiny2\"");
+    }
 }

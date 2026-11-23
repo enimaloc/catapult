@@ -42,6 +42,8 @@ class TwitchLoginSuccessHandlerTest {
     @Mock JwtService jwtService;
     @Mock AuthCodeStore codeStore;
 
+    @Mock org.springframework.beans.factory.ObjectProvider<fr.enimaloc.catapult.service.bungie.BungieLinkService> bungieLinkProvider;
+    @Mock fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinks;
     @InjectMocks TwitchLoginSuccessHandler handler;
 
     private MockHttpServletRequest request;
@@ -338,5 +340,82 @@ class TwitchLoginSuccessHandlerTest {
         when(jwtService.generate(catapultUser)).thenReturn("jwt");
         when(codeStore.issue("jwt")).thenReturn("one-time");
         return authToken;
+    }
+
+    private org.springframework.security.oauth2.client.OAuth2AuthorizedClient bungieClient(String refresh) {
+        var registration = org.springframework.security.oauth2.client.registration.ClientRegistration
+                .withRegistrationId("bungie").clientId("12345").redirectUri("http://localhost/cb")
+                .authorizationGrantType(org.springframework.security.oauth2.core.AuthorizationGrantType.AUTHORIZATION_CODE)
+                .authorizationUri("https://www.bungie.net/en/OAuth/Authorize")
+                .tokenUri("https://www.bungie.net/platform/app/oauth/token/").build();
+        var access = new org.springframework.security.oauth2.core.OAuth2AccessToken(
+                org.springframework.security.oauth2.core.OAuth2AccessToken.TokenType.BEARER, "access",
+                java.time.Instant.now(), java.time.Instant.now().plusSeconds(3600));
+        return new org.springframework.security.oauth2.client.OAuth2AuthorizedClient(registration, "42", access,
+                refresh == null ? null : new org.springframework.security.oauth2.core.OAuth2RefreshToken(refresh,
+                        java.time.Instant.now()));
+    }
+
+    @Test
+    void bungieLink_isWrittenWithItsRefreshToken_andSpringsCopyIsForgotten() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("bungie");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("bungie", authToken, request))
+                .thenReturn(bungieClient("refresh-token"));
+        when(bungieLinkProvider.getIfAvailable()).thenReturn(bungieLinks);
+        var pending = new fr.enimaloc.catapult.service.bungie.BungieLinkService.PendingLink("42", "G#0042", 3, "461",
+                java.time.Instant.now());
+        request.setAttribute(fr.enimaloc.catapult.service.bungie.BungieLinkService.PENDING_ATTRIBUTE, pending);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(bungieLinks).complete(eq(userAccount), eq(pending), eq("refresh-token"), eq("access"), any());
+        verify(authorizedClientRepository).removeAuthorizedClient("bungie", authToken, request, response);
+        verify(oAuthTokenRepository, never()).save(any());
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("https://web.example.com/channel/jeb_?linked=bungie#integrations");
+    }
+
+    @Test
+    void bungieLink_withoutACheckedLoginOrARefreshToken_isAFailedLink_andTheTokenIsStillForgotten() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("bungie");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("bungie", authToken, request))
+                .thenReturn(bungieClient(null));
+        when(bungieLinkProvider.getIfAvailable()).thenReturn(bungieLinks);
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        verify(bungieLinks, never()).complete(any(), any(), any(), any(), any());
+        verify(authorizedClientRepository).removeAuthorizedClient("bungie", authToken, request, response);
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("https://web.example.com/channel/jeb_?error=bungie_failed#integrations");
+    }
+
+    @Test
+    void bungieLink_aFailedWrite_isAFailedLink() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("bungie");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+        when(authorizedClientRepository.loadAuthorizedClient("bungie", authToken, request))
+                .thenReturn(bungieClient("refresh-token"));
+        when(bungieLinkProvider.getIfAvailable()).thenReturn(bungieLinks);
+        var pending = new fr.enimaloc.catapult.service.bungie.BungieLinkService.PendingLink("42", null, null, null,
+                java.time.Instant.now());
+        request.setAttribute(fr.enimaloc.catapult.service.bungie.BungieLinkService.PENDING_ATTRIBUTE, pending);
+        org.mockito.Mockito.doThrow(new IllegalStateException("refresh-token")).when(bungieLinks)
+                .complete(any(), any(), any(), any(), any());
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(response.getRedirectedUrl()).contains("error=bungie_failed");
     }
 }

@@ -117,6 +117,7 @@ class OpenApiDocsTest {
     @MockitoBean MemberFetchBudgets memberFetchBudgets;
     @MockitoBean BlizzardStatsService blizzardStatsService;
     @MockitoBean BlizzardGameDataService blizzardGameDataService;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService bungieStatsService;
 
     private JsonNode docs() throws Exception {
         String body = mvc.perform(get("/api/v3/api-docs")).andExpect(status().isOk())

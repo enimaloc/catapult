@@ -118,6 +118,7 @@ public class ChannelDashboardAssembler {
     private final RetroAchievementsAccountService retroAchievementsAccounts;
     // Only present when battlenet.enabled.
     private final Optional<BlizzardAccountService> blizzardAccounts;
+    private final fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinks;
 
     @Value("${xbox.enabled:false}")
     private boolean xboxEnabled;
@@ -175,7 +176,8 @@ public class ChannelDashboardAssembler {
                 owner ? epicData(channel) : null,
                 owner ? speedrunAccounts.data(channel) : null,
                 owner ? retroAchievementsAccounts.data(channel) : null,
-                owner ? blizzardAccounts.map(accounts -> accounts.data(channel)).orElse(null) : null);
+                owner ? blizzardAccounts.map(accounts -> accounts.data(channel)).orElse(null) : null,
+                owner ? bungieLinks.data(channel) : null);
     }
 
     /** The source value of the "with drops" filter. */

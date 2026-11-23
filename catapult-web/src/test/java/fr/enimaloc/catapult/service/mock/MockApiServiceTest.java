@@ -502,6 +502,17 @@ class MockApiServiceTest {
     }
 
     @Test
+    void bungieLink_isUnlinkedAndTellsThePage() {
+        assertThat(data.bungieData().linked()).isTrue();
+
+        assertThat(service.deleteBungieLink(username)).isEqualTo(204);
+
+        assertThat(data.bungieData()).isEqualTo(fr.enimaloc.catapult.common.dto.channel.BungieAccountData.unlinked(true));
+        assertThat(events.getLast()).isEqualTo(new fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent(username,
+                false, false, "", false, false, true, true));
+    }
+
+    @Test
     void blizzardSettings_followTheChoicesAndTellThePage() {
         assertThat(data.blizzardStatsData().region()).isEqualTo("eu");
         assertThat(data.blizzardStatsData().characters()).hasSize(2);

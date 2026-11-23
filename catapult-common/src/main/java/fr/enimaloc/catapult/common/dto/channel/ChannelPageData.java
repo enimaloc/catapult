@@ -43,8 +43,24 @@ public record ChannelPageData(
         /** The owner's RetroAchievements account; null for anyone else. Names and flags only, never the key. */
         RetroAchievementsData retroAchievements,
         /** The owner's Blizzard settings; null for anyone else, or without Battle.net on this instance. Names only. */
-        BlizzardStatsData blizzardStats
+        BlizzardStatsData blizzardStats,
+        /** The owner's Bungie.net link; null for anyone else, or when Bungie is not set up and nothing is linked. */
+        BungieAccountData bungie
 ) {
+    /** A page without the Bungie.net link. */
+    public ChannelPageData(ChannelUserDto channelUser, String channelUsername, boolean isOwner, boolean isLive,
+                           boolean botEnabled, GameDto currentGame, PagedBindings bindings, List<CclDto> availableCcls,
+                           Set<String> blockedCcls, List<TwDto> availableTws, Set<String> blockedTws,
+                           String filterStatus, String filterSource, SteamData steam, XboxData xbox,
+                           MinecraftData minecraft, BattleNetData battleNet, ObsData obs, TwitchatData twitchat,
+                           CustomBindingsStateDto customBindings, Map<String, DropDto> drops, AnkamaData ankama,
+                           EpicData epic, SpeedrunData speedrun, RetroAchievementsData retroAchievements,
+                           BlizzardStatsData blizzardStats) {
+        this(channelUser, channelUsername, isOwner, isLive, botEnabled, currentGame, bindings, availableCcls,
+                blockedCcls, availableTws, blockedTws, filterStatus, filterSource, steam, xbox, minecraft, battleNet,
+                obs, twitchat, customBindings, drops, ankama, epic, speedrun, retroAchievements, blizzardStats, null);
+    }
+
     /** A page without the Blizzard settings. */
     public ChannelPageData(ChannelUserDto channelUser, String channelUsername, boolean isOwner, boolean isLive,
                            boolean botEnabled, GameDto currentGame, PagedBindings bindings, List<CclDto> availableCcls,
