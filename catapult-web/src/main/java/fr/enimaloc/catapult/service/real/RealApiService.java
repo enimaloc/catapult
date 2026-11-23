@@ -431,14 +431,17 @@ public class RealApiService implements ApiService {
 
     @Override
     public int saveChessUsername(String username, String site, String name) {
-        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/chess/{site}",
-                new ChessUsernameRequest(name), id, site), status -> status);
+        ChessUsernameRequest body = new ChessUsernameRequest(name);
+        return onChannel(username, id -> "lichess".equals(site)
+                ? client.putVoid("/api/internal/users/{userId}/settings/chess/lichess", body, id)
+                : client.putVoid("/api/internal/users/{userId}/settings/chess/chesscom", body, id), status -> status);
     }
 
     @Override
     public int deleteChessUsername(String username, String site) {
-        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/chess/{site}", id,
-                site), status -> status);
+        return onChannel(username, id -> "lichess".equals(site)
+                ? client.delete("/api/internal/users/{userId}/settings/chess/lichess", id)
+                : client.delete("/api/internal/users/{userId}/settings/chess/chesscom", id), status -> status);
     }
 
     @Override
