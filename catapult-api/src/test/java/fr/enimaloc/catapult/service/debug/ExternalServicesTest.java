@@ -22,6 +22,7 @@ class ExternalServicesTest {
             "https://eu.api.blizzard.com/x, battlenet",
             "https://www.bungie.net/Platform/Settings/, bungie",
             "https://osu.ppy.sh/api/v2/me, osu",
+            "https://api.hypixel.net/v2/player, hypixel",
             "https://haapi.ankama.com/json/Ankama/v5/Account/Account, ankama",
             "https://api.twitch.tv/helix/users, twitch",
             "https://example.org/x, example.org",
