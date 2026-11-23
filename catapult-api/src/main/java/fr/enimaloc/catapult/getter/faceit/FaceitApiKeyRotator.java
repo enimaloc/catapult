@@ -94,11 +94,16 @@ public class FaceitApiKeyRotator {
         return snapshot.stream().min(Comparator.comparingLong(k -> keyBlockedUntil.getOrDefault(k, 0L)));
     }
 
+    /** Whether {@code key} is set aside now (refused or rate limited). */
+    public boolean blocked(String key) {
+        return keyBlockedUntil.getOrDefault(key, 0L) > clock.millis();
+    }
+
     public Map<String, Long> getKeyBlockedUntil() {
         return Map.copyOf(keyBlockedUntil);
     }
 
-    /** The key FACEIT refused (401 / 403): set aside for {@code duration}, a refused key is not retried at once. */
+    /** The key FACEIT refused (401, or 403 {@code err_f0}): set aside for {@code duration}, a refused key is not retried at once. */
     public void onKeyRejected(String key, Duration duration) {
         keyBlockedUntil.put(key, clock.millis() + duration.toMillis());
         log.warn("FACEIT key {} refused, set aside for {}s", mask(key), duration.toSeconds());

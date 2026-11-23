@@ -9,3 +9,6 @@ are the ones commonly seen in FACEIT answers, not checked on a real one. The 404
   (GET /players/{id}/games/cs2/stats?offset=0&limit=1).
 Seen live on 2026-11-22: forbidden.json (GET /players?nickname=s1mple without a key answers 403 with this body and
 ratelimit-limit: 20, 20;w=1).
+Also to check with a real key: that a missing player answers 404 with code "err_nf0" (only that code counts as
+"not found"), that an invalid key answers 403 "err_f0" (only that code, or a 401, sets the key aside), and the
+order of the lifetime "Recent Results" (read here as newest first).

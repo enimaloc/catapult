@@ -97,4 +97,16 @@ class FaceitApiKeyRotatorTest {
         assertThat(rotator.usage("A").windowCalls()).isEqualTo(2);
         assertThat(rotator.getKeyBlockedUntil()).isEmpty();
     }
+
+    @Test
+    void blocked_tellsAKeySetAsideNow() {
+        keys("A");
+
+        rotator.onKeyRejected("A", Duration.ofMinutes(5));
+
+        assertThat(rotator.blocked("A")).isTrue();
+        clock.advance(Duration.ofMinutes(6));
+        assertThat(rotator.blocked("A")).isFalse();
+        assertThat(rotator.blocked("unknown")).isFalse();
+    }
 }

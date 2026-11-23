@@ -301,4 +301,66 @@ class HttpFaceitClientTest {
         assertThat(HttpFaceitClient.readLimited(new ByteArrayInputStream(big), HttpFaceitClient.MAX_BYTES)).isNull();
         assertThat(HttpFaceitClient.readLimited(new ByteArrayInputStream(new byte[3]), 3)).hasSize(3);
     }
+
+    @Test
+    void whileEveryKeyIsSetAside_nothingIsSent() throws IOException {
+        server.expect(requestTo(startsWith(API))).andRespond(withStatus(HttpStatus.FORBIDDEN)
+                .contentType(MediaType.APPLICATION_JSON).body(fixture("forbidden.json")));
+
+        assertThatThrownBy(() -> client.player(ID)).isInstanceOf(FaceitUnavailableException.class);
+        assertThatThrownBy(() -> client.player(ID)).isInstanceOf(FaceitUnavailableException.class)
+                .hasMessage("no usable FACEIT API key now");
+
+        assertThat(acquired).hasValue(1);
+        server.verify();
+    }
+
+    @Test
+    void a403WithoutTheNotAuthorizedCode_refusesThatCallOnly_andLeavesTheKeyUsable() throws IOException {
+        when(repository.findByExclusiveFalse()).thenReturn(List.of(new FaceitApiKeyEntry(KEY),
+                new FaceitApiKeyEntry(OTHER)));
+        rotator.refreshKeys();
+        server.expect(requestTo(startsWith(API))).andRespond(withStatus(HttpStatus.FORBIDDEN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"errors\":[{\"message\":\"Forbidden\",\"code\":\"err_f1\",\"http_status\":403}]}"));
+        server.expect(requestTo(startsWith(API)))
+                .andRespond(withSuccess(fixture("player.json"), MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.player(ID)).isInstanceOf(FaceitUnavailableException.class);
+        // no retry with the other key, and both keys still usable
+        assertThat(acquired).hasValue(1);
+        assertThat(rotator.blockedKeyCount()).isZero();
+        assertThat(client.player(ID).nickname()).isEqualTo("Catapult");
+        server.verify();
+    }
+
+    @Test
+    void a403WithTheNotAuthorizedCode_setsTheKeyAside() throws IOException {
+        server.expect(requestTo(startsWith(API))).andRespond(withStatus(HttpStatus.FORBIDDEN)
+                .contentType(MediaType.APPLICATION_JSON).body(fixture("forbidden.json")));
+
+        assertThatThrownBy(() -> client.player(ID)).isInstanceOf(FaceitUnavailableException.class);
+
+        assertThat(rotator.blocked(KEY)).isTrue();
+    }
+
+    @Test
+    void a404WithAnotherCode_isAnOutage_notANotFound() {
+        server.expect(requestTo(startsWith(API))).andRespond(withStatus(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body("{\"errors\":[{\"message\":\"No route\",\"code\":\"err_r0\",\"http_status\":404}]}"));
+
+        assertThatThrownBy(() -> client.lifetime(ID, "cs2")).isInstanceOf(FaceitUnavailableException.class);
+    }
+
+    @Test
+    void anEmptyLifetime_orAnEmptyMatch_isGarbled() {
+        server.expect(requestTo(startsWith(API)))
+                .andRespond(withSuccess("{\"player_id\":\"p\",\"lifetime\":{}}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(startsWith(API)))
+                .andRespond(withSuccess("{\"items\":[{\"stats\":{}}]}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.lifetime(ID, "cs2")).isInstanceOf(FaceitUnavailableException.class);
+        assertThatThrownBy(() -> client.lastMatch(ID, "cs2")).isInstanceOf(FaceitUnavailableException.class);
+    }
 }

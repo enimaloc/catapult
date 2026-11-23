@@ -32,8 +32,10 @@ import java.util.Optional;
  * travels in the {@code Authorization: Bearer} header (never in a URL), and no key or body is ever put in an
  * exception message or a log. Redirects are never followed and any 3xx is an error; a 2xx that is not JSON or not of
  * the expected shape is an error, never "absent"; only FACEIT's JSON 404 ({@code {"errors":[{"http_status":404}]}})
- * means "not found". A key FACEIT refuses (401, 403) is set aside and the call is tried once more with another key. A
- * 429 pauses every call (its {@code Retry-After}, at most {@link #MAX_PAUSE}). Every request asks the
+ * with the {@code err_nf0} code means "not found". A key FACEIT refuses (a 401, or a 403 with its "not authorized"
+ * code {@code err_f0}) is set aside and the call is tried once more with another key; any other 403 refuses that one
+ * resource: the call is unavailable and the pool is left alone. While every key is set aside nothing is sent. A 429
+ * pauses every call (its {@code Retry-After}, at most {@link #MAX_PAUSE}). Every request asks the
  * {@link FaceitRateLimiter} first.
  *
  * <p>The lifetime and match stats are free-form maps in FACEIT's documentation: the names read here
@@ -47,10 +49,12 @@ public class HttpFaceitClient implements FaceitClient {
     private static final Duration PAUSE = Duration.ofSeconds(60);
     /** The longest pause a 429 can ask for: a larger Retry-After is not trusted. */
     static final Duration MAX_PAUSE = Duration.ofMinutes(10);
-    /** How long a key FACEIT answered 401 is set aside. */
+    /** How long a key FACEIT refused (401, or 403 {@code err_f0}) is set aside. */
     static final Duration REJECTED_FOR = Duration.ofHours(1);
-    /** How long a key FACEIT answered 403 is set aside (a revoked key, or a route it may not use). */
-    static final Duration FORBIDDEN_FOR = Duration.ofMinutes(5);
+    /** FACEIT's error code for a request it does not authorise (seen live on a call without a key). */
+    static final String NOT_AUTHORIZED = "err_f0";
+    /** FACEIT's error code for a resource it does not know (the shape of the 404 fixture; not verified live). */
+    static final String NOT_FOUND = "err_nf0";
 
     private record Answer(int status, String retryAfter, byte[] body, boolean tooBig) {
     }
@@ -123,7 +127,8 @@ public class HttpFaceitClient implements FaceitClient {
     public Lifetime lifetime(String playerId, String game) {
         JsonNode json = object(get(API + "/players/{id}/stats/{game}", playerId, game));
         JsonNode lifetime = json.path("lifetime");
-        if (!lifetime.isObject()) {
+        if (!lifetime.isObject() || integer(lifetime.path("Matches")) == null) {
+            // an empty or nameless lifetime is not "no stats": FACEIT answers 404 for that
             throw garbled();
         }
         List<Boolean> recent = new ArrayList<>();
@@ -150,7 +155,7 @@ public class HttpFaceitClient implements FaceitClient {
             return Optional.empty();
         }
         JsonNode stats = items.get(0).path("stats");
-        if (!stats.isObject()) {
+        if (!stats.isObject() || (text(stats.path("Match Id")) == null && text(stats.path("Map")) == null)) {
             throw garbled();
         }
         Integer result = integer(stats.path("Result"));
@@ -168,21 +173,27 @@ public class HttpFaceitClient implements FaceitClient {
         String tried = null;
         for (int attempt = 0; attempt < 2; attempt++) {
             String key = keys.nextKey().orElseThrow(() -> new FaceitUnavailableException("no FACEIT API key"));
-            if (key.equals(tried)) {
+            if (key.equals(tried) || keys.blocked(key)) {
+                // every key is set aside: nothing is sent
                 break;
             }
             tried = key;
             Answer answer = send(template, key, vars);
-            if (answer.status() == 401 || answer.status() == 403) {
-                keys.onKeyRejected(key, answer.status() == 401 ? REJECTED_FOR : FORBIDDEN_FOR);
+            if (answer.status() == 401
+                    || answer.status() == 403 && hasCode(parseOrNull(answer.body()), NOT_AUTHORIZED)) {
+                keys.onKeyRejected(key, REJECTED_FOR);
                 continue;
+            }
+            if (answer.status() == 403) {
+                // this resource is refused, not the key: the pool is left alone
+                throw new FaceitUnavailableException("FACEIT answered 403");
             }
             if (answer.status() == 429) {
                 keys.onKeyRateLimited(key, retryAfter(answer.retryAfter()));
             }
             return interpret(answer);
         }
-        throw new FaceitUnavailableException("FACEIT refused the API key");
+        throw new FaceitUnavailableException("no usable FACEIT API key now");
     }
 
     /** Charges the limiter, then sends; the key is only ever put in the {@code Authorization} header. */
@@ -197,7 +208,8 @@ public class HttpFaceitClient implements FaceitClient {
                     .exchange((req, res) -> {
                         int status = res.getStatusCode().value();
                         String retryAfter = res.getHeaders().getFirst(HttpHeaders.RETRY_AFTER);
-                        if (status != 404 && !res.getStatusCode().is2xxSuccessful()) {
+                        if (status != 404 && status != 401 && status != 403
+                                && !res.getStatusCode().is2xxSuccessful()) {
                             return new Answer(status, retryAfter, null, false);
                         }
                         byte[] body = readLimited(res.getBody(), MAX_BYTES);
@@ -225,6 +237,7 @@ public class HttpFaceitClient implements FaceitClient {
         }
         if (status == 404) {
             if (isNotFound(parseOrNull(answer.body()))) {
+                // only the documented "not found" code: a retired route's 404 is an outage, never cached
                 throw new FaceitNotFoundException("FACEIT does not know it");
             }
             throw new FaceitUnavailableException("FACEIT answered 404 without a recognised body");
@@ -239,13 +252,27 @@ public class HttpFaceitClient implements FaceitClient {
         return json;
     }
 
-    /** FACEIT's error shape ({@code {"errors":[{"message", "code", "http_status"}]}}) saying 404. */
+    /** FACEIT's error shape ({@code {"errors":[{"message", "code", "http_status"}]}}) saying 404 {@code err_nf0}. */
     private static boolean isNotFound(JsonNode body) {
         if (body == null || !body.path("errors").isArray()) {
             return false;
         }
         for (JsonNode error : body.get("errors")) {
-            if (error.path("http_status").isNumber() && error.get("http_status").asInt() == 404) {
+            if (error.path("http_status").isNumber() && error.get("http_status").asInt() == 404
+                    && NOT_FOUND.equals(text(error.path("code")))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether FACEIT's error shape carries {@code code}. */
+    private static boolean hasCode(JsonNode body, String code) {
+        if (body == null || !body.path("errors").isArray()) {
+            return false;
+        }
+        for (JsonNode error : body.get("errors")) {
+            if (code.equals(text(error.path("code")))) {
                 return true;
             }
         }
