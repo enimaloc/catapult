@@ -9,6 +9,7 @@ import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
 import fr.enimaloc.catapult.common.dto.channel.RiotData;
 import fr.enimaloc.catapult.common.dto.channel.FaceitData;
+import fr.enimaloc.catapult.common.dto.channel.ChessData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 
 import java.util.List;
@@ -50,6 +51,7 @@ public final class ChannelEvents {
     public static final String BUNGIE_ACCOUNT_CHANGED = "bungie.account.changed";
     public static final String RIOT_ACCOUNT_CHANGED = "riot.account.changed";
     public static final String FACEIT_ACCOUNT_CHANGED = "faceit.account.changed";
+    public static final String CHESS_ACCOUNT_CHANGED = "chess.account.changed";
     public static final String CUSTOM_BINDING_CHANGED = "custom.binding.changed";
     public static final String CUSTOM_BINDINGS_UPDATED = "custom.bindings.updated";
 
@@ -152,6 +154,9 @@ public final class ChannelEvents {
      */
     public record RetroAchievementsAccountChanged(String channelId, String channelLogin,
                                                   RetroAchievementsData account) {}
+
+    /** The owner's chess accounts changed: {@code account} is how the settings card stands now (names only). */
+    public record ChessAccountChanged(String channelId, String channelLogin, ChessData account) {}
 
     /**
      * New notifications wait to be sent to these members' Twitchat: whichever catapult-web instance holds one

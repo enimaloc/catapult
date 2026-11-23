@@ -118,6 +118,8 @@ class ChannelDashboardAssemblerTest {
             mock(fr.enimaloc.catapult.service.riot.RiotAccountService.class);
     private final fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService raAccounts =
             mock(fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService.class);
+    private final fr.enimaloc.catapult.service.chess.ChessAccountService chessAccounts =
+            mock(fr.enimaloc.catapult.service.chess.ChessAccountService.class);
     private final MinecraftLinkStateService minecraftStates =
             new MinecraftLinkStateService(minecraft, minecraftGate, minecraftAccounts);
     private final TwitchatWidgetSettingsService twitchat = mock(TwitchatWidgetSettingsService.class);
@@ -150,7 +152,7 @@ class ChannelDashboardAssemblerTest {
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumService.class)), categoryCache,
                 streamTitle, dropsGate, dropsCatalog, speedrunAccounts, raAccounts, java.util.Optional.of(blizzardAccounts),
-                bungieLinks, riotAccounts, faceitAccounts);
+                bungieLinks, riotAccounts, faceitAccounts, chessAccounts);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }
@@ -638,6 +640,17 @@ class ChannelDashboardAssemblerTest {
                     .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
                     .containsExactly("linked", "region", "wowImported", "characters", "wowMainKey", "available",
                             "wowImportedAt");
+        }
+
+        @Test
+        void dashboardCarriesTheChessAccountsForTheOwnerOnly() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.ChessData("hikaru",
+                    "https://www.chess.com/member/hikaru", "DrNykterstein", "https://lichess.org/@/DrNykterstein");
+            when(chessAccounts.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).chess()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).chess()).isNull();
+            verify(chessAccounts, never()).data(moderator);
         }
 
         @Test

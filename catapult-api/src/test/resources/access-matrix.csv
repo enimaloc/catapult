@@ -216,6 +216,10 @@ PUT,/api/internal/users/{userId}/settings/riot/account,,"{""riotId"":""matrix#EU
 DELETE,/api/internal/users/{userId}/settings/riot/account,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/faceit/nickname,,"{""nickname"":""matrix""}",401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/settings/faceit/nickname,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/chess/chesscom,,"{""username"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/chess/chesscom,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/chess/lichess,,"{""username"":""matrix""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/chess/lichess,,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/settings/twitchat,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat,,"{""enabled"":false}",401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat/branch,,,401,401,403,403,PASS,403,401
