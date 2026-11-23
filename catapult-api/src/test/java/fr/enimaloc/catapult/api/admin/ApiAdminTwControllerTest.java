@@ -101,6 +101,20 @@ class ApiAdminTwControllerTest {
     }
 
     @Test
+    void anUnknownTw_is404_andAMalformedValue400() throws Exception {
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
+        when(adminTwService.listSteamKeywords("nope")).thenThrow(new IllegalArgumentException("Unknown TW: nope"));
+        org.mockito.Mockito.doThrow(new IllegalArgumentException("Invalid keyword; 2..64 chars required"))
+                .when(adminTwService).addSteamKeyword("gore", "x");
+
+        mvc.perform(get("/api/internal/admin/tws/nope/steam-keywords")).andExpect(status().isNotFound());
+        mvc.perform(post("/api/internal/admin/tws/gore/steam-keywords").with(csrf())
+                        .contentType("application/json")
+                        .content("{\"keyword\":\"x\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void addSteamKeyword_delegatesToService() throws Exception {
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(wac).build();
         mvc.perform(post("/api/internal/admin/tws/gore/steam-keywords").with(csrf())
