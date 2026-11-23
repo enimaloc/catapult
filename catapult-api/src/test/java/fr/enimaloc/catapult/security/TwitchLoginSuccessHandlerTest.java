@@ -372,7 +372,7 @@ class TwitchLoginSuccessHandlerTest {
 
         handler.onAuthenticationSuccess(request, response, authToken);
 
-        verify(bungieLinks).complete(userAccount, pending, "refresh-token");
+        verify(bungieLinks).complete(eq(userAccount), eq(pending), eq("refresh-token"), eq("access"), any());
         verify(authorizedClientRepository).removeAuthorizedClient("bungie", authToken, request, response);
         verify(oAuthTokenRepository, never()).save(any());
         assertThat(response.getRedirectedUrl())
@@ -392,7 +392,7 @@ class TwitchLoginSuccessHandlerTest {
 
         handler.onAuthenticationSuccess(request, response, authToken);
 
-        verify(bungieLinks, never()).complete(any(), any(), any());
+        verify(bungieLinks, never()).complete(any(), any(), any(), any(), any());
         verify(authorizedClientRepository).removeAuthorizedClient("bungie", authToken, request, response);
         assertThat(response.getRedirectedUrl())
                 .isEqualTo("https://web.example.com/channel/jeb_?error=bungie_failed#integrations");
@@ -412,7 +412,7 @@ class TwitchLoginSuccessHandlerTest {
                 java.time.Instant.now());
         request.setAttribute(fr.enimaloc.catapult.service.bungie.BungieLinkService.PENDING_ATTRIBUTE, pending);
         org.mockito.Mockito.doThrow(new IllegalStateException("refresh-token")).when(bungieLinks)
-                .complete(any(), any(), any());
+                .complete(any(), any(), any(), any(), any());
 
         handler.onAuthenticationSuccess(request, response, authToken);
 

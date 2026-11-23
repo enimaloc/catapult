@@ -56,14 +56,17 @@ class BungieLinkServiceTest {
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         when(accounts.findById(user.getId())).thenAnswer(i -> Optional.ofNullable(row.get()));
-        when(accounts.save(any())).thenAnswer(i -> {
+        when(accounts.saveAndFlush(any())).thenAnswer(i -> {
             row.set(i.getArgument(0));
             return i.getArgument(0);
         });
         when(credentials.available()).thenReturn(true);
         when(client.currentUser("token")).thenReturn(new BungieData.CurrentUser("42", "Guardian#0042",
                 List.of(new BungieData.DestinyMembership(3, "461", 0)), null));
+        when(tokens.locked(any(), any())).thenAnswer(i ->
+                ((java.util.function.Supplier<?>) i.getArgument(1)).get());
         links = new BungieLinkService(accounts, client, credentials, tokens, encryption, cache, events,
+                mock(org.springframework.transaction.PlatformTransactionManager.class),
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -75,7 +78,7 @@ class BungieLinkServiceTest {
         assertThat(pending).isEqualTo(new BungieLinkService.PendingLink("42", "Guardian#0042", 3, "461",
                 NOW.plusSeconds(7_776_000)));
         assertThat(pending.toString()).doesNotContain("token");
-        verify(accounts, never()).save(any());
+        verify(accounts, never()).saveAndFlush(any());
     }
 
     @Test
@@ -148,7 +151,7 @@ class BungieLinkServiceTest {
     void complete_withoutARefreshToken_writesNothing() {
         assertThatThrownBy(() -> links.complete(user, new BungieLinkService.PendingLink("42", null, null, null, NOW),
                 " ")).isInstanceOf(BungieLinkService.RefusedException.class);
-        verify(accounts, never()).save(any());
+        verify(accounts, never()).saveAndFlush(any());
     }
 
     @Test
@@ -186,5 +189,38 @@ class BungieLinkServiceTest {
 
         assertThat(row.get()).isNotNull();
         verifyNoInteractions(client);
+    }
+
+    @Test
+    void complete_runsUnderTheMembersTokenLock_andHoldsTheLoginsAccessToken() {
+        links.complete(user, new BungieLinkService.PendingLink("42", "G#1", 3, "461", NOW), "refresh", "access",
+                NOW.plusSeconds(3600));
+
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(tokens, accounts, events);
+        order.verify(tokens).locked(eq(user.getId()), any());
+        order.verify(accounts).saveAndFlush(any());
+        order.verify(tokens).evict(user.getId());
+        order.verify(tokens).seed(user.getId(), "access", NOW.plusSeconds(3600));
+        order.verify(events).bungieAccountChanged(eq(user.getId()), any());
+    }
+
+    @Test
+    void aFailedWrite_tellsNothing() {
+        when(accounts.saveAndFlush(any())).thenThrow(new IllegalStateException("db down"));
+
+        assertThatThrownBy(() -> links.complete(user, new BungieLinkService.PendingLink("42", null, 3, "461", NOW),
+                "refresh")).isInstanceOf(IllegalStateException.class);
+
+        verify(events, never()).bungieAccountChanged(any(), any());
+        verify(cache, never()).evictUser(any(), any());
+    }
+
+    @Test
+    void unlink_tellsThePagesOnlyOnceDeleted() {
+        doThrow(new IllegalStateException("db down")).when(accounts).purgeByUserId(user.getId());
+
+        assertThatThrownBy(() -> links.unlink(user)).isInstanceOf(IllegalStateException.class);
+
+        verify(events, never()).bungieAccountChanged(any(), any());
     }
 }

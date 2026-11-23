@@ -19,7 +19,9 @@ import org.springframework.context.event.EventListener;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -88,18 +90,23 @@ public class BungieLinkService {
     private final EnrichmentCache cache;
     private final ChannelEventPublisher events;
     private final Clock clock;
+    /** A transaction of its own (REQUIRES_NEW): written and committed before anything is told, even in a caller's. */
+    private final TransactionTemplate transactions;
 
     @Autowired
     public BungieLinkService(BungieAccountRepository accounts, BungieClient client,
                              BungieCredentialsService credentials, BungieTokenService tokens,
                              TokenEncryptionService encryption, EnrichmentCache cache,
-                             ChannelEventPublisher events) {
-        this(accounts, client, credentials, tokens, encryption, cache, events, Clock.systemUTC());
+                             ChannelEventPublisher events, PlatformTransactionManager transactionManager) {
+        this(accounts, client, credentials, tokens, encryption, cache, events, transactionManager,
+                Clock.systemUTC());
     }
 
     BungieLinkService(BungieAccountRepository accounts, BungieClient client, BungieCredentialsService credentials,
                       BungieTokenService tokens, TokenEncryptionService encryption, EnrichmentCache cache,
-                      ChannelEventPublisher events, Clock clock) {
+                      ChannelEventPublisher events, PlatformTransactionManager transactionManager, Clock clock) {
+        this.transactions = new TransactionTemplate(transactionManager);
+        this.transactions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         this.accounts = accounts;
         this.client = client;
         this.credentials = credentials;
@@ -156,25 +163,45 @@ public class BungieLinkService {
      * another Bungie.net account than the one linked forgets what was cached for the former.
      */
     public void complete(UserAccount user, PendingLink pending, String refreshToken) {
+        complete(user, pending, refreshToken, null, null);
+    }
+
+    /**
+     * {@link #complete(UserAccount, PendingLink, String)}, holding the access token the login came with (valid an
+     * hour) so that the first read does not renew it at once. The row is written in a transaction of its own under
+     * the member's token lock (no renewal crosses it); the cache, the held tokens and the pages follow once it is
+     * committed.
+     */
+    public void complete(UserAccount user, PendingLink pending, String refreshToken, String accessToken,
+                         Instant accessExpiresAt) {
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new RefusedException(Refusal.FAILED);
         }
         UUID userId = user.getId();
-        boolean changed = write(userId, pending, refreshToken);
-        tokens.evict(userId);
+        boolean changed = tokens.locked(userId, () -> {
+            boolean replaced = write(userId, pending, refreshToken);
+            tokens.evict(userId);
+            tokens.seed(userId, accessToken, accessExpiresAt);
+            return replaced;
+        });
         if (changed) {
             cache.evictUser(userId, SOURCES);
         }
         tell(userId);
     }
 
-    /** Unlinks: deletes the row (whatever its version), forgets the cached stats and the access token. */
-    @Transactional
+    /**
+     * Unlinks: deletes the row (whatever its version) in a transaction of its own under the member's token lock,
+     * then, once committed, forgets the cached stats and the access token and tells the pages.
+     */
     public void unlink(UserAccount user) {
         UUID userId = user.getId();
-        accounts.purgeByUserId(userId);
+        tokens.locked(userId, () -> {
+            transactions.executeWithoutResult(status -> accounts.purgeByUserId(userId));
+            tokens.evict(userId);
+            return null;
+        });
         cache.evictUser(userId, SOURCES);
-        tokens.evict(userId);
         tell(userId);
     }
 
@@ -212,10 +239,10 @@ public class BungieLinkService {
     /** Writes the link; true when it is another Bungie.net account than the one linked (or none was). */
     private boolean write(UUID userId, PendingLink pending, String refreshToken) {
         try {
-            return writeOnce(userId, pending, refreshToken);
+            return Boolean.TRUE.equals(transactions.execute(status -> writeOnce(userId, pending, refreshToken)));
         } catch (OptimisticLockingFailureException | DataIntegrityViolationException first) {
             try {
-                return writeOnce(userId, pending, refreshToken);
+                return Boolean.TRUE.equals(transactions.execute(status -> writeOnce(userId, pending, refreshToken)));
             } catch (OptimisticLockingFailureException | DataIntegrityViolationException again) {
                 log.warn("The Bungie link of {} crossed another write twice", userId);
                 throw new ApiProblem(ErrorCode.CONFLICT, "The Bungie link changed meanwhile, try again");
@@ -239,7 +266,7 @@ public class BungieLinkService {
             row.setLinkedAt(now);
         }
         row.setUpdatedAt(now);
-        accounts.save(row);
+        accounts.saveAndFlush(row);
         return changed;
     }
 

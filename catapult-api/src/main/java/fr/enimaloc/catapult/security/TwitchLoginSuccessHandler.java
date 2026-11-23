@@ -158,7 +158,8 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
             return false;
         }
         try {
-            links.complete(catUser.getUserAccount(), link, refreshToken);
+            links.complete(catUser.getUserAccount(), link, refreshToken, client.getAccessToken().getTokenValue(),
+                    client.getAccessToken().getExpiresAt());
             return true;
         } catch (RuntimeException e) {
             log.warn("Bungie link of user {} not written: {}", catUser.getUserAccount().getId(),

@@ -58,6 +58,7 @@ class AccountServiceTest {
     @Mock private TwitchChatService twitchChatService;
     @Mock private EventSubService twitchEventSubService;
     @Mock private fr.enimaloc.catapult.service.enrichment.EnrichmentCache enrichmentCache;
+    @Mock private fr.enimaloc.catapult.service.enrichment.bungie.BungieTokenService bungieTokens;
     @InjectMocks private AccountService accountService;
 
     private UserAccount account;
