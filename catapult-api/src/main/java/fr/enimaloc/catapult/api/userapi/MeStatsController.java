@@ -13,7 +13,10 @@ import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.Blizzard
 import fr.enimaloc.catapult.service.enrichment.bungie.BungieStats;
 import fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService;
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BungieGame;
+import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame;
 import fr.enimaloc.catapult.service.enrichment.rastats.RaAccountView;
+import fr.enimaloc.catapult.service.enrichment.riot.RiotStats;
+import fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService;
 import fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsStatsService;
 import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.PlatformStats;
 import fr.enimaloc.catapult.service.enrichment.steamstats.SteamStatsService;
@@ -71,6 +74,7 @@ public class MeStatsController {
     private final RetroAchievementsStatsService retroAchievementsStatsService;
     private final BlizzardStatsService blizzardStatsService;
     private final BungieStatsService bungieStatsService;
+    private final RiotStatsService riotStatsService;
     private final MemberFetchBudgets memberFetchBudgets;
     private final ApiUserResolver userResolver;
     private final PublicBaseUrl publicBaseUrl;
@@ -236,6 +240,35 @@ public class MeStatsController {
         BungieStats stats = detail(userId, notFound, (user, budget) -> bungieStatsService.forGame(user,
                 BungieGame.DESTINY2, RequestLocale.parse(lang, acceptLanguage), budget, true));
         return GameInfoV3Response.bungieStats(stats, links());
+    }
+
+    @GetMapping("/riot/{game}")
+    @Operation(summary = "Get your stats on a Riot game",
+            description = "The riot object of GET /api/me/stats (status, game, account = your Riot ID, platform, and "
+                    + "the object of the game: lol your summoner level, solo / flex ranks and the game you are in "
+                    + "with your champion, tft your rank), plus what only the detail has: every ranked queue "
+                    + "(lol.queues, tft.queues). Valorant has no personal stats (its API needs Riot Sign On)."
+                    + STATUS_NOTE + BUDGET_NOTE)
+    @ApiResponse(responseCode = "200", description = "Your stats on the game.")
+    @ApiResponse(responseCode = "400", description = "Unknown game (lol or tft).", content = @Content)
+    @ApiResponse(responseCode = "404", description = "No Riot ID declared, or Riot stats unavailable on this "
+            + "instance.", content = @Content)
+    @ApiResponse(responseCode = "429", description = "Your refreshes are spent; retry after Retry-After seconds.",
+            content = @Content)
+    public RiotStats riot(
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "Riot game: lol or tft.", in = ParameterIn.PATH, example = "lol")
+            @PathVariable @Pattern(regexp = ApiV2.RIOT_GAME) String game,
+            @Parameter(description = LANG_DESCRIPTION, example = "fr", schema = @Schema(defaultValue = "en"))
+            @RequestParam(name = "lang", required = false) String lang,
+            @Parameter(description = ACCEPT_LANGUAGE_DESCRIPTION, in = ParameterIn.HEADER,
+                    example = "fr-FR,fr;q=0.9")
+            @RequestHeader(value = "Accept-Language", required = false) String acceptLanguage) {
+        RiotGame riotGame = "tft".equals(game) ? RiotGame.TFT : RiotGame.LOL;
+        RiotStats stats = detail(userId, "No Riot stats for you: no Riot ID declared, or Riot stats unavailable",
+                (user, budget) -> riotStatsService.forGame(user, riotGame, RequestLocale.parse(lang, acceptLanguage),
+                        budget, true));
+        return GameInfoV3Response.riotStats(stats, links());
     }
 
     @GetMapping("/retroachievements")

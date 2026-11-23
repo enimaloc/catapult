@@ -122,6 +122,10 @@ class GameEnrichmentAssemblerTest {
             mock(fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService.class);
     private final fr.enimaloc.catapult.service.enrichment.bungie.BungieGameDataService bungieData =
             mock(fr.enimaloc.catapult.service.enrichment.bungie.BungieGameDataService.class);
+    private final fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService riotStats =
+            mock(fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService.class);
+    private final fr.enimaloc.catapult.service.enrichment.riot.RiotGameDataService riotData =
+            mock(fr.enimaloc.catapult.service.enrichment.riot.RiotGameDataService.class);
     private final EnrichmentProperties properties = new EnrichmentProperties();
 
     private GameEnrichmentAssembler assembler;
@@ -132,6 +136,7 @@ class GameEnrichmentAssemblerTest {
         assembler = new GameEnrichmentAssembler(hltb, protonDb, steamGridDb, steamDeck, pcgw, prices, openCritic,
                 twitch, speedrunGames, speedrunIdentity, speedrunPersonal, igdbService, igdbGameDetailsService,
                 trailers, steamStats, xboxStats, raStats, blizzardStats, blizzardData, bungieStats, bungieData,
+                riotStats, riotData,
                 properties);
         when(hltb.timeToBeat(any(), any())).thenReturn(Optional.of(TTB));
         when(protonDb.summary(anyString(), any())).thenReturn(Optional.of(PROTON));
@@ -377,6 +382,8 @@ class GameEnrichmentAssemblerTest {
                 .withBean(BlizzardGameDataService.class, () -> blizzardData)
                 .withBean(fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService.class, () -> bungieStats)
                 .withBean(fr.enimaloc.catapult.service.enrichment.bungie.BungieGameDataService.class, () -> bungieData)
+                .withBean(fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService.class, () -> riotStats)
+                .withBean(fr.enimaloc.catapult.service.enrichment.riot.RiotGameDataService.class, () -> riotData)
                 .withBean(EnrichmentProperties.class)
                 .withUserConfiguration(GameEnrichmentAssembler.class)
                 .run(ctx -> assertThat(ctx).hasSingleBean(GameEnrichmentAssembler.class));
@@ -791,5 +798,83 @@ class GameEnrichmentAssemblerTest {
         assertThat(result.stats().bungie()).isEqualTo(D2_STATS);
         // no Blizzard object on a Bungie game
         assertThat(result.stats().blizzard()).isNull();
+    }
+
+    // ---------------------------------------------------------------- Riot
+
+    private static final DetectedGame LEAGUE = new DetectedGame("lol", GameBinding.SourceType.STEAM,
+            "League of Legends");
+    private static final fr.enimaloc.catapult.service.enrichment.riot.RiotStats LOL_STATS =
+            new fr.enimaloc.catapult.service.enrichment.riot.RiotStats(Status.OK,
+                    fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame.LOL, "Catapult#EUW",
+                    "euw1", null, null, null);
+    private static final fr.enimaloc.catapult.service.enrichment.riot.RiotPublisher LOL_PUBLIC =
+            new fr.enimaloc.catapult.service.enrichment.riot.RiotPublisher(
+                    fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame.LOL,
+                    new fr.enimaloc.catapult.service.enrichment.riot.RiotPublisher.Lol("16.23.1"));
+
+    private void riotGame() {
+        when(riotStats.gameOf("115"))
+                .thenReturn(Optional.of(fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame.LOL));
+        when(riotData.available()).thenReturn(true);
+        when(riotData.forGame(eq(fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame.LOL),
+                any())).thenReturn(Optional.of(LOL_PUBLIC));
+    }
+
+    @Test
+    void publicAggregateHasNoRiotStats_butThePatch() {
+        riotGame();
+
+        GameEnrichment result = assembler.enrich(LEAGUE, Optional.of("115"), Optional.empty(), "League of Legends",
+                "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
+
+        assertThat(result.stats()).isNull();
+        verify(riotStats, org.mockito.Mockito.never()).forDetected(any(), any(), any(), any());
+        assertThat(result.publisher().riot()).isEqualTo(LOL_PUBLIC);
+        assertThat(result.publisher().blizzard()).isNull();
+    }
+
+    @Test
+    void memberRiotStats_byTheIgdbId() {
+        UserAccount user = member();
+        riotGame();
+        when(riotStats.forDetected(eq(user), eq("115"), eq(Locale.FRENCH), any())).thenReturn(Optional.of(LOL_STATS));
+
+        GameEnrichment result = assembler.enrich(LEAGUE, Optional.of("115"), Optional.empty(), "League of Legends",
+                "FR", null, LINKS, Optional.of(user), Locale.FRENCH);
+
+        assertThat(result.stats().riot()).isEqualTo(LOL_STATS);
+        verify(riotStats).forDetected(user, "115", Locale.FRENCH, FetchBudget.UNLIMITED);
+    }
+
+    @Test
+    void riotOff_isNoPublisher() {
+        when(riotStats.gameOf("115"))
+                .thenReturn(Optional.of(fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame.LOL));
+        when(riotData.available()).thenReturn(false);
+
+        GameEnrichment result = assembler.enrich(LEAGUE, Optional.of("115"), Optional.empty(), "League of Legends",
+                "FR", null, LINKS, Optional.empty(), Locale.ENGLISH);
+
+        assertThat(result.publisher()).isNull();
+        verify(riotData, org.mockito.Mockito.never()).forGame(any(), any());
+    }
+
+    @Test
+    void slowRiotDoesNotBlockOthers() {
+        properties.setAggregateTimeout(Duration.ofMillis(500));
+        UserAccount user = member();
+        statsEverywhere(user);
+        when(riotStats.forDetected(any(), any(), any(), any()))
+                .thenAnswer(slow(Duration.ofSeconds(3), Optional.of(LOL_STATS)));
+
+        long start = System.nanoTime();
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
+                null, LINKS, Optional.of(user), Locale.ENGLISH);
+        Duration took = Duration.ofNanos(System.nanoTime() - start);
+
+        assertThat(result.stats().riot()).isNull();
+        assertThat(result.stats().steam()).isEqualTo(STEAM_OK);
+        assertThat(took).isLessThan(Duration.ofSeconds(2));
     }
 }

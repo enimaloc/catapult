@@ -118,6 +118,7 @@ class OpenApiDocsTest {
     @MockitoBean BlizzardStatsService blizzardStatsService;
     @MockitoBean BlizzardGameDataService blizzardGameDataService;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService bungieStatsService;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService riotStatsService;
 
     private JsonNode docs() throws Exception {
         String body = mvc.perform(get("/api/v3/api-docs")).andExpect(status().isOk())
@@ -251,7 +252,7 @@ class OpenApiDocsTest {
 
         assertThat(paths(docs)).contains("/api/me/stats", "/api/me/stats/steam/{appId}",
                 "/api/me/stats/xbox/{titleId}", "/api/me/stats/retroachievements/{gameId}",
-                "/api/me/stats/retroachievements", "/api/me/stats/blizzard/{game}");
+                "/api/me/stats/retroachievements", "/api/me/stats/blizzard/{game}", "/api/me/stats/riot/{game}");
         assertThat(versionHeader(docs, "/paths/~1api~1me~1stats~1steam~1{appId}/get/parameters").get("schema")
                 .get("enum").toString()).isEqualTo("[\"3\"]");
         JsonNode schemas = docs.at("/components/schemas");
@@ -270,6 +271,11 @@ class OpenApiDocsTest {
                 .contains("BlizzardStats");
         assertThat(schemas.at("/StatsObject/properties").has("blizzard")).isTrue();
         assertThat(schemas.at("/BlizzardStats/properties").has("more")).isTrue();
+        // Riot: the same, the detail answering the aggregate's own record
+        assertThat(docs.at("/paths/~1api~1me~1stats~1riot~1{game}/get/responses/200/content").toString())
+                .contains("RiotStats");
+        assertThat(schemas.at("/StatsObject/properties").has("riot")).isTrue();
+        assertThat(schemas.at("/RiotStats/properties").has("more")).isTrue();
     }
 
     /**

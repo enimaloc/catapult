@@ -87,6 +87,7 @@ class MeStatsControllerTest {
     @MockitoBean MemberFetchBudgets budgets;
     @MockitoBean BlizzardStatsService blizzardStats;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService bungieStats;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService riotStats;
 
     private UserAccount user;
     private boolean budgetLeft = true;
@@ -385,5 +386,44 @@ class MeStatsControllerTest {
         SecretKey jwtSecretKey() {
             return new SecretKeySpec(new byte[32], "HmacSHA256");
         }
+    }
+
+    // ---------------------------------------------------------------- Riot
+
+    @Test
+    void riotDetailIsTheSameProjection() throws Exception {
+        var queues = List.of(new fr.enimaloc.catapult.service.enrichment.riot.RiotStats.Queue("RANKED_SOLO_5x5",
+                new fr.enimaloc.catapult.service.enrichment.riot.RiotStats.Rank("GOLD", "II", 57, 61, 54)));
+        when(riotStats.forGame(eq(user), eq(fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame.LOL),
+                eq(Locale.FRENCH), any(), eq(true))).thenReturn(Optional.of(
+                new fr.enimaloc.catapult.service.enrichment.riot.RiotStats(Status.OK,
+                        fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame.LOL,
+                        "Catapult#EUW", "euw1", new fr.enimaloc.catapult.service.enrichment.riot.RiotStats.LolStats(
+                        Status.OK, 312, null, null, null, null, queues), null, null)));
+
+        mvc.perform(v3(get(STATS + "/riot/lol")).param("lang", "fr"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.game").value("lol"))
+                .andExpect(jsonPath("$.account").value("Catapult#EUW"))
+                .andExpect(jsonPath("$.lol.queues[0].queueType").value("RANKED_SOLO_5x5"))
+                .andExpect(jsonPath("$.more").value("http://localhost/api/me/stats/riot/lol?version=3"));
+        org.assertj.core.api.Assertions.assertThat(MeStatsController.class.getMethod("riot", UUID.class,
+                String.class, String.class, String.class).getReturnType())
+                .isEqualTo(fr.enimaloc.catapult.service.enrichment.riot.RiotStats.class);
+    }
+
+    @Test
+    void riotTft_andTheBudget_andUnknownGames() throws Exception {
+        when(riotStats.forGame(any(), any(), any(), any(), anyBoolean())).thenReturn(Optional.empty());
+        mvc.perform(v3(get(STATS + "/riot/tft"))).andExpect(status().isNotFound());
+        verify(riotStats).forGame(eq(user), eq(fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame.TFT),
+                any(), any(), eq(true));
+
+        for (String game : List.of("valorant", "LOL", "lor")) {
+            mvc.perform(v3(get(STATS + "/riot/" + game))).andExpect(status().isBadRequest());
+        }
+
+        budgetLeft = false;
+        mvc.perform(v3(get(STATS + "/riot/lol"))).andExpect(status().isTooManyRequests());
     }
 }

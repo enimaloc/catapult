@@ -57,4 +57,14 @@ class PublisherGamesTest {
         assertThat(JsonMapper.builder().build().writeValueAsString(PublisherGames.BungieGame.DESTINY2))
                 .isEqualTo("\"destiny2\"");
     }
+
+    @Test
+    void riotGames_areTheirIgdbIds_andAnEmptyIdMapsNothing() {
+        assertThat(PublisherGames.riot("115", "115", "", "126459")).contains(PublisherGames.RiotGame.LOL);
+        assertThat(PublisherGames.riot("126459", "115", "", "126459")).contains(PublisherGames.RiotGame.VALORANT);
+        assertThat(PublisherGames.riot("7", "115", "7", "126459")).contains(PublisherGames.RiotGame.TFT);
+        assertThat(PublisherGames.riot("", "115", "", "126459")).isEmpty();
+        assertThat(PublisherGames.riot(null, "115", "", "126459")).isEmpty();
+        assertThat(PublisherGames.riot("123", "115", "", "126459")).isEmpty();
+    }
 }

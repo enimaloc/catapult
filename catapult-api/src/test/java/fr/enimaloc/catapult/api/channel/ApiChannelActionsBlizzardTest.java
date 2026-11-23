@@ -88,4 +88,26 @@ class ApiChannelActionsBlizzardTest extends ApiChannelActionsTestSupport {
         mvc.perform(as(owner, HttpMethod.DELETE, "/settings/bungie", null)).andExpect(status().isNoContent());
         verify(bungieLinkService).unlink(any());
     }
+
+    // ---------------------------------------------------------------- Riot
+
+    @Test
+    void riotSettings_byAModerator_areForbidden() throws Exception {
+        mvc.perform(as(moderator, HttpMethod.PUT, "/settings/riot/account",
+                "{\"riotId\":\"Catapult#EUW\",\"platform\":\"euw1\"}")).andExpect(status().isForbidden());
+        mvc.perform(as(moderator, HttpMethod.DELETE, "/settings/riot/account", null))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(riotAccountService);
+    }
+
+    @Test
+    void riotSettings_byTheOwner_areSavedAndDeleted() throws Exception {
+        mvc.perform(as(owner, HttpMethod.PUT, "/settings/riot/account",
+                "{\"riotId\":\"Catapult#EUW\",\"platform\":\"euw1\"}")).andExpect(status().isNoContent());
+        mvc.perform(as(owner, HttpMethod.DELETE, "/settings/riot/account", null)).andExpect(status().isNoContent());
+
+        verify(riotAccountService).save(owner, "Catapult#EUW", "euw1");
+        verify(riotAccountService).delete(owner);
+    }
 }

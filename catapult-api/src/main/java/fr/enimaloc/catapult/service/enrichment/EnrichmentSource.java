@@ -39,7 +39,13 @@ public enum EnrichmentSource {
     BUNGIE_PROFILE("bungie-profile"),
     BUNGIE_TRIUMPHS("bungie-triumphs"),
     BUNGIE_DEFINITIONS("bungie-definitions"),
-    BUNGIE_SEASON("bungie-season");
+    BUNGIE_SEASON("bungie-season"),
+    RIOT_LOL_SUMMONER("riot-lol-summoner"),
+    RIOT_LOL_LEAGUE("riot-lol-league"),
+    RIOT_LOL_LIVE("riot-lol-live"),
+    RIOT_TFT_LEAGUE("riot-tft-league"),
+    RIOT_LOL_PATCH("riot-lol-patch"),
+    RIOT_LOL_CHAMPIONS("riot-lol-champions");
 
     private final String key;
 
@@ -55,13 +61,14 @@ public enum EnrichmentSource {
     /**
      * Whether the source holds one member's own stats (keyed {@code u:<userId>...}): the Steam, Xbox and
      * RetroAchievements sources, the Blizzard character, achievement and profile ones and the Bungie profile and
-     * triumphs, except the Steam schema and rarity, which are the same for everyone.
+     * triumphs and the Riot summoner, league and live game ones, except the Steam schema and rarity, which are the same for everyone.
      */
     public boolean personal() {
         return switch (this) {
             case STEAM_LIBRARY, STEAM_ACHIEVEMENTS, XBOX_TITLES, XBOX_ACHIEVEMENTS, XBOX_PLAYTIME, RA_USER,
                  RA_PROGRESS, RA_RECENT, BLIZZARD_WOW_CHARACTER, BLIZZARD_WOW_ACHIEVEMENTS, BLIZZARD_SC2_PROFILE,
                  BLIZZARD_D3_PROFILE, BUNGIE_PROFILE, BUNGIE_TRIUMPHS -> true;
+            case RIOT_LOL_SUMMONER, RIOT_LOL_LEAGUE, RIOT_LOL_LIVE, RIOT_TFT_LEAGUE -> true;
             default -> false;
         };
     }

@@ -60,6 +60,7 @@ class ExternalRouteSetTest {
             "GET /api/me/stats/retroachievements",
             "GET /api/me/stats/blizzard/{game}",
             "GET /api/me/stats/bungie/{game}",
+            "GET /api/me/stats/riot/{game}",
             "GET /api/games/igdb/{igdbId}",
             "GET /api/games/steam/{appId}",
             "GET /api/games/xbox/{productId}",

@@ -134,6 +134,12 @@ public class EnrichmentProperties {
     private SourceSettings blizzardHsSets = new SourceSettings();
     private SourceSettings blizzardHsDeck = new SourceSettings();
     private SourceSettings blizzardD3Season = new SourceSettings();
+    private SourceSettings riotLolSummoner = new SourceSettings();
+    private SourceSettings riotLolLeague = new SourceSettings();
+    private SourceSettings riotLolLive = new SourceSettings();
+    private SourceSettings riotTftLeague = new SourceSettings();
+    private SourceSettings riotLolPatch = new SourceSettings();
+    private SourceSettings riotLolChampions = new SourceSettings();
     private Blizzard blizzard = new Blizzard();
     private SourceSettings bungieProfile = new SourceSettings();
     private SourceSettings bungieTriumphs = new SourceSettings();
@@ -285,6 +291,12 @@ public class EnrichmentProperties {
             case BUNGIE_TRIUMPHS -> bungieTriumphs;
             case BUNGIE_DEFINITIONS -> bungieDefinitions;
             case BUNGIE_SEASON -> bungieSeason;
+            case RIOT_LOL_SUMMONER -> riotLolSummoner;
+            case RIOT_LOL_LEAGUE -> riotLolLeague;
+            case RIOT_LOL_LIVE -> riotLolLive;
+            case RIOT_TFT_LEAGUE -> riotTftLeague;
+            case RIOT_LOL_PATCH -> riotLolPatch;
+            case RIOT_LOL_CHAMPIONS -> riotLolChampions;
         };
     }
 
@@ -312,6 +324,10 @@ public class EnrichmentProperties {
             case BUNGIE_PROFILE -> Duration.ofMinutes(2);
             case BUNGIE_TRIUMPHS -> Duration.ofMinutes(30);
             case BUNGIE_DEFINITIONS, BUNGIE_SEASON -> Duration.ofDays(1);
+            case RIOT_LOL_SUMMONER, RIOT_LOL_LEAGUE, RIOT_TFT_LEAGUE -> Duration.ofMinutes(10);
+            case RIOT_LOL_LIVE -> Duration.ofMinutes(1);
+            case RIOT_LOL_PATCH -> Duration.ofHours(1);
+            case RIOT_LOL_CHAMPIONS -> Duration.ofDays(1);
         };
     }
 }

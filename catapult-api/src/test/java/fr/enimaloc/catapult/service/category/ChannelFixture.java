@@ -266,7 +266,8 @@ public class ChannelFixture {
                 mock(fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService.class),
                 mock(fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService.class),
                 Optional.empty(),
-                mock(fr.enimaloc.catapult.service.bungie.BungieLinkService.class));
+                mock(fr.enimaloc.catapult.service.bungie.BungieLinkService.class),
+                mock(fr.enimaloc.catapult.service.riot.RiotAccountService.class));
     }
 
     /** The category events and Twitch writes, in order. */
