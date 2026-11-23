@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import fr.enimaloc.catapult.service.enrichment.faceit.FaceitModels.LastMatch;
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.FaceitGame;
 import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Status;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.List;
 
@@ -25,6 +26,7 @@ public record FaceitStats(Status status, FaceitGame game, String account, Cs2Sta
      * is none or it could not be read). {@code recentResults} (newest first, {@code true} a win) is filled in the
      * detail only (absent from the aggregate). Everything but {@code status} is null unless the status is ok.
      */
+    @Schema(name = "FaceitCs2Stats")
     public record Cs2Stats(Status status, Integer skillLevel, Integer elo, String region, Integer matches,
                            Integer wins, Integer winRatePercent, Double averageKd, Integer averageHeadshotsPercent,
                            Integer currentWinStreak, Integer longestWinStreak, LastMatch lastMatch,
