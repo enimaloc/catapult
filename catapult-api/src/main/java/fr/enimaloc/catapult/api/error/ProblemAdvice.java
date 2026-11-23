@@ -15,6 +15,7 @@ import java.util.Set;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.http.HttpHeaders;
@@ -31,6 +32,7 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.util.DisconnectedClientHelper;
 
 /**
@@ -43,6 +45,15 @@ import org.springframework.web.util.DisconnectedClientHelper;
 public class ProblemAdvice extends ResponseEntityExceptionHandler {
 
     static final String INTERNAL_ERROR_DETAIL = "Internal error";
+    static final String VERSIONS_PROPERTY = "versions";
+
+    private @Nullable RouteVersions routeVersions;
+
+    /** Optional: without it (a standalone test setup), a 404 says nothing of the versions. */
+    @Autowired(required = false)
+    public void setRouteVersions(@Nullable RouteVersions routeVersions) {
+        this.routeVersions = routeVersions;
+    }
 
     /**
      * Ignored: the details are Spring's English defaults, never localised by the API's {@code MessageSource} nor
@@ -65,6 +76,31 @@ public class ProblemAdvice extends ResponseEntityExceptionHandler {
             problem.setProperty(ErrorCode.PROPERTY, codeOf(ex, answer.getStatusCode().value()).code());
         }
         return answer;
+    }
+
+    /**
+     * No handler took the request. When the path is a route of another API version (a version 3 route asked without
+     * {@code version=3}), the 404 says so and lists them in a {@code versions} extension, instead of Spring's
+     * "No static resource".
+     */
+    @Override
+    protected @Nullable ResponseEntity<Object> handleNoResourceFoundException(
+            NoResourceFoundException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        HttpServletRequest servlet = request instanceof NativeWebRequest nativeRequest
+                ? nativeRequest.getNativeRequest(HttpServletRequest.class) : null;
+        List<String> versions = routeVersions == null || servlet == null ? List.of()
+                : routeVersions.of(servlet.getRequestURI().substring(servlet.getContextPath().length()),
+                        servlet.getMethod());
+        if (versions.isEmpty()) {
+            return super.handleNoResourceFoundException(ex, headers, status, request);
+        }
+        int ask = RouteVersions.lowest(versions.getFirst());
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, "This route is not served in the API "
+                + "version asked (or the default one); it is served in version "
+                + String.join(", ", versions) + ": add ?version=" + ask + " or the X-API-Version: " + ask + " header.");
+        problem.setInstance(java.net.URI.create(servlet.getRequestURI()));
+        problem.setProperty(VERSIONS_PROPERTY, versions);
+        return handleExceptionInternal(ex, problem, headers, status, request);
     }
 
     @ExceptionHandler({AccessDeniedException.class, AuthenticationException.class})
