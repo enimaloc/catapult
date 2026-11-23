@@ -840,6 +840,15 @@ class RealApiServiceTest {
     }
 
     @Test
+    void supercellTag_isSavedAndForgottenOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/supercell/clash-royale", "{\"tag\":\"#2PP\"}");
+        expectDelete(channel("enimaloc") + "/settings/supercell/clash-royale");
+
+        assertThat(service.saveSupercellAccount("enimaloc", "clash-royale", "#2PP")).isEqualTo(204);
+        assertThat(service.deleteSupercellAccount("enimaloc", "clash-royale")).isEqualTo(204);
+    }
+
+    @Test
     void hypixelAccount_isSavedAndForgottenOnTheChannel() {
         expectPut(channel("enimaloc") + "/settings/hypixel/account", "{\"player\":\"Notch\"}");
         expectDelete(channel("enimaloc") + "/settings/hypixel/account");
@@ -2136,6 +2145,30 @@ class RealApiServiceTest {
         assertThat(service.adminAddApiKey(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.DTDD, "k")).isEqualTo(204);
         assertThat(service.adminDeleteApiKey(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAM, "k1")).isEqualTo(204);
         assertThat(service.adminRefreshApiKeys(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.STEAM)).isEqualTo(204);
+    }
+
+    @Test
+    void supercellKeys_areReadAndManagedThroughTheirGamesRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.CLASHROYALE;
+        respond(HttpMethod.GET, "/api/internal/admin/supercell-keys/clash-royale/keys",
+                "{\"keys\":[],\"supercellEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/supercell-keys/clash-royale/keys")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/supercell-keys/clash-royale/keys/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/supercell-keys/clash-royale/keys/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
+    }
+
+    @Test
+    void supercellGame_isTheGameSegmentOfItsPool() {
+        assertThat(RealApiService.supercellGame(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.CLASHOFCLANS))
+                .isEqualTo("clash-of-clans");
+        assertThat(RealApiService.supercellGame(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.BRAWLSTARS))
+                .isEqualTo("brawl-stars");
     }
 
     @Test

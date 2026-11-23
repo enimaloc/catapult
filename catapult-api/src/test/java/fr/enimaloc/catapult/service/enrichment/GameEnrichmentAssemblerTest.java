@@ -138,6 +138,8 @@ class GameEnrichmentAssemblerTest {
             mock(fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService.class);
     private final fr.enimaloc.catapult.service.enrichment.hypixel.HypixelGameDataService hypixelData =
             mock(fr.enimaloc.catapult.service.enrichment.hypixel.HypixelGameDataService.class);
+    private final fr.enimaloc.catapult.service.enrichment.supercell.SupercellStatsService supercellStats =
+            mock(fr.enimaloc.catapult.service.enrichment.supercell.SupercellStatsService.class);
     private final EnrichmentProperties properties = new EnrichmentProperties();
 
     private GameEnrichmentAssembler assembler;
@@ -149,7 +151,7 @@ class GameEnrichmentAssemblerTest {
                 twitch, speedrunGames, speedrunIdentity, speedrunPersonal, igdbService, igdbGameDetailsService,
                 trailers, steamStats, xboxStats, raStats, blizzardStats, blizzardData, bungieStats, bungieData,
                 riotStats, riotData, faceitStats,
-                properties, chessStats, osuStats, hypixelStats, hypixelData);
+                properties, chessStats, osuStats, hypixelStats, hypixelData, supercellStats);
         when(hltb.timeToBeat(any(), any())).thenReturn(Optional.of(TTB));
         when(protonDb.summary(anyString(), any())).thenReturn(Optional.of(PROTON));
         when(steamGridDb.bySteamAppId(anyString(), any())).thenReturn(Optional.of(SGDB));
@@ -401,6 +403,8 @@ class GameEnrichmentAssemblerTest {
                 .withBean(fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService.class, () -> osuStats)
                 .withBean(fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService.class, () -> hypixelStats)
                 .withBean(fr.enimaloc.catapult.service.enrichment.hypixel.HypixelGameDataService.class, () -> hypixelData)
+                .withBean(fr.enimaloc.catapult.service.enrichment.supercell.SupercellStatsService.class,
+                        () -> supercellStats)
                 .withBean(EnrichmentProperties.class)
                 .withUserConfiguration(GameEnrichmentAssembler.class)
                 .run(ctx -> assertThat(ctx).hasSingleBean(GameEnrichmentAssembler.class));
@@ -1069,5 +1073,28 @@ class GameEnrichmentAssemblerTest {
                 "FR", null, LINKS, Optional.of(user), Locale.FRENCH);
 
         assertThat(result.stats().hypixel()).isEqualTo(stats);
+    }
+
+    @Test
+    void memberSupercellStats_comeWithTheMember_foundByTheGamesName() {
+        UserAccount user = member();
+        var stats = new fr.enimaloc.catapult.service.enrichment.supercell.SupercellStats(Status.OK,
+                fr.enimaloc.catapult.service.enrichment.supercell.SupercellGame.BRAWL_STARS, "Chief", "#2PP", null,
+                null, null, null);
+        when(supercellStats.forDetected(eq(user), any(), eq("Brawl Stars"), any())).thenReturn(Optional.of(stats));
+
+        GameEnrichment result = assembler.enrich(MINECRAFT, Optional.empty(), Optional.empty(), "Brawl Stars",
+                "FR", null, LINKS, Optional.of(user), Locale.FRENCH);
+
+        assertThat(result.stats().supercell()).isEqualTo(stats);
+    }
+
+    @Test
+    void noSupercellStats_withoutAMember() {
+        GameEnrichment result = assembler.enrich(MINECRAFT, Optional.empty(), Optional.empty(), "Brawl Stars",
+                "FR", null, LINKS, Optional.empty(), Locale.FRENCH);
+
+        verify(supercellStats, never()).forDetected(any(), any(), any(), any());
+        assertThat(result.stats()).isNull();
     }
 }

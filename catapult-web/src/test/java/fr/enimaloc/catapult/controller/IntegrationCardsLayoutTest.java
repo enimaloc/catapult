@@ -66,14 +66,14 @@ class IntegrationCardsLayoutTest {
     void theCards_areSplitBetweenTheIntegrationsAndTheApiTabs_inTheirOrder() {
         List<IntegrationDto> cards = List.of(IntegrationCards.twitch(), card("speedrun"), card("xbox"),
                 card("retroachievements"), card("blizzard-stats"), card("bungie"), card("riot"), card("faceit"),
-                card("chess"), card("osu"), card("hypixel"), card("steam"), card("battlenet"), card("epic"),
+                card("chess"), card("osu"), card("hypixel"), card("supercell"), card("steam"), card("battlenet"), card("epic"),
                 card("ankama"), card("minecraft"), card("obs"), card("twitchat"));
 
         assertThat(IntegrationCards.integrationsTab(cards)).extracting(IntegrationDto::id).containsExactly(
                 "twitch", "xbox", "steam", "battlenet", "epic", "ankama", "minecraft", "obs", "twitchat");
         assertThat(IntegrationCards.apiTab(cards)).extracting(IntegrationDto::id).containsExactly(
                 "speedrun", "retroachievements", "blizzard-stats", "bungie", "riot", "faceit", "chess", "osu",
-                "hypixel");
+                "hypixel", "supercell");
     }
 
     private static IntegrationDto card(String id) {

@@ -59,6 +59,10 @@ public record ApiKeysPageDto(boolean enabled, List<Key> keys) {
         return page == null ? null : new ApiKeysPageDto(page.hypixelEnabled(), keys(page.keys()));
     }
 
+    public static ApiKeysPageDto of(SupercellKeysPageData page) {
+        return page == null ? null : new ApiKeysPageDto(page.supercellEnabled(), keys(page.keys()));
+    }
+
     private static List<Key> keys(List<KeyStatus> keys) {
         return keys == null ? List.of() : keys.stream()
                 .filter(Objects::nonNull)

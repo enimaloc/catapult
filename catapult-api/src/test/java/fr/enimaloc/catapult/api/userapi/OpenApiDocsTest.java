@@ -123,6 +123,7 @@ class OpenApiDocsTest {
     @MockitoBean fr.enimaloc.catapult.service.enrichment.faceit.FaceitStatsService faceitStatsService;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService osuStatsService;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService hypixelStatsService;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.supercell.SupercellStatsService supercellStatsService;
 
     private JsonNode docs() throws Exception {
         String body = mvc.perform(get("/api/v3/api-docs")).andExpect(status().isOk())
@@ -291,6 +292,11 @@ class OpenApiDocsTest {
         assertThat(docs.at("/paths/~1api~1me~1stats~1hypixel/get/responses/200/content").toString())
                 .contains("HypixelStats");
         assertThat(schemas.at("/StatsObject/properties").has("hypixel")).isTrue();
+        // Supercell: the detail answers the aggregate's own record
+        assertThat(docs.at("/paths/~1api~1me~1stats~1supercell~1{game}/get/responses/200/content").toString())
+                .contains("SupercellStats");
+        assertThat(schemas.at("/StatsObject/properties").has("supercell")).isTrue();
+        assertThat(schemas.at("/SupercellStats/properties").has("more")).isTrue();
         assertThat(schemas.at("/HypixelStats/properties").has("more")).isTrue();
         assertThat(schemas.at("/PublisherObject/properties").has("hypixel")).isTrue();
     }

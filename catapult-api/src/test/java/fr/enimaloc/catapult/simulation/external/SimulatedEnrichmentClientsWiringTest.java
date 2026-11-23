@@ -84,6 +84,9 @@ class SimulatedEnrichmentClientsWiringTest {
         @Bean HttpRiotClient riot() { return mock(HttpRiotClient.class); }
         @Bean HttpFaceitClient faceit() { return mock(HttpFaceitClient.class); }
         @Bean HttpHypixelClient hypixel() { return mock(HttpHypixelClient.class); }
+        @Bean fr.enimaloc.catapult.service.enrichment.supercell.HttpSupercellClient supercell() {
+            return mock(fr.enimaloc.catapult.service.enrichment.supercell.HttpSupercellClient.class);
+        }
         @Bean org.springframework.web.client.RestClient.Builder restClientBuilder() {
             return org.springframework.web.client.RestClient.builder();
         }
@@ -94,7 +97,7 @@ class SimulatedEnrichmentClientsWiringTest {
     @Configuration(proxyBeanMethods = false)
     @ComponentScan(basePackageClasses = SimulatedProtonDbClient.class, useDefaultFilters = false,
             includeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
-                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity|SteamStats|XboxStats|RetroAchievements|Blizzard|Bungie|Riot|Faceit|Osu|Hypixel)Client|.*SimulatedBlizzardAppTokenService"))
+                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity|SteamStats|XboxStats|RetroAchievements|Blizzard|Bungie|Riot|Faceit|Osu|Hypixel|Supercell)Client|.*SimulatedBlizzardAppTokenService"))
     static class SimulatedClients {
     }
 
@@ -126,6 +129,8 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(fr.enimaloc.catapult.service.enrichment.osu.OsuClient.class))
                     .isInstanceOf(SimulatedOsuClient.class);
             assertThat(ctx.getBean(HypixelClient.class)).isInstanceOf(SimulatedHypixelClient.class);
+            assertThat(ctx.getBean(fr.enimaloc.catapult.service.enrichment.supercell.SupercellClient.class))
+                    .isInstanceOf(SimulatedSupercellClient.class);
         });
     }
 
@@ -151,7 +156,20 @@ class SimulatedEnrichmentClientsWiringTest {
             assertThat(ctx.getBean(fr.enimaloc.catapult.service.enrichment.osu.OsuClient.class))
                     .isInstanceOf(fr.enimaloc.catapult.service.enrichment.osu.HttpOsuClient.class);
             assertThat(ctx.getBean(HypixelClient.class)).isInstanceOf(HttpHypixelClient.class);
+            assertThat(ctx.getBean(fr.enimaloc.catapult.service.enrichment.supercell.SupercellClient.class))
+                    .isInstanceOf(fr.enimaloc.catapult.service.enrichment.supercell.HttpSupercellClient.class);
         });
+    }
+
+    @Test
+    void simulatedSupercell_answersDeterministically() {
+        var supercell = new SimulatedSupercellClient();
+        assertThat(supercell.player(fr.enimaloc.catapult.service.enrichment.supercell.SupercellGame.CLASH_OF_CLANS, "#2PP").clashOfClans().townHallLevel()).isEqualTo(16);
+        assertThat(supercell.player(fr.enimaloc.catapult.service.enrichment.supercell.SupercellGame.CLASH_ROYALE, "#2PP").clashRoyale().arena())
+                .isEqualTo("Legendary Arena");
+        assertThat(supercell.player(fr.enimaloc.catapult.service.enrichment.supercell.SupercellGame.BRAWL_STARS, "#2PP").brawlStars().trioVictories()).isEqualTo(2400);
+        assertThatThrownBy(() -> supercell.player(fr.enimaloc.catapult.service.enrichment.supercell.SupercellGame.CLASH_OF_CLANS, "#000"))
+                .isInstanceOf(fr.enimaloc.catapult.service.enrichment.supercell.SupercellNotFoundException.class);
     }
 
     @Test

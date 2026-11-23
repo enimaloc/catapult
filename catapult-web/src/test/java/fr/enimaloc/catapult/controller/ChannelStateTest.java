@@ -287,6 +287,17 @@ class ChannelStateTest {
     }
 
     @Test
+    void supercellSettings_asItsEvent() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.SupercellData(null, new fr.enimaloc.catapult.common.dto.channel.SupercellData.Game("#2PP", "Chief", true), null);
+        ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
+                false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, account);
+
+        assertThat(events(ChannelState.of(ch, SETTINGS, null))).contains(fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent.of("enimaloc", account));
+    }
+
+    @Test
     void riotSettings_asItsEvent() {
         ChannelPageData ch = new ChannelPageData(new ChannelUserDto("1", "2", "enimaloc", "img"), "enimaloc", true, true,
                 false, null, new PagedBindings(0, 0, 0, List.of()), List.of(), Set.of(), List.of(), Set.of(), null,

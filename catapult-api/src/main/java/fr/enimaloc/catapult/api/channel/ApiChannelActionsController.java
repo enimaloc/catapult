@@ -113,6 +113,7 @@ public class ApiChannelActionsController {
     private final ChessAccountService chessAccountService;
     private final fr.enimaloc.catapult.service.osu.OsuLinkService osuLinkService;
     private final fr.enimaloc.catapult.service.hypixel.HypixelAccountService hypixelAccountService;
+    private final fr.enimaloc.catapult.service.supercell.SupercellAccountService supercellAccountService;
 
 
     // ── Binding actions ───────────────────────────────────────────────────────
@@ -517,6 +518,32 @@ public class ApiChannelActionsController {
             @PathVariable UUID userId) {
 
         hypixelAccountService.delete(userResolver.user(userId));
+    }
+
+    /**
+     * {@code game}: clash-of-clans, clash-royale or brawl-stars. 400 for an unknown game, a malformed tag or a tag no
+     * player has in that game; 429 when the member's refreshes are spent (the check calls Supercell); 503 when
+     * Supercell cannot be asked (down, or the source off: no key of that game in the pool).
+     */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/supercell/{game}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveSupercellAccount(
+            @PathVariable UUID userId,
+            @PathVariable String game,
+            @RequestBody fr.enimaloc.catapult.common.dto.channel.SupercellAccountRequest body) {
+
+        supercellAccountService.save(userResolver.user(userId), game, body == null ? null : body.tag());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/supercell/{game}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteSupercellAccount(
+            @PathVariable UUID userId,
+            @PathVariable String game) {
+
+        supercellAccountService.delete(userResolver.user(userId), game);
     }
 
     private BlizzardAccountService blizzard() {

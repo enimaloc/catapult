@@ -223,6 +223,8 @@ DELETE,/api/internal/users/{userId}/settings/chess/lichess,,,401,401,403,403,PAS
 DELETE,/api/internal/users/{userId}/settings/osu,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/hypixel/account,,"{""player"":""!""}",401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/settings/hypixel/account,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/supercell/{game},game=clash-of-clans,"{""tag"":""#2PP""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/supercell/{game},game=clash-of-clans,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/settings/twitchat,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat,,"{""enabled"":false}",401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat/branch,,,401,401,403,403,PASS,403,401
@@ -301,6 +303,10 @@ GET,/api/internal/admin/hypixel-keys,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/hypixel-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/hypixel-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/hypixel-keys/refresh,,,401,PASS,403,403,403,PASS,401
+GET,/api/internal/admin/supercell-keys/{game}/keys,game=clash-of-clans,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/supercell-keys/{game}/keys,game=clash-of-clans,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
+DELETE,/api/internal/admin/supercell-keys/{game}/keys/{keyId},game=clash-of-clans;keyId=matrix,,401,PASS,403,403,403,PASS,401
+POST,/api/internal/admin/supercell-keys/{game}/keys/refresh,game=clash-of-clans,,401,PASS,403,403,403,PASS,401
 GET,/api/internal/admin/opencritic-keys,,,401,PASS,403,403,403,PASS,401
 POST,/api/internal/admin/opencritic-keys,,"{""apiKey"":""matrix""}",401,PASS,403,403,403,PASS,401
 DELETE,/api/internal/admin/opencritic-keys/{keyId},keyId=matrix,,401,PASS,403,403,403,PASS,401
@@ -563,4 +569,5 @@ GET,/api/me/stats/faceit/{game},game=cs2;?version=3,,401,401,401,401,401,401,PAS
 GET,/api/me/stats/chess,?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/osu/{game},game=osu;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/hypixel,?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/supercell/{game},game=clash-of-clans;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/retroachievements,?version=3,,401,401,401,401,401,401,PASS

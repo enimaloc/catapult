@@ -60,10 +60,15 @@ class ChannelApiTabRenderingTest {
     }
 
     private static ChannelPageData page(boolean owner, FaceitData faceit, ChessData chess, HypixelData hypixel) {
+        return page(owner, faceit, chess, hypixel, null);
+    }
+
+    private static ChannelPageData page(boolean owner, FaceitData faceit, ChessData chess, HypixelData hypixel,
+                                        fr.enimaloc.catapult.common.dto.channel.SupercellData supercell) {
         return new ChannelPageData(new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
                 "enimaloc", owner, true, true, null, new PagedBindings(0, 1, 0, List.of()), List.of(), Set.of(),
                 List.of(), Set.of(), null, null, null, owner ? new XboxData(true) : null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, faceit, chess, null, hypixel);
+                null, null, null, null, null, null, null, null, faceit, chess, null, hypixel, supercell);
     }
 
     private String render(ChannelPageData data) throws Exception {
@@ -114,6 +119,17 @@ class ChannelApiTabRenderingTest {
         // Both grids share the layout.
         assertThat(api).contains("class=\"connection-grid\"");
         assertThat(integrations).contains("class=\"connection-grid\"");
+    }
+
+    @Test
+    void theSupercellCard_isOnTheApiTab() throws Exception {
+        var game = new fr.enimaloc.catapult.common.dto.channel.SupercellData.Game("#2PP", "Chief", true);
+        String html = render(page(true, null, null, null,
+                new fr.enimaloc.catapult.common.dto.channel.SupercellData(game, null, null)));
+
+        assertThat(panel(html, "api")).contains("data-conn=\"supercell\"", "Chief (#2PP)",
+                "id=\"supercell-clash-royale-input\"");
+        assertThat(panel(html, "integrations")).doesNotContain("data-conn=\"supercell\"");
     }
 
     @Test

@@ -280,6 +280,20 @@ public class ChannelActionsController {
         return ApiStatus.answer(apiService.saveHypixelAccount(username, body == null ? null : body.player()));
     }
 
+    // The member's Supercell player tag in one game (clash-of-clans, clash-royale, brawl-stars): 400 for an unknown game,
+    // a malformed tag or a tag no player has, 429 when their refreshes are spent, 503 when Supercell cannot be asked.
+
+    @PostMapping("/channel/{username}/settings/supercell/{game}")
+    public ResponseEntity<Void> saveSupercellAccount(@PathVariable String username, @PathVariable String game,
+            @RequestBody fr.enimaloc.catapult.common.dto.channel.SupercellAccountRequest body) {
+        return ApiStatus.answer(apiService.saveSupercellAccount(username, game, body == null ? null : body.tag()));
+    }
+
+    @PostMapping("/channel/{username}/settings/supercell/{game}/delete")
+    public ResponseEntity<Void> deleteSupercellAccount(@PathVariable String username, @PathVariable String game) {
+        return ApiStatus.answer(apiService.deleteSupercellAccount(username, game));
+    }
+
     @PostMapping("/channel/{username}/settings/hypixel/account/delete")
     public ResponseEntity<Void> deleteHypixelAccount(@PathVariable String username) {
         return ApiStatus.answer(apiService.deleteHypixelAccount(username));

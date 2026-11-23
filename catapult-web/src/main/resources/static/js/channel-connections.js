@@ -1,5 +1,5 @@
 /**
- * Handlers for the Steam/Minecraft/Battle.net/Ankama/Epic/Speedrun.com/RetroAchievements/Blizzard stats/Hypixel/Riot/FACEIT/Xbox/OBS connection cards,
+ * Handlers for the Steam/Minecraft/Battle.net/Ankama/Epic/Speedrun.com/RetroAchievements/Blizzard stats/Hypixel/Supercell/Riot/FACEIT/Xbox/OBS connection cards,
  * on the Integrations tab or, for the cards that only feed the API's personal stats, on the API tab. The Steam/Minecraft cards' elements are all
  * pre-rendered and only toggled via the `hidden` class (spa:if/spa:switch, see
  * channel.html) instead of being created/destroyed per SSE event, so handlers only
@@ -99,6 +99,9 @@ window.CatapultConnections = (function () {
             showError(actionFailed(response.status));
         }
     }
+
+    // A Supercell player tag as typed: an optional #, then 3 to 12 of its characters (O is read as 0).
+    const SUPERCELL_TAG = /^#?[0289PYLQGRJCUVO]{3,12}$/i;
 
     // Why catapult-api refused an Epic login, which it sends back to this tab as ?error=<code>.
     const EPIC_LINK_ERRORS = {
@@ -291,6 +294,25 @@ window.CatapultConnections = (function () {
                 ["labelHypixelUnavailable", "Hypixel cannot be reached right now: try again later."]);
         });
         on("hypixel-delete-btn", "click", () => postJson(`${baseUrl}/settings/hypixel/account/delete`, {}));
+
+        // Supercell: one player tag per game, checked by that game's API first (a tag that cannot be one is told
+        // here, without asking); the card follows from SupercellAccountChangedEvent.
+        for (const game of ["clash-of-clans", "clash-royale", "brawl-stars"]) {
+            on(`supercell-${game}-save-btn`, "click", async () => {
+                const input = document.getElementById(`supercell-${game}-input`);
+                const typed = input.value.replace(/\s+/g, "");
+                if (typed && !SUPERCELL_TAG.test(typed)) {
+                    CatapultChannel.showError(pageLabel("labelSupercellFormat",
+                        "A player tag is # then 3 to 12 of 0289PYLQGRJCUV."));
+                    return;
+                }
+                await saveSpeedrun(`${baseUrl}/settings/supercell/${game}`, { tag: input.value.trim() }, input,
+                    ["labelSupercellRefused", "No player has this tag in this game."],
+                    ["labelSupercellUnavailable", "Supercell cannot be reached right now: try again later."]);
+            });
+            on(`supercell-${game}-delete-btn`, "click", () =>
+                postJson(`${baseUrl}/settings/supercell/${game}/delete`, {}));
+        }
 
         // Riot: the Riot ID and the server are saved together, Riot checking the Riot ID first; the card follows
         // from RiotAccountChangedEvent.

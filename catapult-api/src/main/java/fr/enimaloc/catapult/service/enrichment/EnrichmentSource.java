@@ -56,7 +56,10 @@ public enum EnrichmentSource {
     OSU_RECENT("osu-recent"),
     HYPIXEL_PLAYER("hypixel-player"),
     HYPIXEL_STATUS("hypixel-status"),
-    HYPIXEL_GAMES("hypixel-games");
+    HYPIXEL_GAMES("hypixel-games"),
+    SUPERCELL_CLASH_OF_CLANS("supercell-clash-of-clans"),
+    SUPERCELL_CLASH_ROYALE("supercell-clash-royale"),
+    SUPERCELL_BRAWL_STARS("supercell-brawl-stars");
 
     private final String key;
 
@@ -73,7 +76,7 @@ public enum EnrichmentSource {
      * Whether the source holds one member's own stats (keyed {@code u:<userId>...}): the Steam, Xbox and
      * RetroAchievements sources, the Blizzard character, achievement and profile ones, the Bungie profile and
      * triumphs, the Riot summoner, league and live game ones, the FACEIT ones, the Chess.com and Lichess ones and
-     * the osu! profile and recent scores and the Hypixel player and status, except the Steam schema and rarity,
+     * the osu! profile and recent scores, the Hypixel player and status and the Supercell players, except the Steam schema and rarity,
      * which are the same for everyone.
      */
     public boolean personal() {
@@ -86,6 +89,7 @@ public enum EnrichmentSource {
             case CHESS_CHESSCOM_STATS, CHESS_CHESSCOM_GAMES, CHESS_LICHESS_USER -> true;
             case OSU_PROFILE, OSU_RECENT -> true;
             case HYPIXEL_PLAYER, HYPIXEL_STATUS -> true;
+            case SUPERCELL_CLASH_OF_CLANS, SUPERCELL_CLASH_ROYALE, SUPERCELL_BRAWL_STARS -> true;
             default -> false;
         };
     }
@@ -97,6 +101,9 @@ public enum EnrichmentSource {
     public boolean backsOff() {
         return switch (this) {
             case PROTONDB, STEAMDECK, PCGAMINGWIKI -> true;
+            // A member's Supercell player: a failed fetch is not asked again at once, so that nobody can spend a
+            // game's key pool by repeating a failing call
+            case SUPERCELL_CLASH_OF_CLANS, SUPERCELL_CLASH_ROYALE, SUPERCELL_BRAWL_STARS -> true;
             default -> false;
         };
     }

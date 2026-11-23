@@ -21,6 +21,9 @@ import fr.enimaloc.catapult.service.enrichment.osu.OsuStats;
 import fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService;
 import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStats;
 import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService;
+import fr.enimaloc.catapult.service.enrichment.supercell.SupercellGame;
+import fr.enimaloc.catapult.service.enrichment.supercell.SupercellStats;
+import fr.enimaloc.catapult.service.enrichment.supercell.SupercellStatsService;
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.OsuGame;
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BungieGame;
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame;
@@ -70,7 +73,7 @@ import static fr.enimaloc.catapult.api.userapi.RequestLocale.LANG_DESCRIPTION;
 @RequestMapping(path = ApiV2.ME_STATS_PATH, version = ApiV2.VERSION_3 + "+")
 @RequiredArgsConstructor
 @Tag(name = "Me — stats", description = "Your own play time and achievements on Steam, Xbox and "
-        + "RetroAchievements, and your Blizzard, Bungie, Riot, FACEIT, chess, osu! and Hypixel stats, by your "
+        + "RetroAchievements, and your Blizzard, Bungie, Riot, FACEIT, chess, osu!, Hypixel and Supercell stats, by your "
         + "personal API token (Authorization: Bearer cat_… or catr_…).")
 public class MeStatsController {
 
@@ -88,6 +91,7 @@ public class MeStatsController {
     private final FaceitStatsService faceitStatsService;
     private final OsuStatsService osuStatsService;
     private final HypixelStatsService hypixelStatsService;
+    private final SupercellStatsService supercellStatsService;
     private final MemberFetchBudgets memberFetchBudgets;
     private final ApiUserResolver userResolver;
     private final PublicBaseUrl publicBaseUrl;
@@ -100,8 +104,8 @@ public class MeStatsController {
     @GetMapping
     @Operation(summary = "Get your stats on the game your channel plays now",
             description = "The stats object of GET /api/me/game (version 3): steam, xbox, retroachievements, "
-                    + "blizzard, bungie, riot, faceit, chess, osu and hypixel, each null when it does not apply (not "
-                    + "linked, game not found there), each with its status and a \"more\" link to its detail; the "
+                    + "blizzard, bungie, riot, faceit, chess, osu, hypixel and supercell, each null when it does not "
+                    + "apply (not linked, game not found there), each with its status and a \"more\" link to its detail; the "
                     + "platforms with their play time and achievements summary (unlocked, total, percent, the 5 latest, the rarest), "
                     + "blizzard with your BattleTag, region and the game's object (wow main character, sc2 or d3 "
                     + "profile), bungie with your Bungie Name and destiny2 profile, riot with your Riot ID, platform "
@@ -109,7 +113,8 @@ public class MeStatsController {
                     + "nickname and your CS2 level, Elo and last match, chess with your Chess.com and Lichess ratings "
                     + "(see GET /api/me/stats/chess), osu with your osu! username and profile (pp, ranks, accuracy, "
                     + "play count and time, latest score), hypixel with your Minecraft name, network level, Bed Wars / "
-                    + "SkyWars and online status. stats is null when nothing applies.")
+                    + "SkyWars and online status, supercell with your player name and tag and the game's object "
+                    + "(clashOfClans, clashRoyale or brawlStars). stats is null when nothing applies.")
     @ApiResponse(responseCode = "200", description = "inGame=false while no game is detected; otherwise your stats.")
     public CurrentStats current(
             @AuthenticationPrincipal UUID userId,
@@ -274,6 +279,35 @@ public class MeStatsController {
         HypixelStats stats = detail(userId, "No Hypixel stats for you: no Minecraft account declared, or Hypixel "
                 + "stats unavailable", (user, budget) -> hypixelStatsService.forMember(user, budget, true));
         return GameInfoV3Response.hypixelStats(stats, links());
+    }
+
+    @GetMapping("/supercell/{game}")
+    @Operation(summary = "Get your stats on a Supercell game",
+            description = "The supercell object of GET /api/me/stats (status, game, account = your player name, tag, "
+                    + "and the object of the game: clashOfClans your town hall, trophies, best trophies, league, war "
+                    + "stars, builder base and clan; clashRoyale your trophies, best trophies, arena, Path of Legend "
+                    + "league, wins, losses, three-crown wins and clan; brawlStars your trophies, highest trophies, 3v3 "
+                    + "/ solo / duo victories and club), plus what only the detail has: Clash of Clans attack and "
+                    + "defense wins and heroes, the Clash Royale battle count and current deck, the Brawl Stars "
+                    + "brawlers. status not_found: no player has the tag you declared any more." + STATUS_NOTE
+                    + BUDGET_NOTE)
+    @ApiResponse(responseCode = "200", description = "Your stats on the game.")
+    @ApiResponse(responseCode = "400", description = "Unknown game (clash-of-clans, clash-royale or brawl-stars).",
+            content = @Content)
+    @ApiResponse(responseCode = "404", description = "No player tag declared for that game, or Supercell stats "
+            + "unavailable on this instance.", content = @Content)
+    @ApiResponse(responseCode = "429", description = "Your refreshes are spent; retry after Retry-After seconds.",
+            content = @Content)
+    public SupercellStats supercell(
+            @AuthenticationPrincipal UUID userId,
+            @Parameter(description = "Supercell game: clash-of-clans, clash-royale or brawl-stars.",
+                    in = ParameterIn.PATH, example = "clash-of-clans")
+            @PathVariable @Pattern(regexp = ApiV2.SUPERCELL_GAME) String game) {
+        SupercellGame supercellGame = SupercellGame.parse(game).orElseThrow();
+        SupercellStats stats = detail(userId, "No " + supercellGame.title() + " stats for you: no player tag "
+                + "declared, or Supercell stats unavailable",
+                (user, budget) -> supercellStatsService.forGame(user, supercellGame, budget, true));
+        return GameInfoV3Response.supercellStats(stats, links());
     }
 
     @GetMapping("/bungie/{game}")

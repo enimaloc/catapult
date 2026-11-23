@@ -69,6 +69,7 @@ public final class ApiV2 {
     static final String BUNGIE_GAME = "destiny2";
     static final String RIOT_GAME = "lol|tft";
     static final String OSU_GAME = "osu";
+    static final String SUPERCELL_GAME = "clash-of-clans|clash-royale|brawl-stars";
 
     // Shapes of the optional "country" and "language" query parameters of the enrichment routes.
     static final String COUNTRY = "[A-Za-z]{2}";

@@ -79,6 +79,17 @@ class ApiKeysPageDtoTest {
     }
 
     @Test
+    void supercellPageKeepsItsFlagAndKeys() {
+        ApiKeysPageDto dto = ApiKeysPageDto.of(new SupercellKeysPageData(List.of(KEY), true));
+
+        assertThat(dto.enabled()).isTrue();
+        assertThat(dto.keys()).containsExactly(new ApiKeysPageDto.Key("k1", "ab…yz", "owner", true, 42));
+        assertThat(ApiKeysPageDto.of(new SupercellKeysPageData(null, false)))
+                .isEqualTo(new ApiKeysPageDto(false, List.of()));
+        assertThat(ApiKeysPageDto.of((SupercellKeysPageData) null)).isNull();
+    }
+
+    @Test
     void anUnreachablePageGivesNull() {
         assertThat(ApiKeysPageDto.of((RetroAchievementsKeysPageData) null)).isNull();
         assertThat(ApiKeysPageDto.of((ItadKeysPageData) null)).isNull();

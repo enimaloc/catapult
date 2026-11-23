@@ -608,6 +608,24 @@ class MockApiServiceTest {
     }
 
     @Test
+    void supercellTag_isNormalized_refusedWhenMalformedOrUnknown_andForgotten() {
+        assertThat(service.saveSupercellAccount(username, "clash-of-clans", "#ABC")).isEqualTo(400);
+        assertThat(service.saveSupercellAccount(username, "clash-of-clans", "#000")).isEqualTo(400);
+        assertThat(service.saveSupercellAccount(username, "clash-of-clans", null)).isEqualTo(400);
+        assertThat(service.saveSupercellAccount(username, "hay-day", "#2PP")).isEqualTo(400);
+        assertThat(service.deleteSupercellAccount(username, "hay-day")).isEqualTo(400);
+
+        assertThat(service.saveSupercellAccount(username, "clash-of-clans", " 2p o ")).isEqualTo(204);
+        assertThat(data.supercellData().clashOfClans()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.SupercellData.Game("#2P0", "Chief 2P0", true));
+        assertThat(data.supercellData().brawlStars().available()).isFalse();
+
+        assertThat(service.deleteSupercellAccount(username, "clash-of-clans")).isEqualTo(204);
+        assertThat(data.supercellData().clashOfClans().tag()).isNull();
+
+        assertThat(events).hasSize(2).allSatisfy(event -> assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent.class));
+    }
+
+    @Test
     void ankamaStatus_isTheMockLink() {
         assertThat(service.ankamaStatus(username)).isEqualTo(data.getAnkamaLink());
     }

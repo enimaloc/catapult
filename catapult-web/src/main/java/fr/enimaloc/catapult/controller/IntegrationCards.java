@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.FaceitData;
 import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
 import fr.enimaloc.catapult.common.dto.channel.HypixelData;
+import fr.enimaloc.catapult.common.dto.channel.SupercellData;
 import fr.enimaloc.catapult.common.dto.channel.RiotData;
 import fr.enimaloc.catapult.common.dto.channel.OsuAccountData;
 import fr.enimaloc.catapult.common.dto.channel.EpicData;
@@ -64,7 +65,7 @@ public final class IntegrationCards {
      * stay there. A card named here before it exists simply lands on the API tab once it does.
      */
     public static final Set<String> API_TAB = Set.of("speedrun", "retroachievements", "blizzard-stats", "bungie", "riot",
-            "faceit", "chess", "osu", "hypixel");
+            "faceit", "chess", "osu", "hypixel", "supercell");
 
     private IntegrationCards() {
     }
@@ -115,6 +116,9 @@ public final class IntegrationCards {
         }
         if (ch.hypixel() != null) {
             cards.add(hypixel(ch.hypixel()));
+        }
+        if (ch.supercell() != null) {
+            cards.add(supercell(ch.supercell()));
         }
         if (ch.riot() != null) {
             cards.add(riot(ch.riot()));
@@ -607,6 +611,58 @@ public final class IntegrationCards {
     // before anything is kept. The declared one shows as a chip that HypixelAccountChangedEvent replaces in place.
     // Without a key in the shared pool the card says the stats are off on this instance (a save would be refused).
     // No secret is ever held for a member.
+
+    // Supercell: one player tag per game (Clash of Clans, Clash Royale, Brawl Stars), each checked with that game's API
+    // before it is kept, each with its own field and buttons. The declared player shows as a chip that
+    // SupercellAccountChangedEvent replaces in place. A game without a key in the shared pool says its stats are off on
+    // this instance (a save would be refused). No secret is ever held for a member.
+
+    private static final String SUPERCELL_EVENT = "SupercellAccountChangedEvent";
+    private static final String SUPERCELL_PREFIX = PREFIX + "supercell.";
+    /** The games of the card: the route segment and the event's field prefix. */
+    static final List<List<String>> SUPERCELL_GAMES = List.of(List.of("clash-of-clans", "clashOfClans"),
+            List.of("clash-royale", "clashRoyale"), List.of("brawl-stars", "brawlStars"));
+
+    static IntegrationDto supercell(SupercellData supercell) {
+        List<IntegrationNode> nodes = new java.util.ArrayList<>();
+        for (List<String> game : SUPERCELL_GAMES) {
+            String route = game.get(0);
+            String field = game.get(1);
+            SupercellData.Game data = switch (route) {
+                case "clash-of-clans" -> supercell.clashOfClans();
+                case "clash-royale" -> supercell.clashRoyale();
+                default -> supercell.brawlStars();
+            };
+            nodes.add(supercellGame(route, field, data == null ? new SupercellData.Game(null, null, false) : data));
+        }
+        nodes.add(new Text(Attrs.cls("supercell-help"), true, key(SUPERCELL_PREFIX + "help")));
+        return wideCard("supercell", nodes.toArray(IntegrationNode[]::new));
+    }
+
+    private static IntegrationNode supercellGame(String route, String field, SupercellData.Game data) {
+        boolean declared = data.tag() != null && !data.tag().isBlank();
+        String id = "supercell-" + route;
+        SpaState declaredState = SpaState.flag(field + "Declared", declared, SUPERCELL_EVENT + "." + field + "Tag");
+        return new Container(Attrs.cls("supercell-game").withClass(id), Container.Kind.DIV, List.of(
+                new Text(Attrs.cls("supercell-game-title"), false, key(SUPERCELL_PREFIX + route)),
+                new Container(Attrs.cls("supercell-account").withState(declaredState), Container.Kind.DIV, List.of(
+                        new Text(Attrs.NONE, false, key(SUPERCELL_PREFIX + "account")),
+                        new Chip(Attrs.cls("supercell-account-name").withState(
+                                SpaState.sync("textContent", SUPERCELL_EVENT + "." + field + "Player")),
+                                Message.literal(fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent
+                                        .player(data))))),
+                new Text(Attrs.cls("supercell-none").withState(SpaState.flag(field + "None", !declared,
+                        SUPERCELL_EVENT + ".!" + field + "Tag")), false, key(SUPERCELL_PREFIX + "none")),
+                new Text(Attrs.cls("supercell-unavailable").withState(SpaState.flag(field + "Unavailable",
+                        !data.available(), SUPERCELL_EVENT + ".!" + field + "Available")), true,
+                        key(SUPERCELL_PREFIX + "unavailable")),
+                new Input(Attrs.id(id + "-input"), "text", key(SUPERCELL_PREFIX + "tag.placeholder"), null, null,
+                        null, null, "off"),
+                new Container(Attrs.id(id + "-actions").withClass("card-actions"), Container.Kind.SEGMENTED_GROUP,
+                        List.of(segmented(Attrs.id(id + "-save-btn"), key(SUPERCELL_PREFIX + "save")),
+                                segmented(Attrs.id(id + "-delete-btn").withState(declaredState),
+                                        key(SUPERCELL_PREFIX + "delete"))))));
+    }
 
     private static final String HYPIXEL_EVENT = "HypixelAccountChangedEvent";
     private static final String HYPIXEL_PREFIX = PREFIX + "hypixel.";

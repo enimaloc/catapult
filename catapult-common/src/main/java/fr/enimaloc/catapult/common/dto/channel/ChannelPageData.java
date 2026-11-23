@@ -55,8 +55,26 @@ public record ChannelPageData(
         /** The owner's osu! link; null for anyone else, or when osu! is not set up and nothing is linked. */
         OsuAccountData osu,
         /** The owner's Hypixel settings; null for anyone else. The Minecraft name and UUID only. */
-        HypixelData hypixel
+        HypixelData hypixel,
+        /** The owner's Supercell settings; null for anyone else. The player tags and names only. */
+        SupercellData supercell
 ) {
+    /** A page without the Supercell settings. */
+    public ChannelPageData(ChannelUserDto channelUser, String channelUsername, boolean isOwner, boolean isLive,
+                           boolean botEnabled, GameDto currentGame, PagedBindings bindings, List<CclDto> availableCcls,
+                           Set<String> blockedCcls, List<TwDto> availableTws, Set<String> blockedTws,
+                           String filterStatus, String filterSource, SteamData steam, XboxData xbox,
+                           MinecraftData minecraft, BattleNetData battleNet, ObsData obs, TwitchatData twitchat,
+                           CustomBindingsStateDto customBindings, Map<String, DropDto> drops, AnkamaData ankama,
+                           EpicData epic, SpeedrunData speedrun, RetroAchievementsData retroAchievements,
+                           BlizzardStatsData blizzardStats, BungieAccountData bungie, RiotData riot,
+                           FaceitData faceit, ChessData chess, OsuAccountData osu, HypixelData hypixel) {
+        this(channelUser, channelUsername, isOwner, isLive, botEnabled, currentGame, bindings, availableCcls,
+                blockedCcls, availableTws, blockedTws, filterStatus, filterSource, steam, xbox, minecraft, battleNet,
+                obs, twitchat, customBindings, drops, ankama, epic, speedrun, retroAchievements, blizzardStats, bungie,
+                riot, faceit, chess, osu, hypixel, null);
+    }
+
     /** A page without the Hypixel settings. */
     public ChannelPageData(ChannelUserDto channelUser, String channelUsername, boolean isOwner, boolean isLive,
                            boolean botEnabled, GameDto currentGame, PagedBindings bindings, List<CclDto> availableCcls,

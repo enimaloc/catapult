@@ -65,6 +65,7 @@ import fr.enimaloc.catapult.common.dto.admin.RetroAchievementsKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.RiotKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.FaceitKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.HypixelKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.SupercellKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
@@ -409,6 +410,19 @@ public class RealApiService implements ApiService {
     public int deleteFaceitNickname(String username) {
         return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/faceit/nickname", id),
                 status -> status);
+    }
+
+    @Override
+    public int saveSupercellAccount(String username, String game, String tag) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/supercell/{game}",
+                new fr.enimaloc.catapult.common.dto.channel.SupercellAccountRequest(tag), id, game),
+                status -> status);
+    }
+
+    @Override
+    public int deleteSupercellAccount(String username, String game) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/supercell/{game}", id,
+                game), status -> status);
     }
 
     @Override
@@ -1646,6 +1660,11 @@ public class RealApiService implements ApiService {
                 HypixelKeysPageData page = client.get("/api/internal/admin/hypixel-keys", HypixelKeysPageData.class);
                 yield page == null ? null : ApiKeysPageDto.of(page);
             }
+            case CLASHOFCLANS, CLASHROYALE, BRAWLSTARS -> {
+                SupercellKeysPageData page = client.get("/api/internal/admin/supercell-keys/{game}/keys",
+                        SupercellKeysPageData.class, supercellGame(provider));
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
         };
     }
 
@@ -1662,6 +1681,8 @@ public class RealApiService implements ApiService {
             case RIOT -> client.call(HttpMethod.POST, "/api/internal/admin/riot-keys", body, Void.class);
             case FACEIT -> client.call(HttpMethod.POST, "/api/internal/admin/faceit-keys", body, Void.class);
             case HYPIXEL -> client.call(HttpMethod.POST, "/api/internal/admin/hypixel-keys", body, Void.class);
+            case CLASHOFCLANS, CLASHROYALE, BRAWLSTARS -> client.call(HttpMethod.POST,
+                    "/api/internal/admin/supercell-keys/{game}/keys", body, Void.class, supercellGame(provider));
         };
         return result.status();
     }
@@ -1678,6 +1699,9 @@ public class RealApiService implements ApiService {
             case RIOT -> client.call(HttpMethod.DELETE, "/api/internal/admin/riot-keys/{keyId}", null, Void.class, keyId);
             case FACEIT -> client.call(HttpMethod.DELETE, "/api/internal/admin/faceit-keys/{keyId}", null, Void.class, keyId);
             case HYPIXEL -> client.call(HttpMethod.DELETE, "/api/internal/admin/hypixel-keys/{keyId}", null, Void.class, keyId);
+            case CLASHOFCLANS, CLASHROYALE, BRAWLSTARS -> client.call(HttpMethod.DELETE,
+                    "/api/internal/admin/supercell-keys/{game}/keys/{keyId}", null, Void.class, supercellGame(provider),
+                    keyId);
         };
         return result.status();
     }
@@ -1694,8 +1718,19 @@ public class RealApiService implements ApiService {
             case RIOT -> client.call(HttpMethod.POST, "/api/internal/admin/riot-keys/refresh", null, Void.class);
             case FACEIT -> client.call(HttpMethod.POST, "/api/internal/admin/faceit-keys/refresh", null, Void.class);
             case HYPIXEL -> client.call(HttpMethod.POST, "/api/internal/admin/hypixel-keys/refresh", null, Void.class);
+            case CLASHOFCLANS, CLASHROYALE, BRAWLSTARS -> client.call(HttpMethod.POST,
+                    "/api/internal/admin/supercell-keys/{game}/keys/refresh", null, Void.class, supercellGame(provider));
         };
         return result.status();
+    }
+
+    /**
+     * The catapult-api game segment of a Supercell key pool: {@code clash-of-clans} for
+     * {@code supercell-keys/clash-of-clans/keys}.
+     */
+    static String supercellGame(ApiKeyProvider provider) {
+        String path = provider.apiPath();
+        return path.substring(path.indexOf('/') + 1, path.lastIndexOf('/'));
     }
 
     @Override

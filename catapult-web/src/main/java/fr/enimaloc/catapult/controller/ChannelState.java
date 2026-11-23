@@ -29,6 +29,7 @@ import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
 import fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent;
 import fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent;
 import fr.enimaloc.catapult.event.hypixel.HypixelAccountChangedEvent;
+import fr.enimaloc.catapult.event.supercell.SupercellAccountChangedEvent;
 import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
 import fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent;
 import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
@@ -115,6 +116,9 @@ public final class ChannelState {
         }
         if (ch.hypixel() != null) {
             events.add(HypixelAccountChangedEvent.of(login, ch.hypixel()));
+        }
+        if (ch.supercell() != null) {
+            events.add(SupercellAccountChangedEvent.of(login, ch.supercell()));
         }
         if (ch.riot() != null) {
             events.add(RiotAccountChangedEvent.of(login, ch.riot()));

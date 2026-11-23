@@ -31,6 +31,12 @@ class AdminPathNamesTest {
         assertThat(ApiKeyProvider.FACEIT.pathName()).isEqualTo("faceit");
         assertThat(ApiKeyProvider.HYPIXEL.apiPath()).isEqualTo("hypixel-keys");
         assertThat(ApiKeyProvider.HYPIXEL.pathName()).isEqualTo("hypixel");
+        assertThat(ApiKeyProvider.CLASHOFCLANS.apiPath()).isEqualTo("supercell-keys/clash-of-clans/keys");
+        assertThat(ApiKeyProvider.CLASHOFCLANS.pathName()).isEqualTo("clashofclans");
+        assertThat(ApiKeyProvider.CLASHROYALE.apiPath()).isEqualTo("supercell-keys/clash-royale/keys");
+        assertThat(ApiKeyProvider.CLASHROYALE.pathName()).isEqualTo("clashroyale");
+        assertThat(ApiKeyProvider.BRAWLSTARS.apiPath()).isEqualTo("supercell-keys/brawl-stars/keys");
+        assertThat(ApiKeyProvider.BRAWLSTARS.pathName()).isEqualTo("brawlstars");
     }
 
     @ParameterizedTest

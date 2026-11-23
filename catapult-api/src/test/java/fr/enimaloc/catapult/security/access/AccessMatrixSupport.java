@@ -210,6 +210,9 @@ abstract class AccessMatrixSupport {
     fr.enimaloc.catapult.service.enrichment.chess.ChessClient chessClient;
     @MockitoBean
     fr.enimaloc.catapult.service.enrichment.hypixel.HypixelClient hypixelClient;
+    /** The Supercell settings check the player tag a member saves. */
+    @MockitoBean
+    fr.enimaloc.catapult.service.enrichment.supercell.SupercellClient supercellClient;
 
     @Autowired
     MockMvc mvc;
@@ -302,6 +305,9 @@ abstract class AccessMatrixSupport {
         when(chessClient.lichessUser(any())).thenAnswer(i -> new fr.enimaloc.catapult.service.enrichment.chess
                 .LichessUser(i.getArgument(0), i.getArgument(0), null, null, java.util.Map.of(), null, null, null,
                         null, null, null));
+        // A declared Supercell tag always belongs to a player here, of whichever game is asked
+        when(supercellClient.player(any(), any())).thenAnswer(i -> new fr.enimaloc.catapult.service.enrichment
+                .supercell.SupercellModels.SupercellPlayer(i.getArgument(1), "matrix", null, null, null));
     }
 
     private UserAccount account(String username, String twitchId) {
