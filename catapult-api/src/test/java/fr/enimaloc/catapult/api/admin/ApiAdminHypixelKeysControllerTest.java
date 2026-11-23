@@ -52,7 +52,7 @@ class ApiAdminHypixelKeysControllerTest {
     @ParameterizedTest
     @ValueSource(strings = {"1234", "123456781234-4ef0-9abc-0123456789ab", "12345678-abcd-4ef0-9abc-0123456789ag",
             "12345678-abcd-4ef0-9abc-0123456789ab0", "x 12345678-abcd-4ef0-9abc-0123456789ab",
-            "RGAPI-12345678-abcd-4ef0-9abc-0123456789ab"})
+            "RGAPI-not-a-hypixel-key"})
     void add_refusesAnInvalidFormat_with400(String key) {
         assertThatThrownBy(() -> controller.add(new AddKeyRequest(key)))
                 .isInstanceOfSatisfying(ResponseStatusException.class,
