@@ -851,6 +851,13 @@ class RealApiServiceTest {
     }
 
     @Test
+    void osuLink_isDeletedOnTheChannel() {
+        expectDelete(channel("enimaloc") + "/settings/osu");
+
+        assertThat(service.deleteOsuLink("enimaloc")).isEqualTo(204);
+    }
+
+    @Test
     void bungieLink_isDeletedOnTheChannel() {
         expectDelete(channel("enimaloc") + "/settings/bungie");
 

@@ -27,6 +27,7 @@ import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
 import fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent;
 import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
 import fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent;
+import fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent;
 import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
 import fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent;
 import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
@@ -119,6 +120,9 @@ public final class ChannelState {
         }
         if (ch.chess() != null) {
             events.add(ChessAccountChangedEvent.of(login, ch.chess()));
+        }
+        if (ch.osu() != null) {
+            events.add(OsuAccountChangedEvent.of(login, ch.osu()));
         }
         CustomBindingsStateDto custom = ch.customBindings();
         if (custom != null) {

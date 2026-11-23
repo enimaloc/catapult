@@ -502,6 +502,17 @@ class MockApiServiceTest {
     }
 
     @Test
+    void osuLink_isUnlinkedAndTellsThePage() {
+        assertThat(data.osuData().linked()).isTrue();
+
+        assertThat(service.deleteOsuLink(username)).isEqualTo(204);
+
+        assertThat(data.osuData()).isEqualTo(fr.enimaloc.catapult.common.dto.channel.OsuAccountData.unlinked(true));
+        assertThat(events.getLast()).isEqualTo(new fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent(username,
+                false, false, "", false, true, true));
+    }
+
+    @Test
     void bungieLink_isUnlinkedAndTellsThePage() {
         assertThat(data.bungieData().linked()).isTrue();
 

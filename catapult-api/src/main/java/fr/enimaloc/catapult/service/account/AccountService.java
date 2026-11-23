@@ -57,6 +57,7 @@ public class AccountService {
     private final EventSubService twitchEventSubService;
     private final EnrichmentCache enrichmentCache;
     private final fr.enimaloc.catapult.service.enrichment.bungie.BungieTokenService bungieTokens;
+    private final fr.enimaloc.catapult.service.enrichment.osu.OsuTokenService osuTokens;
 
     // =========================================================
     // Two-step deletion
@@ -105,6 +106,8 @@ public class AccountService {
         enrichmentCache.evictUser(account.getId());
         // the Bungie link goes with the account (cascade): nothing of it is held in memory either
         bungieTokens.evict(account.getId());
+        // the osu! link too
+        osuTokens.evict(account.getId());
         // No official revocation endpoint for these providers — database deletion only
 //        for (OAuthToken.Provider p : List.of(OAuthToken.Provider.XBOX, OAuthToken.Provider.BATTLENET)) {
 //            oAuthTokenRepository.findByUserAndProvider(account, p)

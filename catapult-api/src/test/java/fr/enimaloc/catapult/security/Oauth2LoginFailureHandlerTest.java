@@ -224,4 +224,29 @@ class Oauth2LoginFailureHandlerTest {
         assertThat(response.getRedirectedUrl())
                 .isEqualTo("http://localhost:8081/channel/jeb_?error=bungie_cancelled#integrations");
     }
+
+    @Test
+    void osuRefusals_goBackToTheCard_andAnyOtherFailureIsAFailedLink() throws Exception {
+        for (String code : new String[]{"osu_unavailable", "osu_mismatch", "osu_failed"}) {
+            request = callbackOf("osu", "jeb_");
+            response = new MockHttpServletResponse();
+            handler.onAuthenticationFailure(request, response,
+                    new OAuth2AuthenticationException(new OAuth2Error(code)));
+            assertThat(response.getRedirectedUrl())
+                    .isEqualTo("http://localhost:8081/channel/jeb_?error=" + code + "#integrations");
+        }
+        request = callbackOf("osu", "jeb_");
+        response = new MockHttpServletResponse();
+        handler.onAuthenticationFailure(request, response,
+                new OAuth2AuthenticationException(new OAuth2Error("invalid_token_response")));
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("http://localhost:8081/channel/jeb_?error=osu_failed#integrations");
+
+        request = callbackOf("osu", "jeb_");
+        response = new MockHttpServletResponse();
+        handler.onAuthenticationFailure(request, response,
+                new OAuth2AuthenticationException(new OAuth2Error("access_denied")));
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("http://localhost:8081/channel/jeb_?error=osu_cancelled#integrations");
+    }
 }

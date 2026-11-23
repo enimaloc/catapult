@@ -277,6 +277,12 @@ public class ChannelActionsController {
         return ApiStatus.answer(apiService.deleteBungieLink(username));
     }
 
+    // Unlinking osu!; linking is a login (/oauth2/authorization/osu), not a route here.
+    @PostMapping("/channel/{username}/settings/osu/delete")
+    public ResponseEntity<Void> deleteOsuLink(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteOsuLink(username));
+    }
+
     @PostMapping("/channel/{username}/steam/refresh-profile-cache")
     public ResponseEntity<Void> refreshSteamProfileCache(@PathVariable String username) {
         return ApiStatus.answer(apiService.refreshSteamProfileCache(username));

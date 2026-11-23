@@ -110,4 +110,13 @@ class ApiChannelActionsBlizzardTest extends ApiChannelActionsTestSupport {
         verify(riotAccountService).save(owner, "Catapult#EUW", "euw1");
         verify(riotAccountService).delete(owner);
     }
+
+    @Test
+    void osuUnlink_byTheOwnerOnly() throws Exception {
+        mvc.perform(as(moderator, HttpMethod.DELETE, "/settings/osu", null)).andExpect(status().isForbidden());
+        verifyNoInteractions(osuLinkService);
+
+        mvc.perform(as(owner, HttpMethod.DELETE, "/settings/osu", null)).andExpect(status().isNoContent());
+        verify(osuLinkService).unlink(any());
+    }
 }

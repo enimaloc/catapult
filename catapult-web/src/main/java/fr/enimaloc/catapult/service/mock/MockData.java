@@ -21,6 +21,7 @@ import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.FaceitData;
 import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
+import fr.enimaloc.catapult.common.dto.channel.OsuAccountData;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
 import fr.enimaloc.catapult.common.dto.channel.RiotData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
@@ -154,6 +155,8 @@ public class MockData {
     private String blizzardWowMain = "eu:1001";
     /** The Bungie card too: linked to a Steam Destiny 2 profile. */
     private boolean bungieLinked = true;
+    /** The osu! card too: linked. */
+    private boolean osuLinked = true;
     private ObsData obsData;
     private String obsPassword;
     private String twitchatBranch = TwitchatData.AUTO;
@@ -401,7 +404,7 @@ public class MockData {
                 // drops: the mock has no experiments, they are offered
                 drops(), ankamaData(), epicData(), speedrunData(), retroAchievementsData(), blizzardStatsData(),
                 bungieData(),
-                riotData(), faceitData(), chessData());
+                riotData(), faceitData(), chessData(), osuData());
     }
 
     /** The mock's one running drops campaign, on the first binding's category. */
@@ -464,6 +467,15 @@ public class MockData {
 
     public void unlinkBungie() {
         bungieLinked = false;
+    }
+
+    public OsuAccountData osuData() {
+        return osuLinked ? new OsuAccountData(true, "Simulated", false, true,
+                java.time.Instant.parse("2026-11-20T10:00:00Z")) : OsuAccountData.unlinked(true);
+    }
+
+    public void unlinkOsu() {
+        osuLinked = false;
     }
 
     public void saveBlizzardRegion(String region) {

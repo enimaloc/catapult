@@ -8,6 +8,7 @@ import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
 import fr.enimaloc.catapult.common.dto.channel.RiotData;
 import fr.enimaloc.catapult.common.dto.channel.FaceitData;
 import fr.enimaloc.catapult.common.dto.channel.ChessData;
+import fr.enimaloc.catapult.common.dto.channel.OsuAccountData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
@@ -182,6 +183,12 @@ public class ChannelEventPublisher {
     public void faceitAccountChanged(UUID channelOwnerId, FaceitData account) {
         publish(channelOwnerId, ChannelEvents.FACEIT_ACCOUNT_CHANGED,
                 (id, login) -> new ChannelEvents.FaceitAccountChanged(id, login, account));
+    }
+
+    /** The owner's osu! link now stands as {@code account} (names only, never a token). */
+    public void osuAccountChanged(UUID channelOwnerId, OsuAccountData account) {
+        publish(channelOwnerId, ChannelEvents.OSU_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.OsuAccountChanged(id, login, account));
     }
 
     /** The owner's RetroAchievements settings now stand as {@code account} (the name only, never the key). */

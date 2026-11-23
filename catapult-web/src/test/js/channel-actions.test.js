@@ -318,6 +318,7 @@ describe("channel-connections", () => {
               <select id="blizzard-main-select"><option value="eu:1001">Thrall</option><option value="us:77">Jaina</option></select>
               <button id="blizzard-forget-btn"></button>
               <button id="bungie-disconnect-btn"></button>
+              <button id="osu-disconnect-btn"></button>
               <button id="epic-resend-btn"></button>
               <button id="epic-disconnect-btn"></button>
               <input id="obs-host" value="10.0.0.2">
@@ -755,6 +756,39 @@ describe("channel-connections", () => {
 
             expect(snackbars()).toEqual([text]);
             expect(location.pathname + location.search + location.hash).toBe("/channel/enimaloc#integrations");
+        });
+
+        it("unlinks osu! with a post", async () => {
+            await click("#osu-disconnect-btn");
+
+            expect(posts()).toEqual([["/channel/enimaloc/settings/osu/delete", {}]]);
+        });
+
+        it.each([
+            ["osu_unavailable", "Linking osu! is not available for now: try again later."],
+            ["osu_mismatch", "osu! answered for another account than the one you signed in with: try again."],
+            ["osu_failed", "Linking your osu! account failed: try again later."],
+            ["osu_cancelled", "osu! linking cancelled."],
+        ])("tells an osu! link refused with %s once, and takes it off the address", (code, text) => {
+            history.replaceState(null, "", `/channel/enimaloc?error=${code}#integrations`);
+
+            render();
+            render();
+
+            expect(snackbars()).toEqual([text]);
+            expect(location.pathname + location.search + location.hash).toBe("/channel/enimaloc#integrations");
+        });
+
+        it("tells a finished osu! link once", () => {
+            document.body.dataset.labelOsuDone = "Lie";
+            history.replaceState(null, "", "/channel/enimaloc?linked=osu#integrations");
+
+            render();
+            render();
+
+            expect(snackbars()).toEqual(["Lie"]);
+            expect(location.search).toBe("");
+            delete document.body.dataset.labelOsuDone;
         });
 
         it("unlinks Bungie.net with a post", async () => {

@@ -16,6 +16,7 @@ import fr.enimaloc.catapult.service.battlenet.BattleNetFriendService;
 import fr.enimaloc.catapult.service.battlenet.BattleNetGateService;
 import fr.enimaloc.catapult.service.blizzard.BlizzardImportRefusedException;
 import fr.enimaloc.catapult.service.bungie.BungieLinkService;
+import fr.enimaloc.catapult.service.osu.OsuLinkService;
 import fr.enimaloc.catapult.service.blizzard.BlizzardWowImportService;
 import fr.enimaloc.catapult.service.epic.EpicEnrollmentException;
 import fr.enimaloc.catapult.service.epic.EpicFriendService;
@@ -72,6 +73,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
     // Only present when battlenet.enabled.
     private final ObjectProvider<BlizzardWowImportService> wowImports;
     private final ObjectProvider<BungieLinkService> bungieLinks;
+    private final ObjectProvider<OsuLinkService> osuLinks;
 
     @Value("${app.owner-id:}")
     private String ownerId;
@@ -110,6 +112,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
                 case "battlenet-stats" -> handleBattleNetStatsConsent(userRequest);
                 case "epic" -> handleEpicLink(userRequest);
                 case "bungie" -> handleBungieLink(userRequest);
+                case "osu" -> handleOsuLink(userRequest);
                 default -> delegate.loadUser(userRequest);
             };
         } catch (OAuth2AuthenticationException e) {
@@ -208,6 +211,33 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
         } catch (RuntimeException e) {
             log.warn("World of Warcraft import failed for user {}: {}", user.getId(), e.getClass().getSimpleName());
             throw new OAuth2AuthenticationException(new OAuth2Error("battlenet_stats_failed"));
+        }
+        return existingUser;
+    }
+
+    /**
+     * The osu! link of a member already logged in with Twitch: the account the token reads ({@code GET /me}) is left
+     * as a pending link in the request; it is written by TwitchLoginSuccessHandler, the only one that gets the refresh
+     * token. Nothing is written here and no token reaches a log. Not transactional, see {@link #loadUser}.
+     */
+    private OAuth2User handleOsuLink(OAuth2UserRequest userRequest) {
+        Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
+        if (currentAuth == null || !(currentAuth.getPrincipal() instanceof CatapultOAuth2User existingUser)) {
+            log.error("OSU link without an authenticated Twitch session");
+            throw new OAuth2AuthenticationException(new OAuth2Error("unauthorized"));
+        }
+        OsuLinkService links = osuLinks.getIfAvailable();
+        if (links == null) {
+            throw new OAuth2AuthenticationException(new OAuth2Error("osu_unavailable"));
+        }
+        try {
+            OsuLinkService.PendingLink pending = links.check(userRequest.getAccessToken().getTokenValue());
+            if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes web) {
+                web.getRequest().setAttribute(OsuLinkService.PENDING_ATTRIBUTE, pending);
+            }
+        } catch (OsuLinkService.RefusedException e) {
+            log.warn("osu! link refused for user {}: {}", existingUser.getUserAccount().getId(), e.reason());
+            throw new OAuth2AuthenticationException(new OAuth2Error(e.reason().code()));
         }
         return existingUser;
     }

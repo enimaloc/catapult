@@ -469,6 +469,12 @@ public class RealApiService implements ApiService {
     }
 
     @Override
+    public int deleteOsuLink(String username) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/osu", id),
+                status -> status);
+    }
+
+    @Override
     public int refreshSteamProfileCache(String username) {
         return onChannel(username, id -> client.postVoid("/api/internal/users/{userId}/steam-profile/refresh", null, id),
                 status -> status);

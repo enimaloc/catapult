@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.FaceitData;
 import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
 import fr.enimaloc.catapult.common.dto.channel.RiotData;
+import fr.enimaloc.catapult.common.dto.channel.OsuAccountData;
 import fr.enimaloc.catapult.common.dto.channel.EpicData;
 import fr.enimaloc.catapult.common.dto.channel.MinecraftData;
 import fr.enimaloc.catapult.common.dto.channel.ObsData;
@@ -32,6 +33,7 @@ import fr.enimaloc.catapult.dto.integration.Message;
 import fr.enimaloc.catapult.dto.integration.SpaState;
 import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
 import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
+import fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -99,6 +101,9 @@ public final class IntegrationCards {
         }
         if (ch.chess() != null) {
             cards.add(chess(ch.chess()));
+        }
+        if (ch.osu() != null) {
+            cards.add(osu(ch.osu()));
         }
         if (ch.obs() != null) {
             cards.add(obs(ch.obs()));
@@ -675,6 +680,38 @@ public final class IntegrationCards {
                                 segmented(Attrs.id("faceit-delete-btn").withState(hasNameState),
                                         key(FACEIT_PREFIX + "delete")))),
                 new Text(Attrs.cls("faceit-help"), true, key(FACEIT_PREFIX + "help")));
+    }
+
+    // osu!: the owner's osu! link (profile and latest scores). Linking leaves for osu!'s login (catapult-api's
+    // /oauth2/authorization/osu), which sends the member back to this tab; it is only offered while the instance has an
+    // osu! application set (otherwise the login does not exist). A link osu! refused since asks to link again.
+    // OsuAccountChangedEvent flips everything. Never a token, never an internal id.
+
+    private static final String OSU_EVENT = "OsuAccountChangedEvent";
+    private static final String OSU_PREFIX = PREFIX + "osu.";
+
+    static IntegrationDto osu(OsuAccountData osu) {
+        OsuAccountChangedEvent now = OsuAccountChangedEvent.of(null, osu);
+        return card("osu",
+                new Chip(Attrs.cls("osu-connected-chip").withState(SpaState.flag("osuUsable", now.usable(),
+                        OSU_EVENT + ".usable")), CONNECTED),
+                new Chip(Attrs.cls("osu-not-connected-chip").withState(SpaState.flag("osuNotUsable",
+                        !now.usable(), OSU_EVENT + ".!usable")), NOT_CONNECTED),
+                new Chip(Attrs.cls("osu-account").withState(SpaState.flag("osuNamed", now.usable(),
+                        OSU_EVENT + ".usable").andSync("textContent", OSU_EVENT + ".account")),
+                        literal(now.account())),
+                new Text(Attrs.cls("osu-invalid").withState(SpaState.flag("osuInvalid", now.invalid(),
+                        OSU_EVENT + ".invalid")), true, key(OSU_PREFIX + "invalid")),
+                new Text(Attrs.cls("osu-unavailable").withState(SpaState.flag("osuUnavailable",
+                        !now.available(), OSU_EVENT + ".!available")), true, key(OSU_PREFIX + "unavailable")),
+                new Container(Attrs.id("osu-link-actions").withClass("card-actions"), Container.Kind.DIV, List.of(
+                        new Button(Attrs.id("osu-connect-btn").withState(SpaState.flag("osuCanLink",
+                                now.canLink(), OSU_EVENT + ".canLink")), Button.Kind.FILLED,
+                                key(OSU_PREFIX + "connect")),
+                        new Button(Attrs.id("osu-disconnect-btn").withState(SpaState.flag("osuLinked",
+                                now.linked(), OSU_EVENT + ".linked")), Button.Kind.TEXT,
+                                key(OSU_PREFIX + "disconnect")))),
+                new Text(Attrs.cls("osu-help"), true, key(OSU_PREFIX + "help")));
     }
 
     // Epic: one sub-view and button per status, driven by the status field of EpicLinkEvent, which carries NONE too.

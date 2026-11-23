@@ -37,6 +37,11 @@
             progress from those sites' public profiles; Chess.com's player id and Lichess's account id are kept
             next to them. They are read on demand and refreshed every 2 minutes at most (every 10 minutes for the
             Chess.com ratings); the last copy is kept until you remove the name or delete your account</li>
+        <li>osu! — your osu! user id, username and default game mode and the authorization osu! gives when you link
+            (its renewal token, stored encrypted and replaced each time it is used), kept until you unlink osu! or
+            delete your account. Your osu! profile (pp, ranks, accuracy, play count and time) and latest scores are
+            read on demand with that authorization, each refreshed every 2 minutes at most; the last copy is kept
+            until you unlink osu! or delete your account</li>
         <li>Error reports — when a page hits an error: your account id, the trail of your last actions
             (clicks, pages, requests) and a recording of the page, without what you type in fields,
             to reproduce the problem</li>

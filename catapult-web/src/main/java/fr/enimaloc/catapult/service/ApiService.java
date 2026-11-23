@@ -162,6 +162,8 @@ public interface ApiService {
      */
     int saveChessUsername(String username, String site, String name);
     int deleteChessUsername(String username, String site);
+    /** Unlinks the owner's osu! account and forgets their osu! stats. */
+    int deleteOsuLink(String username);
     int refreshSteamProfileCache(String username);
     LinkStateResponse minecraftStatus(String username);
     int minecraftEnroll(String username, String name);

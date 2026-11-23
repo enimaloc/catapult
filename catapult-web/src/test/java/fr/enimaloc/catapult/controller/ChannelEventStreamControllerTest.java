@@ -157,6 +157,22 @@ class ChannelEventStreamControllerTest {
     }
 
     @Test
+    void theOsuLinkGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent("enimaloc", true, true,
+                "Inspector4242", false, true, false);
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:OsuAccountChangedEvent",
+                "Inspector4242");
+        assertThat(moderator.getResponse().getContentAsString())
+                .doesNotContain("OsuAccountChangedEvent").doesNotContain("Inspector4242");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
+
+    @Test
     void theBungieLinkGoesToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
         MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
         MvcResult moderator = subscribe("enimaloc", member("a-moderator"));

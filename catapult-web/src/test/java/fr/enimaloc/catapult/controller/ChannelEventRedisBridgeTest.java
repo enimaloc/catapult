@@ -256,6 +256,16 @@ class ChannelEventRedisBridgeTest {
     }
 
     @Test
+    void bridgeRelaysOsuAccountChanged() {
+        var account = fr.enimaloc.catapult.common.dto.channel.OsuAccountData.unlinked(true);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.OSU_ACCOUNT_CHANGED,
+                new ChannelEvents.OsuAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent("streamer", false,
+                        false, "", false, true, true));
+    }
+
+    @Test
     void bridgeRelaysBungieAccountChanged() {
         var account = fr.enimaloc.catapult.common.dto.channel.BungieAccountData.unlinked(true);
 

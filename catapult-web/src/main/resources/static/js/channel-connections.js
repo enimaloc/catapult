@@ -117,9 +117,15 @@ window.CatapultConnections = (function () {
             "Bungie answered for another account than the one you signed in with: try again."],
         bungie_failed: ["labelBungieFailed", "Linking your Bungie.net account failed: try again later."],
         bungie_cancelled: ["labelBungieCancelled", "Bungie.net linking cancelled."],
+        // The osu! link (osu! card) too.
+        osu_unavailable: ["labelOsuUnavailable", "Linking osu! is not available for now: try again later."],
+        osu_mismatch: ["labelOsuMismatch",
+            "osu! answered for another account than the one you signed in with: try again."],
+        osu_failed: ["labelOsuFailed", "Linking your osu! account failed: try again later."],
+        osu_cancelled: ["labelOsuCancelled", "osu! linking cancelled."],
     };
     // What is not a failure: shown as a plain message, not an error.
-    const NEUTRAL_LINK_CODES = new Set(["battlenet_stats_cancelled", "bungie_cancelled"]);
+    const NEUTRAL_LINK_CODES = new Set(["battlenet_stats_cancelled", "bungie_cancelled", "osu_cancelled"]);
 
     // Tells a refused Epic login or World of Warcraft import once, or a finished import (?imported=wow): the code
     // leaves the address, so neither a reload nor binding again repeats it.
@@ -139,6 +145,10 @@ window.CatapultConnections = (function () {
             url.searchParams.delete("linked");
             history.replaceState(history.state, "", url);
             CatapultChannel.showMessage(pageLabel("labelBungieDone", "Bungie.net account linked."));
+        } else if (url.searchParams.get("linked") === "osu") {
+            url.searchParams.delete("linked");
+            history.replaceState(history.state, "", url);
+            CatapultChannel.showMessage(pageLabel("labelOsuDone", "osu! account linked."));
         } else if (url.searchParams.get("imported") === "wow-empty") {
             url.searchParams.delete("imported");
             history.replaceState(history.state, "", url);
@@ -315,6 +325,10 @@ window.CatapultConnections = (function () {
         // Bungie. Linking leaves for Bungie's login, which sends the member back to this tab.
         on("bungie-connect-btn", "click", () => location.assign("/oauth2/authorization/bungie"));
         on("bungie-disconnect-btn", "click", () => postJson(`${baseUrl}/settings/bungie/delete`, {}));
+
+        // osu!. Linking leaves for osu!'s login, which sends the member back to this tab.
+        on("osu-connect-btn", "click", () => location.assign("/oauth2/authorization/osu"));
+        on("osu-disconnect-btn", "click", () => postJson(`${baseUrl}/settings/osu/delete`, {}));
         localizeBlizzardImportDate();
 
         // OBS: connecting and disconnecting both save the whole form, only `enabled` differs.

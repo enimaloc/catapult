@@ -108,6 +108,7 @@ import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
 import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
 import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
 import fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent;
+import fr.enimaloc.catapult.event.osu.OsuAccountChangedEvent;
 import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
 import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
@@ -763,6 +764,15 @@ public class MockApiService implements ApiService {
         MockData data = currentData();
         change.accept(data);
         eventPublisher.publishEvent(ChessAccountChangedEvent.of(username, data.chessData()));
+        return NO_CONTENT;
+    }
+
+    @Override
+    public int deleteOsuLink(String username) {
+        log.trace("deleteOsuLink({})", username);
+        MockData data = currentData();
+        data.unlinkOsu();
+        eventPublisher.publishEvent(OsuAccountChangedEvent.of(username, data.osuData()));
         return NO_CONTENT;
     }
 
