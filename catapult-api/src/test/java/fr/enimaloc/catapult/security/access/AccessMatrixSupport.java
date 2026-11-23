@@ -205,6 +205,10 @@ abstract class AccessMatrixSupport {
     @MockitoBean
     fr.enimaloc.catapult.service.enrichment.rastats.RetroAchievementsClient retroAchievementsClient;
 
+    /** The chess settings check the Chess.com or Lichess name a member saves. */
+    @MockitoBean
+    fr.enimaloc.catapult.service.enrichment.chess.ChessClient chessClient;
+
     @Autowired
     MockMvc mvc;
 
