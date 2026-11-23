@@ -3,7 +3,6 @@ package fr.enimaloc.catapult.common.dto.channel;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
@@ -15,9 +14,7 @@ class ChannelPageDataConstructorsTest {
 
     @Test
     void everyConstructorBuildsAPage() throws Exception {
-        Constructor<?>[] constructors = Arrays.stream(ChannelPageData.class.getConstructors())
-                .filter(c -> Modifier.isPublic(c.getModifiers()))
-                .toArray(Constructor<?>[]::new);
+        Constructor<?>[] constructors = ChannelPageData.class.getConstructors();
         assertThat(constructors).hasSizeGreaterThan(1);
 
         for (Constructor<?> constructor : constructors) {
