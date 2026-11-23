@@ -7,6 +7,8 @@ import fr.enimaloc.catapult.domain.emergency.ProviderEmergencyStop;
 import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.service.ActivityLogService;
 import fr.enimaloc.catapult.service.account.BotToggleService;
+import fr.enimaloc.catapult.getter.DetectedGame;
+import fr.enimaloc.catapult.service.binding.ChannelDashboardActions;
 import fr.enimaloc.catapult.service.binding.GameStateService;
 import fr.enimaloc.catapult.service.twitch.TwitchChatService;
 import lombok.RequiredArgsConstructor;
@@ -16,16 +18,23 @@ import org.springframework.context.MessageSource;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 /**
- * Answers {@code off}, {@code on} and {@code emergency} when the system account is mentioned in a channel's chat. Only
+ * Answers {@code off}, {@code on}, {@code emergency} and {@code refresh} when the system account is mentioned in a channel's chat. Only
  * moderators, the broadcaster and the instance owner are heard; a disabled bot hears nothing but {@code on}. Not the
  * retired chat command system: the replies come from {@code bot.mention.*} messages, in French.
  */
@@ -48,6 +57,21 @@ public class SystemMentionCommands {
     private final TwitchChatService chat;
     private final MessageSource messages;
     private final EmergencyProperties properties;
+    private final ChannelDashboardActions dashboardActions;
+
+    /**
+     * Runs {@code refresh}: a detection cycle waits for the one in progress and calls the providers, so it must not
+     * hold the chat connection's thread. Replaced by a direct executor in the tests.
+     */
+    private Executor refreshExecutor = Executors.newVirtualThreadPerTaskExecutor();
+
+    /**
+     * A check holds the instance-wide detection lock: a channel gets at most one refresh per {@link #REFRESH_COOLDOWN},
+     * counted from when it was asked, so a burst of mentions cannot pile up checks that delay every other channel.
+     */
+    static final Duration REFRESH_COOLDOWN = Duration.ofSeconds(30);
+    private final Map<UUID, Instant> lastRefresh = new ConcurrentHashMap<>();
+    private Clock clock = Clock.systemUTC();
 
     @Value("${app.owner-id:}")
     private String ownerId;
@@ -74,6 +98,14 @@ public class SystemMentionCommands {
             case "off" -> off(current, sender);
             case "on" -> on(current, sender);
             case "emergency" -> emergency(current, sender, mention.args(), owner);
+            case "refresh" -> {
+                if (claimRefresh(current.getId())) {
+                    refreshExecutor.execute(() -> refresh(current, sender));
+                } else {
+                    log.debug("Refresh by {} ignored in {}: one was asked less than {} ago", sender.login(),
+                            current.getId(), REFRESH_COOLDOWN);
+                }
+            }
             default -> log.debug("Ignoring unknown mention command '{}' in {}", mention.command(), current.getId());
         }
     }
@@ -94,6 +126,45 @@ public class SystemMentionCommands {
         emergencyStopService.liftChannel(channel, sender.login());
         reply(channel, "bot.mention.on", sender.login());
         activityLog.addEntry(channel.getId(), "INFO", "Bot enabled from the chat by " + sender.login());
+    }
+
+    /** True, and the channel's cooldown started, when no refresh was asked there within the cooldown. */
+    private boolean claimRefresh(UUID channelId) {
+        Instant now = clock.instant();
+        Instant[] claimed = new Instant[1];
+        lastRefresh.compute(channelId, (id, last) -> {
+            if (last != null && last.plus(REFRESH_COOLDOWN).isAfter(now)) {
+                return last;
+            }
+            claimed[0] = now;
+            return now;
+        });
+        return claimed[0] != null;
+    }
+
+    /**
+     * Detects the game again as if it had just been picked up: the game remembered as current is forgotten, so the
+     * check that follows applies it (category, title, tags...) even when it did not change.
+     */
+    private void refresh(UserAccount channel, MentionSender sender) {
+        if (channel.getStatus() != UserAccount.Status.ACTIVE) {
+            reply(channel, "bot.mention.refresh.inactive");
+            return;
+        }
+        Optional<DetectedGame> game;
+        try {
+            gameStateService.forgetLastKnownGame(channel.getId());
+            dashboardActions.recheckGame(channel);
+            game = gameStateService.getLastKnownGame(channel);
+        } catch (RuntimeException e) {
+            log.error("Refresh asked by {} failed in the chat of {}", sender.login(), channel.getId(), e);
+            reply(channel, "bot.mention.refresh.error");
+            return;
+        }
+        activityLog.addEntry(channel.getId(), "INFO", "Game detection refreshed from the chat by " + sender.login());
+        game.map(DetectedGame::getSourceName).filter(name -> name != null && !name.isBlank()).ifPresentOrElse(
+                name -> reply(channel, "bot.mention.refresh.done", name),
+                () -> reply(channel, "bot.mention.refresh.none"));
     }
 
     private void emergency(UserAccount channel, MentionSender sender, List<String> args, boolean owner) {
