@@ -266,13 +266,13 @@ public class HttpFaceitClient implements FaceitClient {
         return false;
     }
 
-    /** Whether FACEIT's error shape carries {@code code}. */
-    private static boolean hasCode(JsonNode body, String code) {
+    /** Whether FACEIT's error shape carries the {@code expected} error code. */
+    private static boolean hasCode(JsonNode body, String expected) {
         if (body == null || !body.path("errors").isArray()) {
             return false;
         }
         for (JsonNode error : body.get("errors")) {
-            if (code.equals(text(error.path("code")))) {
+            if (expected.equals(text(error.path("code")))) {
                 return true;
             }
         }
