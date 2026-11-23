@@ -559,7 +559,7 @@ describe("channel-connections", () => {
             await click("#hypixel-save-btn");
 
             expect(snackbars()).toEqual([
-                "This name does not exist, or this account never joined Hypixel",
+                "This name does not exist, or this account never joined Hypixel.",
                 "Hypixel cannot be reached right now: try again later.",
             ]);
         });

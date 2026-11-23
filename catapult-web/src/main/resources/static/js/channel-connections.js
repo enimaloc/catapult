@@ -276,7 +276,7 @@ window.CatapultConnections = (function () {
         on("hypixel-save-btn", "click", async () => {
             const input = document.getElementById("hypixel-player-input");
             await saveSpeedrun(`${baseUrl}/settings/hypixel/account`, { player: input.value.trim() }, input,
-                ["labelHypixelRefused", "This name does not exist, or this account never joined Hypixel"],
+                ["labelHypixelRefused", "This name does not exist, or this account never joined Hypixel."],
                 ["labelHypixelUnavailable", "Hypixel cannot be reached right now: try again later."]);
         });
         on("hypixel-delete-btn", "click", () => postJson(`${baseUrl}/settings/hypixel/account/delete`, {}));
