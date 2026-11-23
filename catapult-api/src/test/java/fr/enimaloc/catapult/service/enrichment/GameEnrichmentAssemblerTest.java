@@ -120,6 +120,8 @@ class GameEnrichmentAssemblerTest {
     private final XboxStatsService xboxStats = mock(XboxStatsService.class);
     private final RetroAchievementsStatsService raStats = mock(RetroAchievementsStatsService.class);
     private final BlizzardStatsService blizzardStats = mock(BlizzardStatsService.class);
+    private final fr.enimaloc.catapult.service.enrichment.chess.ChessStatsService chessStats =
+            mock(fr.enimaloc.catapult.service.enrichment.chess.ChessStatsService.class);
     private final BlizzardGameDataService blizzardData = mock(BlizzardGameDataService.class);
     private final fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService bungieStats =
             mock(fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService.class);
@@ -141,7 +143,7 @@ class GameEnrichmentAssemblerTest {
                 twitch, speedrunGames, speedrunIdentity, speedrunPersonal, igdbService, igdbGameDetailsService,
                 trailers, steamStats, xboxStats, raStats, blizzardStats, blizzardData, bungieStats, bungieData,
                 riotStats, riotData, faceitStats,
-                properties);
+                properties, chessStats);
         when(hltb.timeToBeat(any(), any())).thenReturn(Optional.of(TTB));
         when(protonDb.summary(anyString(), any())).thenReturn(Optional.of(PROTON));
         when(steamGridDb.bySteamAppId(anyString(), any())).thenReturn(Optional.of(SGDB));
@@ -389,6 +391,7 @@ class GameEnrichmentAssemblerTest {
                 .withBean(fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService.class, () -> riotStats)
                 .withBean(fr.enimaloc.catapult.service.enrichment.riot.RiotGameDataService.class, () -> riotData)
                 .withBean(FaceitStatsService.class, () -> faceitStats)
+                .withBean(fr.enimaloc.catapult.service.enrichment.chess.ChessStatsService.class, () -> chessStats)
                 .withBean(EnrichmentProperties.class)
                 .withUserConfiguration(GameEnrichmentAssembler.class)
                 .run(ctx -> assertThat(ctx).hasSingleBean(GameEnrichmentAssembler.class));
@@ -755,6 +758,64 @@ class GameEnrichmentAssemblerTest {
 
         assertThat(stats.blizzard()).isEqualTo(WOW_STATS);
         verifyNoInteractions(blizzardData);
+    }
+
+    // ---------------------------------------------------------------- chess
+
+    private static final DetectedGame CHESS = new DetectedGame(null, GameBinding.SourceType.MANUAL, "Chess");
+    private static final fr.enimaloc.catapult.service.enrichment.chess.ChessStats CHESS_STATS =
+            new fr.enimaloc.catapult.service.enrichment.chess.ChessStats(Status.OK, "chess", "hikaru", null, null,
+                    null);
+
+    @Test
+    void publicAggregateHasNoChessStats() {
+        GameEnrichment result = assembler.enrich(CHESS, Optional.empty(), Optional.empty(), "Chess", "FR", null,
+                LINKS, Optional.empty(), Locale.ENGLISH);
+
+        assertThat(result.stats()).isNull();
+        verifyNoInteractions(chessStats);
+    }
+
+    @Test
+    void memberChessStatsAreInTheStats() {
+        UserAccount user = member();
+        when(chessStats.forDetected(eq(user), eq(CHESS), eq((String) null), any()))
+                .thenReturn(Optional.of(CHESS_STATS));
+
+        GameEnrichment result = assembler.enrich(CHESS, Optional.empty(), Optional.empty(), "Chess", "FR", null,
+                LINKS, Optional.of(user), Locale.ENGLISH);
+
+        assertThat(result.stats().chess()).isEqualTo(CHESS_STATS);
+        verify(chessStats).forDetected(user, CHESS, null, FetchBudget.UNLIMITED);
+    }
+
+    @Test
+    void slowChessDoesNotBlockOthers() {
+        properties.setAggregateTimeout(Duration.ofMillis(500));
+        UserAccount user = member();
+        statsEverywhere(user);
+        when(chessStats.forDetected(any(), any(), any(), any()))
+                .thenAnswer(slow(Duration.ofSeconds(3), Optional.of(CHESS_STATS)));
+
+        long start = System.nanoTime();
+        GameEnrichment result = assembler.enrich(PORTAL, Optional.of("72"), Optional.of("620"), "Portal 2", "FR",
+                null, LINKS, Optional.of(user), Locale.ENGLISH);
+        Duration took = Duration.ofNanos(System.nanoTime() - start);
+
+        assertThat(result.stats().chess()).isNull();
+        assertThat(result.stats().steam()).isEqualTo(STEAM_OK);
+        assertThat(took).isLessThan(Duration.ofMillis(1500));
+    }
+
+    @Test
+    void personalStatsAlone_includeChess() {
+        UserAccount user = member();
+        when(chessStats.forDetected(eq(user), eq(CHESS), any(), any())).thenReturn(Optional.of(CHESS_STATS));
+
+        PersonalStatsEnrichment stats = assembler.personalStats(CHESS, Optional.empty(), Optional.empty(), "Chess",
+                user, Locale.ENGLISH);
+
+        assertThat(stats.chess()).isEqualTo(CHESS_STATS);
     }
 
     private static Answer<Object> slow(Duration delay, Object value) {

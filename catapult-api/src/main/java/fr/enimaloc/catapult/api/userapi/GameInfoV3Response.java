@@ -14,6 +14,7 @@ import fr.enimaloc.catapult.service.enrichment.bungie.BungieStats;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotPublisher;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotStats;
 import fr.enimaloc.catapult.service.enrichment.faceit.FaceitStats;
+import fr.enimaloc.catapult.service.enrichment.chess.ChessStats;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.pcgw.PcGamingWikiPage;
@@ -309,31 +310,38 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
     }
 
     /**
-     * The member's own stats on the game: Steam, Xbox, RetroAchievements, Blizzard and FACEIT, each null when it does not
-     * apply, each with a {@code status} ({@code ok}, {@code private}, {@code not_owned}, {@code no_achievements},
+     * The member's own stats on the game: Steam, Xbox, RetroAchievements, Blizzard, Bungie, Riot, FACEIT and chess,
+     * each null when it does not apply, each with a {@code status} ({@code ok}, {@code private}, {@code not_owned}, {@code no_achievements},
      * {@code not_found}, {@code unsupported}, {@code unavailable}) and a "more" link to its detail route. Personal
      * data.
      */
     public record StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
                               @JsonIgnore GameBinding.SourceType detectedOn, BungieStats bungie, RiotStats riot,
-                              FaceitStats faceit) {
+                              FaceitStats faceit, ChessStats chess) {
 
         /** Without the Bungie, Riot and FACEIT stats. */
         public StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
                            GameBinding.SourceType detectedOn) {
-            this(steam, xbox, retroachievements, blizzard, detectedOn, null, null, null);
+            this(steam, xbox, retroachievements, blizzard, detectedOn, null, null, null, null);
         }
 
         /** Without the Riot and FACEIT stats. */
         public StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
                            GameBinding.SourceType detectedOn, BungieStats bungie) {
-            this(steam, xbox, retroachievements, blizzard, detectedOn, bungie, null, null);
+            this(steam, xbox, retroachievements, blizzard, detectedOn, bungie, null, null, null);
         }
 
         /** Without the FACEIT stats. */
         public StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
                            GameBinding.SourceType detectedOn, BungieStats bungie, RiotStats riot) {
-            this(steam, xbox, retroachievements, blizzard, detectedOn, bungie, riot, null);
+            this(steam, xbox, retroachievements, blizzard, detectedOn, bungie, riot, null, null);
+        }
+
+        /** Without the chess stats. */
+        public StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
+                           GameBinding.SourceType detectedOn, BungieStats bungie, RiotStats riot,
+                           FaceitStats faceit) {
+            this(steam, xbox, retroachievements, blizzard, detectedOn, bungie, riot, faceit, null);
         }
 
         static StatsObject of(PersonalStatsEnrichment s, MoreLinks links) {
@@ -342,7 +350,8 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
             }
             return new StatsObject(SteamStats.of(s.steam(), links), XboxStats.of(s.xbox(), links),
                     RaStats.of(s.retroachievements(), links), blizzardStats(s.blizzard(), links), s.detectedOn(),
-                    bungieStats(s.bungie(), links), riotStats(s.riot(), links), faceitStats(s.faceit(), links));
+                    bungieStats(s.bungie(), links), riotStats(s.riot(), links), faceitStats(s.faceit(), links),
+                    chessStats(s.chess(), links));
         }
 
         List<PlatformObject> platforms() {
@@ -441,6 +450,14 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
         }
         return s.withMore(s.game() == null ? null
                 : links.toMe(ApiV2.ME_STATS_PATH + "/faceit/" + s.game().faceitId()));
+    }
+
+    /**
+     * The member's chess stats with the "more" link to {@code /api/me/stats/chess}: the aggregate and the detail
+     * route serve this same record.
+     */
+    static ChessStats chessStats(ChessStats s, MoreLinks links) {
+        return s == null ? null : s.withMore(links.toMe(ApiV2.ME_STATS_PATH + "/chess"));
     }
 
     /**

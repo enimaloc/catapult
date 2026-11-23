@@ -308,6 +308,12 @@ describe("channel-connections", () => {
               <select id="riot-platform-select"><option value="euw1">EUW1</option><option value="na1">NA1</option></select>
               <button id="riot-save-btn"></button>
               <button id="riot-delete-btn"></button>
+              <input id="chess-chesscom-username-input" value="  Hikaru ">
+              <button id="chess-chesscom-save-btn"></button>
+              <button id="chess-chesscom-delete-btn"></button>
+              <input id="chess-lichess-username-input" value="DrNykterstein">
+              <button id="chess-lichess-save-btn"></button>
+              <button id="chess-lichess-delete-btn"></button>
               <select id="blizzard-region-select"><option value="eu">EU</option><option value="us">US</option></select>
               <select id="blizzard-main-select"><option value="eu:1001">Thrall</option><option value="us:77">Jaina</option></select>
               <button id="blizzard-forget-btn"></button>
@@ -577,6 +583,56 @@ describe("channel-connections", () => {
 
             expect(snackbars()).toEqual(["Injoignable"]);
             delete document.body.dataset.labelRetroachievementsUnavailable;
+        });
+    });
+
+    describe("the chess accounts", () => {
+        const snackbars = () => Array.from(document.querySelectorAll("mdui-snackbar"), s => s.textContent);
+
+        it("saves each trimmed name and removes it with posts", async () => {
+            await click("#chess-chesscom-save-btn");
+            await click("#chess-lichess-save-btn");
+            await click("#chess-chesscom-delete-btn");
+            await click("#chess-lichess-delete-btn");
+
+            expect(posts()).toEqual([
+                ["/channel/enimaloc/settings/chess/chesscom", { username: "Hikaru" }],
+                ["/channel/enimaloc/settings/chess/lichess", { username: "DrNykterstein" }],
+                ["/channel/enimaloc/settings/chess/chesscom/delete", {}],
+                ["/channel/enimaloc/settings/chess/lichess/delete", {}],
+            ]);
+            expect(snackbars()).toEqual([]);
+        });
+
+        it("sends nothing for an empty field", async () => {
+            document.getElementById("chess-lichess-username-input").value = "  ";
+            await click("#chess-lichess-save-btn");
+
+            expect(posts()).toEqual([]);
+        });
+
+        it("tells a name a site refuses, and that it cannot be reached", async () => {
+            posted.mockResolvedValueOnce(response(400));
+            await click("#chess-chesscom-save-btn");
+            posted.mockResolvedValueOnce(response(400));
+            await click("#chess-lichess-save-btn");
+            posted.mockResolvedValueOnce(response(503));
+            await click("#chess-lichess-save-btn");
+
+            expect(snackbars()).toEqual([
+                "Chess.com does not know this username",
+                "Lichess does not know this username, or the account is closed",
+                "Chess.com or Lichess cannot be reached right now: try again later.",
+            ]);
+        });
+
+        it("speaks the page's language", async () => {
+            document.body.dataset.labelChessRefusedChesscom = "Nom inconnu";
+            posted.mockResolvedValueOnce(response(400));
+            await click("#chess-chesscom-save-btn");
+
+            expect(snackbars()).toEqual(["Nom inconnu"]);
+            delete document.body.dataset.labelChessRefusedChesscom;
         });
     });
 

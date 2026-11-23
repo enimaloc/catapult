@@ -513,6 +513,25 @@ class MockApiServiceTest {
     }
 
     @Test
+    void chessAccounts_followTheSettingsAndTellThePage() {
+        assertThat(data.chessData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.ChessData(null, null));
+
+        assertThat(service.saveChessUsername(username, "chesscom", " Hikaru ")).isEqualTo(204);
+        assertThat(service.saveChessUsername(username, "lichess", "DrNykterstein")).isEqualTo(204);
+        assertThat(service.saveChessUsername(username, "lichess", "gone")).isEqualTo(400);
+        assertThat(data.chessData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.ChessData("hikaru", "DrNykterstein"));
+
+        assertThat(service.deleteChessUsername(username, "chesscom")).isEqualTo(204);
+        assertThat(data.chessData().chesscomUsername()).isNull();
+        assertThat(data.chessData().lichessUsername()).isEqualTo("DrNykterstein");
+
+        assertThat(events).hasSize(3).allSatisfy(event -> assertThat(event)
+                .isInstanceOf(fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent.class));
+        assertThat(events.getLast()).isEqualTo(new fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent(
+                username, null, "DrNykterstein"));
+    }
+
+    @Test
     void blizzardSettings_followTheChoicesAndTellThePage() {
         assertThat(data.blizzardStatsData().region()).isEqualTo("eu");
         assertThat(data.blizzardStatsData().characters()).hasSize(2);

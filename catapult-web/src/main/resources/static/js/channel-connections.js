@@ -280,6 +280,21 @@ window.CatapultConnections = (function () {
                 ["labelFaceitUnavailable", "FACEIT cannot be reached right now: try again later."]);
         });
         on("faceit-delete-btn", "click", () => postJson(`${baseUrl}/settings/faceit/nickname/delete`, {}));
+        // Chess: a Chess.com and a Lichess name, each checked with its site on saving.
+        const chessUnavailable = ["labelChessUnavailable",
+            "Chess.com or Lichess cannot be reached right now: try again later."];
+        const chessRefused = {
+            chesscom: ["labelChessRefusedChesscom", "Chess.com does not know this username"],
+            lichess: ["labelChessRefusedLichess", "Lichess does not know this username, or the account is closed"],
+        };
+        for (const site of ["chesscom", "lichess"]) {
+            on(`chess-${site}-save-btn`, "click", () => {
+                const input = document.getElementById(`chess-${site}-username-input`);
+                return saveSpeedrun(`${baseUrl}/settings/chess/${site}`, { username: input.value.trim() }, input,
+                    chessRefused[site], chessUnavailable);
+            });
+            on(`chess-${site}-delete-btn`, "click", () => postJson(`${baseUrl}/settings/chess/${site}/delete`, {}));
+        }
 
         // Blizzard stats: the region and the main are saved as picked; importing leaves for Blizzard's login (which
         // sends the member back to this tab with ?imported=wow, or the reason it failed). The card follows from the

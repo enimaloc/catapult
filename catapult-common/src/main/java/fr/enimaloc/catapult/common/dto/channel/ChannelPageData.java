@@ -49,8 +49,26 @@ public record ChannelPageData(
         /** The owner's Riot settings; null for anyone else. The Riot ID and platform only. */
         RiotData riot,
         /** The owner's FACEIT settings; null for anyone else. The nickname only. */
-        FaceitData faceit
+        FaceitData faceit,
+        /** The owner's chess accounts (Chess.com, Lichess); null for anyone else. Names only. */
+        ChessData chess
 ) {
+    /** A page without the chess accounts. */
+    public ChannelPageData(ChannelUserDto channelUser, String channelUsername, boolean isOwner, boolean isLive,
+                           boolean botEnabled, GameDto currentGame, PagedBindings bindings, List<CclDto> availableCcls,
+                           Set<String> blockedCcls, List<TwDto> availableTws, Set<String> blockedTws,
+                           String filterStatus, String filterSource, SteamData steam, XboxData xbox,
+                           MinecraftData minecraft, BattleNetData battleNet, ObsData obs, TwitchatData twitchat,
+                           CustomBindingsStateDto customBindings, Map<String, DropDto> drops, AnkamaData ankama,
+                           EpicData epic, SpeedrunData speedrun, RetroAchievementsData retroAchievements,
+                           BlizzardStatsData blizzardStats, BungieAccountData bungie, RiotData riot,
+                           FaceitData faceit) {
+        this(channelUser, channelUsername, isOwner, isLive, botEnabled, currentGame, bindings, availableCcls,
+                blockedCcls, availableTws, blockedTws, filterStatus, filterSource, steam, xbox, minecraft, battleNet,
+                obs, twitchat, customBindings, drops, ankama, epic, speedrun, retroAchievements, blizzardStats, bungie,
+                riot, faceit, null);
+    }
+
     /** A page without the FACEIT settings. */
     public ChannelPageData(ChannelUserDto channelUser, String channelUsername, boolean isOwner, boolean isLive,
                            boolean botEnabled, GameDto currentGame, PagedBindings bindings, List<CclDto> availableCcls,
@@ -63,7 +81,7 @@ public record ChannelPageData(
         this(channelUser, channelUsername, isOwner, isLive, botEnabled, currentGame, bindings, availableCcls,
                 blockedCcls, availableTws, blockedTws, filterStatus, filterSource, steam, xbox, minecraft, battleNet,
                 obs, twitchat, customBindings, drops, ankama, epic, speedrun, retroAchievements, blizzardStats, bungie,
-                riot, null);
+                riot, null, null);
     }
 
     /** A page without the Riot settings. */

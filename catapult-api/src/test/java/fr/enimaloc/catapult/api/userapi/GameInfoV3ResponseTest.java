@@ -520,6 +520,26 @@ class GameInfoV3ResponseTest {
     }
 
     @Test
+    void chessStatsCarryTheirMoreLinkAndNoDetailField() {
+        var chesscom = new fr.enimaloc.catapult.service.enrichment.chess.ChessStats.Chesscom(Status.OK, "hikaru",
+                "https://www.chess.com/member/hikaru", Map.of(), null, 2, 1, null);
+        var chess = new fr.enimaloc.catapult.service.enrichment.chess.ChessStats(Status.OK, "chess", "hikaru",
+                chesscom, null, null);
+        PersonalStatsEnrichment stats = PersonalStatsEnrichment.of(null, null, null, null,
+                GameBinding.SourceType.MANUAL, chess);
+        GameEnrichment enrichment = new GameEnrichment(null, null, null, null, null, null, null, null, null, null,
+                null, stats, null);
+
+        JsonNode node = MAPPER.readTree(MAPPER.writeValueAsString(GameInfoV3Response.of(BASE_V2, enrichment, LINKS,
+                Optional.empty()))).path("stats").path("chess");
+
+        assertThat(node.path("game").asString()).isEqualTo("chess");
+        assertThat(node.path("chesscom").path("dailyGames").asInt()).isEqualTo(2);
+        assertThat(node.path("chesscom").has("games")).isFalse();
+        assertThat(node.path("more").asString()).isEqualTo(BASE + "/api/me/stats/chess?version=3");
+    }
+
+    @Test
     void notFoundSerializesInStats() {
         BlizzardStats.WowStats notFound = new BlizzardStats.WowStats(Status.NOT_FOUND, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null, null);

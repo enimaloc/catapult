@@ -21,6 +21,7 @@ import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.FaceitNicknameRequest;
 import fr.enimaloc.catapult.common.dto.channel.RiotAccountRequest;
+import fr.enimaloc.catapult.common.dto.channel.ChessUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
@@ -234,6 +235,20 @@ public class ChannelActionsController {
     @PostMapping("/channel/{username}/settings/riot/account/delete")
     public ResponseEntity<Void> deleteRiotAccount(@PathVariable String username) {
         return ApiStatus.answer(apiService.deleteRiotAccount(username));
+    }
+
+    // The member's chess accounts (Chess.com, Lichess), answered like RetroAchievements': 400 for a name the site does
+    // not know, 503 when it cannot be asked. Only these two sites are relayed.
+
+    @PostMapping("/channel/{username}/settings/chess/{site:chesscom|lichess}")
+    public ResponseEntity<Void> saveChessUsername(@PathVariable String username, @PathVariable String site,
+                                                  @RequestBody ChessUsernameRequest body) {
+        return ApiStatus.answer(apiService.saveChessUsername(username, site, body.username()));
+    }
+
+    @PostMapping("/channel/{username}/settings/chess/{site:chesscom|lichess}/delete")
+    public ResponseEntity<Void> deleteChessUsername(@PathVariable String username, @PathVariable String site) {
+        return ApiStatus.answer(apiService.deleteChessUsername(username, site));
     }
 
     // The member's Blizzard settings: 400 for an unknown region or a character that is not an imported one, 404 without a

@@ -126,6 +126,7 @@ import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.FaceitNicknameRequest;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.RiotAccountRequest;
+import fr.enimaloc.catapult.common.dto.channel.ChessUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardRegionRequest;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardWowMainRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
@@ -426,6 +427,21 @@ public class RealApiService implements ApiService {
     public int deleteRetroAchievementsApiKey(String username) {
         return onChannel(username, id -> client.delete(
                 "/api/internal/users/{userId}/settings/retroachievements/api-key", id), status -> status);
+    }
+
+    @Override
+    public int saveChessUsername(String username, String site, String name) {
+        ChessUsernameRequest body = new ChessUsernameRequest(name);
+        return onChannel(username, id -> "lichess".equals(site)
+                ? client.putVoid("/api/internal/users/{userId}/settings/chess/lichess", body, id)
+                : client.putVoid("/api/internal/users/{userId}/settings/chess/chesscom", body, id), status -> status);
+    }
+
+    @Override
+    public int deleteChessUsername(String username, String site) {
+        return onChannel(username, id -> "lichess".equals(site)
+                ? client.delete("/api/internal/users/{userId}/settings/chess/lichess", id)
+                : client.delete("/api/internal/users/{userId}/settings/chess/chesscom", id), status -> status);
     }
 
     @Override

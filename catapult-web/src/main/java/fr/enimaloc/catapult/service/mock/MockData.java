@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.HashMap;
 import fr.enimaloc.catapult.common.dto.channel.DropDto;
+import fr.enimaloc.catapult.common.dto.channel.ChessData;
 import fr.enimaloc.catapult.common.dto.channel.BindingDto;
 import fr.enimaloc.catapult.common.dto.admin.AdminMemberDto;
 import fr.enimaloc.catapult.common.dto.channel.ChannelDto;
@@ -140,6 +141,9 @@ public class MockData {
     /** The Riot ID the mock session declared ({@code gameName#tagLine}), and its platform. */
     private String riotId;
     private String riotPlatform;
+    /** The chess card too: the Chess.com and the Lichess names declared. */
+    private String chesscomUsername;
+    private String lichessUsername;
     /** The Blizzard card too: a region and two imported World of Warcraft characters, the first the main. */
     static final List<String> BLIZZARD_REGIONS = List.of("eu", "us", "kr", "tw");
     private static final List<BlizzardStatsData.WowCharacterOption> MOCK_WOW_CHARACTERS = List.of(
@@ -397,7 +401,7 @@ public class MockData {
                 // drops: the mock has no experiments, they are offered
                 drops(), ankamaData(), epicData(), speedrunData(), retroAchievementsData(), blizzardStatsData(),
                 bungieData(),
-                riotData(), faceitData());
+                riotData(), faceitData(), chessData());
     }
 
     /** The mock's one running drops campaign, on the first binding's category. */
@@ -507,6 +511,27 @@ public class MockData {
 
     public void deleteFaceitNickname() {
         faceitNickname = null;
+    }
+
+    public ChessData chessData() {
+        return new ChessData(chesscomUsername, lichessUsername);
+    }
+
+    /** Declares {@code name} on {@code site} ({@code chesscom}, lowercased as Chess.com does, or {@code lichess}). */
+    public void saveChessUsername(String site, String name) {
+        if ("chesscom".equals(site)) {
+            chesscomUsername = name.toLowerCase(java.util.Locale.ROOT);
+        } else {
+            lichessUsername = name;
+        }
+    }
+
+    public void deleteChessUsername(String site) {
+        if ("chesscom".equals(site)) {
+            chesscomUsername = null;
+        } else {
+            lichessUsername = null;
+        }
     }
 
     public RetroAchievementsData retroAchievementsData() {

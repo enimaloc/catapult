@@ -18,6 +18,7 @@ import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
 import fr.enimaloc.catapult.api.error.ApiProblem;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardRegionRequest;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardWowMainRequest;
+import fr.enimaloc.catapult.common.dto.channel.ChessUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
@@ -51,6 +52,7 @@ import fr.enimaloc.catapult.service.riot.RiotAccountService;
 import fr.enimaloc.catapult.common.dto.channel.RiotAccountRequest;
 import fr.enimaloc.catapult.service.faceit.FaceitAccountService;
 import fr.enimaloc.catapult.common.dto.channel.FaceitNicknameRequest;
+import fr.enimaloc.catapult.service.chess.ChessAccountService;
 import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardRegion;
 import fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService;
 import fr.enimaloc.catapult.service.steam.SteamPersonalTokenService;
@@ -108,6 +110,7 @@ public class ApiChannelActionsController {
     private final fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinkService;
     private final RiotAccountService riotAccountService;
     private final FaceitAccountService faceitAccountService;
+    private final ChessAccountService chessAccountService;
 
 
     // ── Binding actions ───────────────────────────────────────────────────────
@@ -569,6 +572,52 @@ public class ApiChannelActionsController {
             @PathVariable UUID userId) {
 
         retroAchievementsAccountService.deleteApiKey(userResolver.user(userId));
+    }
+
+    /**
+     * 400 when Chess.com does not know the name (or the account is closed), 429 when the member's refreshes
+     * are spent, 503 when it cannot be asked.
+     */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/chess/chesscom")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveChesscomUsername(
+            @PathVariable UUID userId,
+            @RequestBody ChessUsernameRequest body) {
+
+        chessAccountService.saveChesscom(userResolver.user(userId), body.username());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/chess/chesscom")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteChesscomUsername(
+            @PathVariable UUID userId) {
+
+        chessAccountService.deleteChesscom(userResolver.user(userId));
+    }
+
+    /**
+     * 400 when Lichess does not know the name (or the account is closed), 429 when the member's refreshes
+     * are spent, 503 when it cannot be asked.
+     */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/chess/lichess")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveLichessUsername(
+            @PathVariable UUID userId,
+            @RequestBody ChessUsernameRequest body) {
+
+        chessAccountService.saveLichess(userResolver.user(userId), body.username());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/chess/lichess")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteLichessUsername(
+            @PathVariable UUID userId) {
+
+        chessAccountService.deleteLichess(userResolver.user(userId));
     }
 
     @PreAuthorize("@authz.ownsChannel(#userId)")

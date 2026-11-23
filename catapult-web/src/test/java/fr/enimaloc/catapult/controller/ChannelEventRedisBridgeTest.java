@@ -275,6 +275,21 @@ class ChannelEventRedisBridgeTest {
     }
 
     @Test
+    void bridgeRelaysChessAccountChanged() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.ChessData("hikaru", "DrNykterstein");
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CHESS_ACCOUNT_CHANGED,
+                new ChannelEvents.ChessAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.chess.ChessAccountChangedEvent("streamer", "hikaru", "DrNykterstein"));
+    }
+
+    @Test
+    void bridgeDropsAChessEventWithoutItsData() {
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.CHESS_ACCOUNT_CHANGED,
+                new ChannelEvents.ChessAccountChanged(owner.toString(), "streamer", null)))).isEmpty();
+    }
+
+    @Test
     void bridgeDropsABlizzardEventWithoutItsData() {
         assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.BLIZZARD_ACCOUNT_CHANGED,
                 new ChannelEvents.BlizzardAccountChanged(owner.toString(), "streamer", null)))).isEmpty();

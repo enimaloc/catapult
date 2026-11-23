@@ -4,7 +4,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import fr.enimaloc.catapult.domain.binding.GameBinding.SourceType;
 import fr.enimaloc.catapult.getter.DetectedGame;
 
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 /** Tells which publisher game a detected game is. */
 public final class PublisherGames {
@@ -121,5 +123,21 @@ public final class PublisherGames {
             return Optional.of(RiotGame.VALORANT);
         }
         return Optional.empty();
+    }
+
+    /** The IGDB ids of the chess sites, checked on IGDB on 2026-11-23: Chess.com, Lichess. */
+    private static final Set<String> CHESS_IGDB_IDS = Set.of("121957", "122008");
+    /**
+     * The detected names that are chess: the Twitch category "Chess" (it has no IGDB id) and the two sites' names.
+     */
+    private static final Set<String> CHESS_NAMES = Set.of("chess", "chess.com", "lichess", "lichess.org");
+
+    /** Whether a detected game is chess: by the sites' IGDB ids, else by the detected name. */
+    public static boolean chess(DetectedGame game, String igdbId) {
+        if (igdbId != null && CHESS_IGDB_IDS.contains(igdbId)) {
+            return true;
+        }
+        return game != null && game.getSourceName() != null
+                && CHESS_NAMES.contains(game.getSourceName().strip().toLowerCase(Locale.ROOT));
     }
 }

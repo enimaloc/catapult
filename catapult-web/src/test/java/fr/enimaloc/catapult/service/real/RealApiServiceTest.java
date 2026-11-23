@@ -831,6 +831,15 @@ class RealApiServiceTest {
     }
 
     @Test
+    void chessNames_areSavedAndRemovedOnTheChannel() {
+        expectPut(channel("enimaloc") + "/settings/chess/lichess", "{\"username\":\"DrNykterstein\"}");
+        expectDelete(channel("enimaloc") + "/settings/chess/chesscom");
+
+        assertThat(service.saveChessUsername("enimaloc", "lichess", "DrNykterstein")).isEqualTo(204);
+        assertThat(service.deleteChessUsername("enimaloc", "chesscom")).isEqualTo(204);
+    }
+
+    @Test
     void blizzardSettings_areSavedAndForgottenOnTheChannel() {
         expectPut(channel("enimaloc") + "/settings/blizzard/region", "{\"region\":\"us\"}");
         expectPut(channel("enimaloc") + "/settings/blizzard/wow-main", "{\"region\":\"eu\",\"characterId\":1001}");

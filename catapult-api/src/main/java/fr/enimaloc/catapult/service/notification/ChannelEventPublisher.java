@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
 import fr.enimaloc.catapult.common.dto.channel.RiotData;
 import fr.enimaloc.catapult.common.dto.channel.FaceitData;
+import fr.enimaloc.catapult.common.dto.channel.ChessData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
@@ -187,6 +188,12 @@ public class ChannelEventPublisher {
     public void retroAchievementsAccountChanged(UUID channelOwnerId, RetroAchievementsData account) {
         publish(channelOwnerId, ChannelEvents.RETROACHIEVEMENTS_ACCOUNT_CHANGED,
                 (id, login) -> new ChannelEvents.RetroAchievementsAccountChanged(id, login, account));
+    }
+
+    /** The owner's chess accounts now stand as {@code account} (names only). */
+    public void chessAccountChanged(UUID channelOwnerId, ChessData account) {
+        publish(channelOwnerId, ChannelEvents.CHESS_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.ChessAccountChanged(id, login, account));
     }
 
     /** The channel's active custom binding is now {@code activeId}; null once deactivated. */

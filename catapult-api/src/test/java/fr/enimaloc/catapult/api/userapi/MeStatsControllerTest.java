@@ -89,6 +89,7 @@ class MeStatsControllerTest {
     @MockitoBean fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService bungieStats;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService riotStats;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.faceit.FaceitStatsService faceitStats;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.chess.ChessStatsService chessStats;
 
     private UserAccount user;
     private boolean budgetLeft = true;
@@ -273,6 +274,52 @@ class MeStatsControllerTest {
     void withoutToken_401() throws Exception {
         mvc.perform(get(STATS + "/steam/440").header("X-API-Version", "3"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    // ---------------------------------------------------------------- Chess
+
+    @Test
+    void chessDetailIsTheSameProjectionWithTheDailyGames() throws Exception {
+        var game = new fr.enimaloc.catapult.service.enrichment.chess.ChesscomDailyGame(
+                "https://www.chess.com/game/daily/1", "black", "rival", true, null, "chess");
+        var chesscom = new fr.enimaloc.catapult.service.enrichment.chess.ChessStats.Chesscom(Status.OK, "hikaru",
+                "https://www.chess.com/member/hikaru", Map.of("blitz",
+                new fr.enimaloc.catapult.service.enrichment.chess.ChessRating(3449, 30, null, null, 3503, 10, 5, 3,
+                        2, null)), 2814, 1, 1, List.of(game));
+        when(chessStats.forMember(eq(user), any(), eq(true))).thenReturn(Optional.of(
+                new fr.enimaloc.catapult.service.enrichment.chess.ChessStats(Status.OK, "chess", "hikaru", chesscom,
+                        null, null)));
+
+        mvc.perform(v3(get(STATS + "/chess")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ok"))
+                .andExpect(jsonPath("$.game").value("chess"))
+                .andExpect(jsonPath("$.account").value("hikaru"))
+                .andExpect(jsonPath("$.chesscom.ratings.blitz.rating").value(3449))
+                .andExpect(jsonPath("$.chesscom.games[0].opponent").value("rival"))
+                .andExpect(jsonPath("$.lichess").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.more").value("http://localhost/api/me/stats/chess?version=3"));
+        org.assertj.core.api.Assertions.assertThat(MeStatsController.class.getMethod("chess", UUID.class)
+                .getReturnType()).isEqualTo(fr.enimaloc.catapult.service.enrichment.chess.ChessStats.class);
+    }
+
+    @Test
+    void chessWithoutAccountIs404() throws Exception {
+        when(chessStats.forMember(any(), any(), anyBoolean())).thenReturn(Optional.empty());
+
+        mvc.perform(v3(get(STATS + "/chess")))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith("application/problem+json"));
+    }
+
+    @Test
+    void chessBudgetSpentIs429() throws Exception {
+        budgetLeft = false;
+
+        mvc.perform(v3(get(STATS + "/chess")))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "42"));
+        verifyNoInteractions(chessStats);
     }
 
     // ---------------------------------------------------------------- Blizzard
