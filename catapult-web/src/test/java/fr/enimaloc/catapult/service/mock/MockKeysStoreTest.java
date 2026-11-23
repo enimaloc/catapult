@@ -42,6 +42,11 @@ class MockKeysStoreTest {
         assertThat(store.add(ApiKeyProvider.FACEIT, " 12345678-abcd-4ef0-9abc-0123456789ab ")).isEqualTo(204);
         assertThat(store.add(ApiKeyProvider.HYPIXEL, RAW)).isEqualTo(400);
         assertThat(store.add(ApiKeyProvider.HYPIXEL, " 12345678-abcd-4ef0-9abc-0123456789ab ")).isEqualTo(204);
+        assertThat(store.add(ApiKeyProvider.CLASHROYALE, RAW)).isEqualTo(400);
+        assertThat(store.add(ApiKeyProvider.CLASHROYALE, " " + MockKeysStore.MOCK_SUPERCELL_KEY + " ")).isEqualTo(204);
+        assertThat(store.page(ApiKeyProvider.CLASHROYALE).keys()).hasSize(1);
+        assertThat(store.page(ApiKeyProvider.BRAWLSTARS).keys()).isEmpty();
+        assertThat(store.page(ApiKeyProvider.CLASHOFCLANS).keys().getFirst().usage().windowSeconds()).isEqualTo(60);
     }
 
     @Test

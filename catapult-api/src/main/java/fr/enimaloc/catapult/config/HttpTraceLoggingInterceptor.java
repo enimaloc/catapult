@@ -68,6 +68,10 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
     private static final Pattern RIOT_KEY =
             Pattern.compile("(?i)RGAPI-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
 
+    /** A JWT (a Supercell API key is one) quoted in a body: never logged. */
+    private static final Pattern JWT =
+            Pattern.compile("eyJ[A-Za-z0-9_-]{8,}\\.eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]+");
+
     /** An OAuth token answer, from any provider: its tokens are credentials (they never reach the log). */
     private static final Pattern ACCESS_TOKEN_FIELD =
             Pattern.compile("(\"(?:access_token|refresh_token|id_token)\"\\s*:\\s*\")(?:[^\"\\\\]|\\\\.)*(\")");
@@ -252,6 +256,7 @@ public class HttpTraceLoggingInterceptor implements ClientHttpRequestInterceptor
         }
         String masked = ACCESS_TOKEN_FIELD.matcher(new String(respBody, StandardCharsets.UTF_8)).replaceAll("$1***$2");
         masked = RIOT_KEY.matcher(masked).replaceAll("***");
+        masked = JWT.matcher(masked).replaceAll("***");
         return masked.getBytes(StandardCharsets.UTF_8);
     }
 

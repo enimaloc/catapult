@@ -492,6 +492,9 @@ public class AdminTabsFragmentController {
             model.addAttribute("riot", apiService.adminApiKeys(ApiKeyProvider.RIOT));
             model.addAttribute("faceit", apiService.adminApiKeys(ApiKeyProvider.FACEIT));
             model.addAttribute("hypixel", apiService.adminApiKeys(ApiKeyProvider.HYPIXEL));
+            model.addAttribute("clashofclans", apiService.adminApiKeys(ApiKeyProvider.CLASHOFCLANS));
+            model.addAttribute("clashroyale", apiService.adminApiKeys(ApiKeyProvider.CLASHROYALE));
+            model.addAttribute("brawlstars", apiService.adminApiKeys(ApiKeyProvider.BRAWLSTARS));
             model.addAttribute("minecraft", apiService.adminMinecraftAccounts());
             model.addAttribute("battlenet", apiService.adminBattleNetAccounts());
             model.addAttribute("ankama", apiService.adminAnkamaAccounts());

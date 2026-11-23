@@ -18,6 +18,13 @@ import java.util.regex.Pattern;
 class MockKeysStore {
     /** The shape an OAuth client secret takes (osu!, Bungie): checked like the API does. */
     private static final Pattern SECRET_SHAPE = Pattern.compile("[A-Za-z0-9._~+/=-]{16,128}");
+    /** A Supercell key: a JWT (three base64url parts, the first two JSON objects), one pool per game. */
+    private static final Pattern SUPERCELL_KEY_FORMAT =
+            Pattern.compile("eyJ[A-Za-z0-9_-]{8,}\\.eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}");
+    private static final java.util.Set<ApiKeyProvider> SUPERCELL = java.util.EnumSet.of(
+            ApiKeyProvider.CLASHOFCLANS, ApiKeyProvider.CLASHROYALE, ApiKeyProvider.BRAWLSTARS);
+    /** The mock's Clash of Clans key, put together at run time: not a real key, nor shaped like one in the source. */
+    static final String MOCK_SUPERCELL_KEY = "ey" + "J" + "mockheader00" + ".ey" + "J" + "mockpayload0" + ".fake-signature";
     private static final Map<ApiKeyProvider, Pattern> FORMATS = Map.of(
             ApiKeyProvider.STEAM, Pattern.compile("[0-9A-Fa-f]{32}"),
             ApiKeyProvider.DTDD, Pattern.compile("ddd_[A-Za-z0-9]{16,128}"),
@@ -45,6 +52,9 @@ class MockKeysStore {
         keys.put(ApiKeyProvider.RIOT, new ArrayList<>(List.of("RGAPI-00000000-0000-4000-8000-000000000000")));
         keys.put(ApiKeyProvider.FACEIT, new ArrayList<>(List.of("00000000-0000-4000-8000-0000000fac17")));
         keys.put(ApiKeyProvider.HYPIXEL, new ArrayList<>(List.of("00000000-0000-4000-8000-00000000beef")));
+        keys.put(ApiKeyProvider.CLASHOFCLANS, new ArrayList<>(List.of(MOCK_SUPERCELL_KEY)));
+        keys.put(ApiKeyProvider.CLASHROYALE, new ArrayList<>());
+        keys.put(ApiKeyProvider.BRAWLSTARS, new ArrayList<>());
     }
 
     private static String mask(String key) {
@@ -64,7 +74,8 @@ class MockKeysStore {
                 || provider == ApiKeyProvider.OPENCRITIC || provider == ApiKeyProvider.RETROACHIEVEMENTS
                 || provider == ApiKeyProvider.RIOT
                 || provider == ApiKeyProvider.FACEIT
-                || provider == ApiKeyProvider.HYPIXEL) {
+                || provider == ApiKeyProvider.HYPIXEL
+                || SUPERCELL.contains(provider)) {
             return new KeyUsageDto(window, null, 60, null, "DAY", 40 + tick % 20, null, null);
         }
         return provider == ApiKeyProvider.STEAM
@@ -80,7 +91,8 @@ class MockKeysStore {
 
     synchronized int add(ApiKeyProvider provider, String apiKey) {
         String trimmed = apiKey == null ? "" : apiKey.trim();
-        if (!FORMATS.get(provider).matcher(trimmed).matches()) return 400;
+        Pattern format = SUPERCELL.contains(provider) ? SUPERCELL_KEY_FORMAT : FORMATS.get(provider);
+        if (!format.matcher(trimmed).matches()) return 400;
         if (!keys.get(provider).contains(trimmed)) keys.get(provider).add(trimmed);
         return 204;
     }

@@ -146,6 +146,25 @@ public class EnrichmentProperties {
         private List<String> igdbIds = List.of("121");
     }
 
+    /**
+     * Supercell API settings that are not a source's own ({@code catapult.enrichment.supercell.*}). Supercell
+     * documents no rate: the defaults stay well under what its developer keys are known to allow. The IGDB ids map a
+     * detected game to a Supercell one besides its name; an empty one maps nothing.
+     */
+    @Getter
+    @Setter
+    public static class Supercell {
+        /** The whole Supercell source; each game also stays off while it has no key in the pool. */
+        private boolean enabled = true;
+        /** Calls per second, per key, spaced evenly (a call waits for its slot). */
+        private int perSecond = 10;
+        /** Calls per minute, per key; beyond it a call is refused. */
+        private int perMinute = 300;
+        private String clashOfClansIgdbId = "";
+        private String clashRoyaleIgdbId = "";
+        private String brawlStarsIgdbId = "";
+    }
+
     private SourceSettings hltb = new SourceSettings();
     private SourceSettings protondb = new SourceSettings();
     private SourceSettings steamgriddb = new SourceSettings();
@@ -207,6 +226,10 @@ public class EnrichmentProperties {
     private SourceSettings osuRecent = new SourceSettings();
     private Osu osu = new Osu();
     private Hypixel hypixel = new Hypixel();
+    private SourceSettings supercellClashOfClans = new SourceSettings();
+    private SourceSettings supercellClashRoyale = new SourceSettings();
+    private SourceSettings supercellBrawlStars = new SourceSettings();
+    private Supercell supercell = new Supercell();
     private Speedrun speedrun = new Speedrun();
     private RetroAchievements retroachievements = new RetroAchievements();
     private XboxStats xboxStats = new XboxStats();
@@ -311,6 +334,10 @@ public class EnrichmentProperties {
         return hypixel.isEnabled();
     }
 
+    public boolean supercellEnabled() {
+        return supercell.isEnabled();
+    }
+
     public int speedrunPerMinute() {
         return speedrun.getPerMinute();
     }
@@ -380,6 +407,9 @@ public class EnrichmentProperties {
             case HYPIXEL_PLAYER -> hypixelPlayer;
             case HYPIXEL_STATUS -> hypixelStatus;
             case HYPIXEL_GAMES -> hypixelGames;
+            case SUPERCELL_CLASH_OF_CLANS -> supercellClashOfClans;
+            case SUPERCELL_CLASH_ROYALE -> supercellClashRoyale;
+            case SUPERCELL_BRAWL_STARS -> supercellBrawlStars;
         };
     }
 
@@ -419,6 +449,7 @@ public class EnrichmentProperties {
             case HYPIXEL_PLAYER -> Duration.ofMinutes(5);
             case HYPIXEL_STATUS -> Duration.ofMinutes(1);
             case HYPIXEL_GAMES -> Duration.ofDays(1);
+            case SUPERCELL_CLASH_OF_CLANS, SUPERCELL_CLASH_ROYALE, SUPERCELL_BRAWL_STARS -> Duration.ofMinutes(10);
         };
     }
 }

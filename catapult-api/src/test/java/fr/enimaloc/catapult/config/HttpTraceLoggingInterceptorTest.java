@@ -239,6 +239,19 @@ class HttpTraceLoggingInterceptorTest {
     }
 
     @Test
+    void aSupercellKey_isOnlyReportedAsABearer_andAQuotedKeyIsMasked() throws IOException {
+        String key = fr.enimaloc.catapult.service.supercell.SupercellTestKeys.clash("trace");
+        String signature = key.substring(key.lastIndexOf('.') + 1);
+        MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET,
+                URI.create("https://api.clashofclans.com/v1/players/%232PP"));
+        request.getHeaders().add("Authorization", "Bearer " + key);
+
+        interceptor.intercept(request, new byte[0], respondWith("{\"note\":\"echo " + key + "\"}"));
+
+        assertThat(messages()).contains("auth=Bearer").doesNotContain(signature).contains("echo ***");
+    }
+
+    @Test
     void theFaceitKeyHeader_isOnlyReportedAsPresent() throws IOException {
         MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET,
                 URI.create("https://open.faceit.com/data/v4/players?nickname=Catapult"));

@@ -310,6 +310,20 @@ class DebugRedactorTest {
     }
 
     @Test
+    void aSupercellKey_isMaskedAsABearer_andWhereverItIsQuoted() {
+        String key = fr.enimaloc.catapult.service.supercell.SupercellTestKeys.clash("redactor");
+        String signature = key.substring(key.lastIndexOf('.') + 1);
+        assertThat(redactor.headers(header("Authorization", "Bearer " + key), false)).doesNotContain(signature);
+        assertThat(redactor.text("Authorization: Bearer " + key, false)).doesNotContain(signature);
+        assertThat(redactor.text("Supercell refused " + key + " at 10:00", false))
+                .isEqualTo("Supercell refused [masqué] at 10:00");
+        assertThat(redactor.body(b("{\"note\":\"" + key + "\"}"), MediaType.APPLICATION_JSON, false))
+                .doesNotContain(signature);
+        // a word that only starts the same way is left alone
+        assertThat(redactor.text("eyJ is how a JWT starts", false)).isEqualTo("eyJ is how a JWT starts");
+    }
+
+    @Test
     void theRiotKey_isMaskedAsAHeader_andWhereverItIsQuoted() {
         String key = "RGAPI-12345678-abcd-4ef0-9abc-0123456789ab";
         assertThat(redactor.isSecretHeader("X-Riot-Token")).isTrue();

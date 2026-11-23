@@ -2139,6 +2139,30 @@ class RealApiServiceTest {
     }
 
     @Test
+    void supercellKeys_areReadAndManagedThroughTheirGamesRoutes() {
+        var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.CLASHROYALE;
+        respond(HttpMethod.GET, "/api/internal/admin/supercell-keys/clash-royale",
+                "{\"keys\":[],\"supercellEnabled\":true}");
+        expect(HttpMethod.POST, "/api/internal/admin/supercell-keys/clash-royale")
+                .andExpect(content().json("{\"apiKey\":\"k\"}", true)).andRespond(withNoContent());
+        expect(HttpMethod.DELETE, "/api/internal/admin/supercell-keys/clash-royale/k1").andRespond(withNoContent());
+        expectPost("/api/internal/admin/supercell-keys/clash-royale/refresh");
+
+        assertThat(service.adminApiKeys(provider).enabled()).isTrue();
+        assertThat(service.adminAddApiKey(provider, "k")).isEqualTo(204);
+        assertThat(service.adminDeleteApiKey(provider, "k1")).isEqualTo(204);
+        assertThat(service.adminRefreshApiKeys(provider)).isEqualTo(204);
+    }
+
+    @Test
+    void supercellGame_isTheGameSegmentOfItsPool() {
+        assertThat(RealApiService.supercellGame(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.CLASHOFCLANS))
+                .isEqualTo("clash-of-clans");
+        assertThat(RealApiService.supercellGame(fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.BRAWLSTARS))
+                .isEqualTo("brawl-stars");
+    }
+
+    @Test
     void itadKeys_areReadAndManagedThroughTheirRoutes() {
         var provider = fr.enimaloc.catapult.common.dto.admin.ApiKeyProvider.ITAD;
         respond(HttpMethod.GET, "/api/internal/admin/itad-keys", "{\"keys\":[],\"itadEnabled\":true}");
