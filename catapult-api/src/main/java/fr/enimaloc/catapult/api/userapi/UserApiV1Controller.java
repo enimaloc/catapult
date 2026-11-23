@@ -32,6 +32,7 @@ public class UserApiV1Controller {
     // variant of this one.
     static final int VERSION = 1;
 
+    @Schema(name = "GameInfoV1Response")
     public record GameInfoResponse(String name, String igdbUrl, GameBinding.SourceType sourceType,
                                    String storeName, String storeUrl, String description,
                                    String twitchGameId, String twitchGameName,

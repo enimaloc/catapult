@@ -3,6 +3,7 @@ package fr.enimaloc.catapult.service.enrichment.bungie;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BungieGame;
 import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.Status;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
 import java.util.List;
@@ -37,6 +38,7 @@ public record BungieStats(Status status, BungieGame game, String account, Destin
     }
 
     /** A character: its class ({@code titan}, {@code hunter}, {@code warlock}), light level, time played. */
+    @Schema(name = "Destiny2Character")
     public record Character(String className, int light, long minutesPlayed, Instant lastPlayed, String emblemUrl) {
     }
 
