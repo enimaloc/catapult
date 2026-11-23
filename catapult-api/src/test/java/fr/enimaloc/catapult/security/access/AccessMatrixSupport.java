@@ -294,6 +294,12 @@ abstract class AccessMatrixSupport {
         when(twitchService.getModeratedChannelIds(argThat(a -> a != null && mod.getId().equals(a.getId()))))
                 .thenReturn(List.of(owner.getTwitchId()));
         when(speedrunClient.charging(any())).thenReturn(speedrunClient);
+        // A declared chess name always exists here: the matrix is about who may save it, not about the sites
+        when(chessClient.chesscomPlayer(any())).thenAnswer(i -> new fr.enimaloc.catapult.service.enrichment.chess
+                .ChesscomPlayer(1L, i.getArgument(0), null, null, null));
+        when(chessClient.lichessUser(any())).thenAnswer(i -> new fr.enimaloc.catapult.service.enrichment.chess
+                .LichessUser(i.getArgument(0), i.getArgument(0), null, null, java.util.Map.of(), null, null, null,
+                        null, null, null));
     }
 
     private UserAccount account(String username, String twitchId) {
