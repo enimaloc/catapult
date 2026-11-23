@@ -20,6 +20,7 @@ import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
 import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
+import fr.enimaloc.catapult.common.dto.channel.RiotData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.channel.SteamData;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
@@ -133,6 +134,9 @@ public class MockData {
     /** The RetroAchievements card is offered to every mock session too; the mock has a shared key. */
     private String retroAchievementsUsername;
     private boolean retroAchievementsKeySaved;
+    /** The Riot ID the mock session declared ({@code gameName#tagLine}), and its platform. */
+    private String riotId;
+    private String riotPlatform;
     /** The Blizzard card too: a region and two imported World of Warcraft characters, the first the main. */
     static final List<String> BLIZZARD_REGIONS = List.of("eu", "us", "kr", "tw");
     private static final List<BlizzardStatsData.WowCharacterOption> MOCK_WOW_CHARACTERS = List.of(
@@ -389,7 +393,8 @@ public class MockData {
                 username.equals(channelDto.twitchUsername()) ? customBindings.state() : null,
                 // drops: the mock has no experiments, they are offered
                 drops(), ankamaData(), epicData(), speedrunData(), retroAchievementsData(), blizzardStatsData(),
-                bungieData());
+                bungieData(),
+                riotData());
     }
 
     /** The mock's one running drops campaign, on the first binding's category. */
@@ -470,6 +475,21 @@ public class MockData {
     public void deleteBlizzardWowCharacters() {
         blizzardCharacters = List.of();
         blizzardWowMain = null;
+    }
+
+    /** The Riot card: the mock has a key in its pool, so the card is usable. */
+    public RiotData riotData() {
+        return new RiotData(riotId, riotId == null ? null : riotPlatform, true);
+    }
+
+    public void saveRiotAccount(String riotId, String platform) {
+        this.riotId = riotId;
+        this.riotPlatform = platform;
+    }
+
+    public void deleteRiotAccount() {
+        riotId = null;
+        riotPlatform = null;
     }
 
     public RetroAchievementsData retroAchievementsData() {

@@ -19,6 +19,7 @@ import fr.enimaloc.catapult.common.dto.channel.BlizzardRegionRequest;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardWowMainRequest;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
+import fr.enimaloc.catapult.common.dto.channel.RiotAccountRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunApiKeyRequest;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.SteamTokenRequest;
@@ -206,6 +207,19 @@ public class ChannelActionsController {
     @PostMapping("/channel/{username}/settings/retroachievements/api-key/delete")
     public ResponseEntity<Void> deleteRetroAchievementsApiKey(@PathVariable String username) {
         return ApiStatus.answer(apiService.deleteRetroAchievementsApiKey(username));
+    }
+
+    // The member's Riot ID: 400 for a malformed or unknown Riot ID or platform, 503 when Riot cannot be asked.
+
+    @PostMapping("/channel/{username}/settings/riot/account")
+    public ResponseEntity<Void> saveRiotAccount(@PathVariable String username,
+                                                @RequestBody RiotAccountRequest body) {
+        return ApiStatus.answer(apiService.saveRiotAccount(username, body.riotId(), body.platform()));
+    }
+
+    @PostMapping("/channel/{username}/settings/riot/account/delete")
+    public ResponseEntity<Void> deleteRiotAccount(@PathVariable String username) {
+        return ApiStatus.answer(apiService.deleteRiotAccount(username));
     }
 
     // The member's Blizzard settings: 400 for an unknown region or a character that is not an imported one, 404 without a

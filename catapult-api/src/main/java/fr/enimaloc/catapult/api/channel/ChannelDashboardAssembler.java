@@ -59,6 +59,7 @@ import fr.enimaloc.catapult.service.battlenet.BattleNetLinkStateService;
 import fr.enimaloc.catapult.service.epic.EpicLinkStateService;
 import fr.enimaloc.catapult.service.blizzard.BlizzardAccountService;
 import fr.enimaloc.catapult.service.retroachievements.RetroAchievementsAccountService;
+import fr.enimaloc.catapult.service.riot.RiotAccountService;
 import fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService;
 import fr.enimaloc.catapult.service.minecraft.MinecraftLinkStateService;
 import fr.enimaloc.catapult.service.notification.TwitchatWidgetSettingsService;
@@ -119,6 +120,7 @@ public class ChannelDashboardAssembler {
     // Only present when battlenet.enabled.
     private final Optional<BlizzardAccountService> blizzardAccounts;
     private final fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinks;
+    private final RiotAccountService riotAccounts;
 
     @Value("${xbox.enabled:false}")
     private boolean xboxEnabled;
@@ -177,7 +179,8 @@ public class ChannelDashboardAssembler {
                 owner ? speedrunAccounts.data(channel) : null,
                 owner ? retroAchievementsAccounts.data(channel) : null,
                 owner ? blizzardAccounts.map(accounts -> accounts.data(channel)).orElse(null) : null,
-                owner ? bungieLinks.data(channel) : null);
+                owner ? bungieLinks.data(channel) : null,
+                owner ? riotAccounts.data(channel) : null);
     }
 
     /** The source value of the "with drops" filter. */

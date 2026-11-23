@@ -391,4 +391,19 @@ class ChannelEventRedisBridgeTest {
                 .doesNotThrowAnyException();
         verify(events, never()).publishEvent(any(Object.class));
     }
+
+    @Test
+    void bridgeRelaysRiotAccountChanged() {
+        var account = new fr.enimaloc.catapult.common.dto.channel.RiotData("Catapult#EUW", "euw1", true);
+
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.RIOT_ACCOUNT_CHANGED,
+                new ChannelEvents.RiotAccountChanged(owner.toString(), "streamer", account))))
+                .containsExactly(new fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent("streamer",
+                        "Catapult#EUW", "euw1", true));
+        assertThat(ChannelEventRedisBridge.events(channel, envelope(ChannelEvents.RIOT_ACCOUNT_CHANGED,
+                new ChannelEvents.RiotAccountChanged(owner.toString(), "streamer",
+                        new fr.enimaloc.catapult.common.dto.channel.RiotData(null, null, false)))))
+                .containsExactly(new fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent("streamer", "", "",
+                        false));
+    }
 }

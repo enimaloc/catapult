@@ -645,6 +645,36 @@ public class MockApiService implements ApiService {
         return retroAchievementsChanged(username, MockData::deleteRetroAchievementsKey);
     }
 
+    /** Like catapult-api: a Riot ID gameName#tagLine on a known platform; the game name "ghost" is unknown. */
+    @Override
+    public int saveRiotAccount(String username, String riotId, String platform) {
+        log.trace("saveRiotAccount({}, {}, {})", username, riotId, platform);
+        String id = riotId == null ? "" : riotId.strip();
+        int hash = id.lastIndexOf('#');
+        if (hash < 3 || hash > id.length() - 4 || hash < id.length() - 6
+                || !fr.enimaloc.catapult.controller.IntegrationCards.RIOT_PLATFORMS.contains(platform)) {
+            return BAD_REQUEST;
+        }
+        if (id.substring(0, hash).strip().equalsIgnoreCase("ghost")) {
+            return BAD_REQUEST;
+        }
+        return riotChanged(username, data -> data.saveRiotAccount(id, platform));
+    }
+
+    @Override
+    public int deleteRiotAccount(String username) {
+        log.trace("deleteRiotAccount({})", username);
+        return riotChanged(username, MockData::deleteRiotAccount);
+    }
+
+    private int riotChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent.of(username,
+                data.riotData()));
+        return NO_CONTENT;
+    }
+
     private int retroAchievementsChanged(String username, java.util.function.Consumer<MockData> change) {
         MockData data = currentData();
         change.accept(data);

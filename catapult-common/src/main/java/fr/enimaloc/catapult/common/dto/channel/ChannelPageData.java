@@ -45,9 +45,26 @@ public record ChannelPageData(
         /** The owner's Blizzard settings; null for anyone else, or without Battle.net on this instance. Names only. */
         BlizzardStatsData blizzardStats,
         /** The owner's Bungie.net link; null for anyone else, or when Bungie is not set up and nothing is linked. */
-        BungieAccountData bungie
+        BungieAccountData bungie,
+        /** The owner's Riot settings; null for anyone else. The Riot ID and platform only. */
+        RiotData riot
 ) {
-    /** A page without the Bungie.net link. */
+    /** A page without the Riot settings. */
+    public ChannelPageData(ChannelUserDto channelUser, String channelUsername, boolean isOwner, boolean isLive,
+                           boolean botEnabled, GameDto currentGame, PagedBindings bindings, List<CclDto> availableCcls,
+                           Set<String> blockedCcls, List<TwDto> availableTws, Set<String> blockedTws,
+                           String filterStatus, String filterSource, SteamData steam, XboxData xbox,
+                           MinecraftData minecraft, BattleNetData battleNet, ObsData obs, TwitchatData twitchat,
+                           CustomBindingsStateDto customBindings, Map<String, DropDto> drops, AnkamaData ankama,
+                           EpicData epic, SpeedrunData speedrun, RetroAchievementsData retroAchievements,
+                           BlizzardStatsData blizzardStats, BungieAccountData bungie) {
+        this(channelUser, channelUsername, isOwner, isLive, botEnabled, currentGame, bindings, availableCcls,
+                blockedCcls, availableTws, blockedTws, filterStatus, filterSource, steam, xbox, minecraft, battleNet,
+                obs, twitchat, customBindings, drops, ankama, epic, speedrun, retroAchievements, blizzardStats, bungie,
+                null);
+    }
+
+    /** A page without the Bungie.net link nor the Riot settings. */
     public ChannelPageData(ChannelUserDto channelUser, String channelUsername, boolean isOwner, boolean isLive,
                            boolean botEnabled, GameDto currentGame, PagedBindings bindings, List<CclDto> availableCcls,
                            Set<String> blockedCcls, List<TwDto> availableTws, Set<String> blockedTws,
@@ -58,7 +75,8 @@ public record ChannelPageData(
                            BlizzardStatsData blizzardStats) {
         this(channelUser, channelUsername, isOwner, isLive, botEnabled, currentGame, bindings, availableCcls,
                 blockedCcls, availableTws, blockedTws, filterStatus, filterSource, steam, xbox, minecraft, battleNet,
-                obs, twitchat, customBindings, drops, ankama, epic, speedrun, retroAchievements, blizzardStats, null);
+                obs, twitchat, customBindings, drops, ankama, epic, speedrun, retroAchievements, blizzardStats, null,
+                null);
     }
 
     /** A page without the Blizzard settings. */
@@ -71,7 +89,7 @@ public record ChannelPageData(
                            EpicData epic, SpeedrunData speedrun, RetroAchievementsData retroAchievements) {
         this(channelUser, channelUsername, isOwner, isLive, botEnabled, currentGame, bindings, availableCcls,
                 blockedCcls, availableTws, blockedTws, filterStatus, filterSource, steam, xbox, minecraft, battleNet,
-                obs, twitchat, customBindings, drops, ankama, epic, speedrun, retroAchievements, null);
+                obs, twitchat, customBindings, drops, ankama, epic, speedrun, retroAchievements, null, null);
     }
 
     /** A page without the RetroAchievements account. */

@@ -26,6 +26,7 @@ import fr.enimaloc.catapult.event.epic.EpicLinkEvent;
 import fr.enimaloc.catapult.event.blizzard.BlizzardAccountChangedEvent;
 import fr.enimaloc.catapult.event.bungie.BungieAccountChangedEvent;
 import fr.enimaloc.catapult.event.retroachievements.RetroAchievementsAccountChangedEvent;
+import fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent;
 import fr.enimaloc.catapult.event.speedrun.SpeedrunAccountChangedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftDisconnectedEvent;
 import fr.enimaloc.catapult.event.minecraft.MinecraftSyncEvent;
@@ -107,6 +108,9 @@ public final class ChannelState {
         }
         if (ch.bungie() != null) {
             events.add(BungieAccountChangedEvent.of(login, ch.bungie()));
+        }
+        if (ch.riot() != null) {
+            events.add(RiotAccountChangedEvent.of(login, ch.riot()));
         }
         CustomBindingsStateDto custom = ch.customBindings();
         if (custom != null) {
