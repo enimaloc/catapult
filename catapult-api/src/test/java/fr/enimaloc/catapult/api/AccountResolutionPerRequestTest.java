@@ -98,6 +98,7 @@ class AccountResolutionPerRequestTest {
     @MockitoBean fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinkService;
     @MockitoBean fr.enimaloc.catapult.service.osu.OsuLinkService osuLinkService;
     @MockitoBean fr.enimaloc.catapult.service.hypixel.HypixelAccountService hypixelAccountService;
+    @MockitoBean fr.enimaloc.catapult.service.supercell.SupercellAccountService supercellAccountService;
     @MockitoBean SchedulerService schedulerService;
     @MockitoBean TwitchatWidgetSettingsService twitchatWidgetSettingsService;
     @MockitoBean TwitchatEventActionService twitchatEventActionService;

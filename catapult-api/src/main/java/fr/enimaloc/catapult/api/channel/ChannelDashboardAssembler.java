@@ -127,6 +127,7 @@ public class ChannelDashboardAssembler {
     private final ChessAccountService chessAccounts;
     private final fr.enimaloc.catapult.service.osu.OsuLinkService osuLinks;
     private final fr.enimaloc.catapult.service.hypixel.HypixelAccountService hypixelAccounts;
+    private final fr.enimaloc.catapult.service.supercell.SupercellAccountService supercellAccounts;
 
     @Value("${xbox.enabled:false}")
     private boolean xboxEnabled;
@@ -190,7 +191,8 @@ public class ChannelDashboardAssembler {
                 owner ? faceitAccounts.data(channel) : null,
                 owner ? chessAccounts.data(channel) : null,
                 owner ? osuLinks.data(channel) : null,
-                owner ? hypixelAccounts.data(channel) : null);
+                owner ? hypixelAccounts.data(channel) : null,
+                owner ? supercellAccounts.data(channel) : null);
     }
 
     /** The source value of the "with drops" filter. */

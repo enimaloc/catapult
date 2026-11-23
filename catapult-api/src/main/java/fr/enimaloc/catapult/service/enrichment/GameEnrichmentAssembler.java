@@ -23,6 +23,8 @@ import fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService;
 import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelGameDataService;
 import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStats;
 import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService;
+import fr.enimaloc.catapult.service.enrichment.supercell.SupercellStats;
+import fr.enimaloc.catapult.service.enrichment.supercell.SupercellStatsService;
 import fr.enimaloc.catapult.service.enrichment.hltb.HltbService;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticGame;
 import fr.enimaloc.catapult.service.enrichment.opencritic.OpenCriticService;
@@ -138,6 +140,7 @@ public class GameEnrichmentAssembler {
     private final OsuStatsService osuStatsService;
     private final HypixelStatsService hypixelStatsService;
     private final HypixelGameDataService hypixelGameDataService;
+    private final SupercellStatsService supercellStatsService;
 
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
@@ -268,8 +271,10 @@ public class GameEnrichmentAssembler {
                 .forDetected(user, igdb, FetchBudget.UNLIMITED).orElse(null));
         CompletableFuture<HypixelStats> hypixel = supply("hypixel stats", () -> hypixelStatsService
                 .forDetected(user, detected, igdb, FetchBudget.UNLIMITED).orElse(null));
+        CompletableFuture<SupercellStats> supercell = supply("supercell stats", () -> supercellStatsService
+                .forDetected(user, igdb, searched, FetchBudget.UNLIMITED).orElse(null));
         return new Stats(steam, xbox, retro, blizzard, detected.getSourceType(), bungie, riot, faceit, chess, osu,
-                hypixel);
+                hypixel, supercell);
     }
 
     private PlatformStats xboxStats(UserAccount user, DetectedGame detected, String igdb, String searched,
@@ -304,7 +309,8 @@ public class GameEnrichmentAssembler {
                          CompletableFuture<BlizzardStats> blizzard, GameBinding.SourceType detectedOn,
                          CompletableFuture<BungieStats> bungie, CompletableFuture<RiotStats> riot,
                          CompletableFuture<FaceitStats> faceit, CompletableFuture<ChessStats> chess,
-                         CompletableFuture<OsuStats> osu, CompletableFuture<HypixelStats> hypixel) {
+                         CompletableFuture<OsuStats> osu, CompletableFuture<HypixelStats> hypixel,
+                         CompletableFuture<SupercellStats> supercell) {
 
         /** What arrived before {@code deadline}; null when no platform applies. */
         PersonalStatsEnrichment await(long deadline) {
@@ -318,7 +324,8 @@ public class GameEnrichmentAssembler {
                     GameEnrichmentAssembler.await(faceit, deadline, "faceit stats"),
                     GameEnrichmentAssembler.await(chess, deadline, "chess stats"),
                     GameEnrichmentAssembler.await(osu, deadline, "osu stats"),
-                    GameEnrichmentAssembler.await(hypixel, deadline, "hypixel stats"));
+                    GameEnrichmentAssembler.await(hypixel, deadline, "hypixel stats"),
+                    GameEnrichmentAssembler.await(supercell, deadline, "supercell stats"));
         }
     }
 

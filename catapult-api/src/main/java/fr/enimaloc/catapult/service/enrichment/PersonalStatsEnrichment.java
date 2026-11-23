@@ -6,20 +6,29 @@ import fr.enimaloc.catapult.service.enrichment.bungie.BungieStats;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessStats;
 import fr.enimaloc.catapult.service.enrichment.faceit.FaceitStats;
 import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStats;
+import fr.enimaloc.catapult.service.enrichment.supercell.SupercellStats;
 import fr.enimaloc.catapult.service.enrichment.osu.OsuStats;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotStats;
 import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.PlatformStats;
 
 /**
  * The member's own stats on the game played now, per platform (Steam, Xbox, RetroAchievements) and publisher
- * (Blizzard, Bungie, Riot, FACEIT, Chess.com and Lichess, osu!, Hypixel), each null when it does not apply (no link, no match, source off, too late).
+ * (Blizzard, Bungie, Riot, FACEIT, Chess.com and Lichess, osu!, Hypixel, Supercell), each null when it does not apply (no link, no match, source off, too late).
  * {@code detectedOn} is the platform the game was detected on, which the summary takes its numbers from first.
  * Personal data: only ever served under {@code /api/me}.
  */
 public record PersonalStatsEnrichment(PlatformStats steam, PlatformStats xbox, PlatformStats retroachievements,
                                       BlizzardStats blizzard, GameBinding.SourceType detectedOn,
                                       BungieStats bungie, RiotStats riot, FaceitStats faceit, ChessStats chess,
-                                      OsuStats osu, HypixelStats hypixel) {
+                                      OsuStats osu, HypixelStats hypixel, SupercellStats supercell) {
+
+    /** Without the Supercell stats. */
+    public PersonalStatsEnrichment(PlatformStats steam, PlatformStats xbox, PlatformStats retroachievements,
+                                   BlizzardStats blizzard, GameBinding.SourceType detectedOn, BungieStats bungie,
+                                   RiotStats riot, FaceitStats faceit, ChessStats chess, OsuStats osu,
+                                   HypixelStats hypixel) {
+        this(steam, xbox, retroachievements, blizzard, detectedOn, bungie, riot, faceit, chess, osu, hypixel, null);
+    }
 
     /** Without the Hypixel stats. */
     public PersonalStatsEnrichment(PlatformStats steam, PlatformStats xbox, PlatformStats retroachievements,
@@ -137,11 +146,22 @@ public record PersonalStatsEnrichment(PlatformStats steam, PlatformStats xbox, P
                                              BlizzardStats blizzard, GameBinding.SourceType detectedOn,
                                              BungieStats bungie, RiotStats riot, FaceitStats faceit,
                                              ChessStats chess, OsuStats osu, HypixelStats hypixel) {
+        return of(steam, xbox, retroachievements, blizzard, detectedOn, bungie, riot, faceit, chess, osu, hypixel,
+                null);
+    }
+
+    /** The stats of the platforms and publishers that apply, Supercell included; null when none does. */
+    public static PersonalStatsEnrichment of(PlatformStats steam, PlatformStats xbox, PlatformStats retroachievements,
+                                             BlizzardStats blizzard, GameBinding.SourceType detectedOn,
+                                             BungieStats bungie, RiotStats riot, FaceitStats faceit,
+                                             ChessStats chess, OsuStats osu, HypixelStats hypixel,
+                                             SupercellStats supercell) {
         if (steam == null && xbox == null && retroachievements == null && blizzard == null && bungie == null
-                && riot == null && faceit == null && chess == null && osu == null && hypixel == null) {
+                && riot == null && faceit == null && chess == null && osu == null && hypixel == null
+                && supercell == null) {
             return null;
         }
         return new PersonalStatsEnrichment(steam, xbox, retroachievements, blizzard, detectedOn, bungie, riot,
-                faceit, chess, osu, hypixel);
+                faceit, chess, osu, hypixel, supercell);
     }
 }

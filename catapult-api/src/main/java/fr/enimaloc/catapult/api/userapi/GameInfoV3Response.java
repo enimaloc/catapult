@@ -16,6 +16,7 @@ import fr.enimaloc.catapult.service.enrichment.riot.RiotStats;
 import fr.enimaloc.catapult.service.enrichment.faceit.FaceitStats;
 import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelPublisher;
 import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStats;
+import fr.enimaloc.catapult.service.enrichment.supercell.SupercellStats;
 import fr.enimaloc.catapult.service.enrichment.osu.OsuStats;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessStats;
 import fr.enimaloc.catapult.service.enrichment.hltb.TimeToBeat;
@@ -320,7 +321,16 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
      */
     public record StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
                               @JsonIgnore GameBinding.SourceType detectedOn, BungieStats bungie, RiotStats riot,
-                              FaceitStats faceit, ChessStats chess, OsuStats osu, HypixelStats hypixel) {
+                              FaceitStats faceit, ChessStats chess, OsuStats osu, HypixelStats hypixel,
+                              SupercellStats supercell) {
+
+        /** Without the Supercell stats. */
+        public StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
+                           GameBinding.SourceType detectedOn, BungieStats bungie, RiotStats riot,
+                           FaceitStats faceit, ChessStats chess, OsuStats osu, HypixelStats hypixel) {
+            this(steam, xbox, retroachievements, blizzard, detectedOn, bungie, riot, faceit, chess, osu, hypixel,
+                    null);
+        }
 
         /** Without the Hypixel stats. */
         public StatsObject(SteamStats steam, XboxStats xbox, RaStats retroachievements, BlizzardStats blizzard,
@@ -368,7 +378,8 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
             return new StatsObject(SteamStats.of(s.steam(), links), XboxStats.of(s.xbox(), links),
                     RaStats.of(s.retroachievements(), links), blizzardStats(s.blizzard(), links), s.detectedOn(),
                     bungieStats(s.bungie(), links), riotStats(s.riot(), links), faceitStats(s.faceit(), links),
-                    chessStats(s.chess(), links), osuStats(s.osu(), links), hypixelStats(s.hypixel(), links));
+                    chessStats(s.chess(), links), osuStats(s.osu(), links), hypixelStats(s.hypixel(), links),
+                    supercellStats(s.supercell(), links));
         }
 
         List<PlatformObject> platforms() {
@@ -507,6 +518,15 @@ public record GameInfoV3Response(@JsonView(GameInfoResponse.Summary.class) boole
      */
     static HypixelStats hypixelStats(HypixelStats s, MoreLinks links) {
         return s == null ? null : s.withMore(links.toMe(ApiV2.ME_STATS_PATH + "/hypixel"));
+    }
+
+    /**
+     * The member's Supercell stats with the "more" link to {@code /api/me/stats/supercell/<game>}: the aggregate and
+     * the detail route serve this same record.
+     */
+    static SupercellStats supercellStats(SupercellStats s, MoreLinks links) {
+        return s == null || s.game() == null ? s
+                : s.withMore(links.toMe(ApiV2.ME_STATS_PATH + "/supercell/" + s.game().key()));
     }
 
     /**

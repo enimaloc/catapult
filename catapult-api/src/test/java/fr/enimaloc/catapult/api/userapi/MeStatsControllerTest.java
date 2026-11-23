@@ -92,6 +92,7 @@ class MeStatsControllerTest {
     @MockitoBean fr.enimaloc.catapult.service.enrichment.chess.ChessStatsService chessStats;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService osuStats;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService hypixelStats;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.supercell.SupercellStatsService supercellStats;
 
     private UserAccount user;
     private boolean budgetLeft = true;
@@ -504,6 +505,47 @@ class MeStatsControllerTest {
 
         budgetLeft = false;
         mvc.perform(v3(get(STATS + "/hypixel")))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void supercellDetailIsTheSameProjection_withTheDetailOnlyFields() throws Exception {
+        var coc = new fr.enimaloc.catapult.service.enrichment.supercell.SupercellStats.ClashOfClansStats(16, 3, 240,
+                5200, 5600, "Legend League", null, 1800, 10, 3900,
+                new fr.enimaloc.catapult.service.enrichment.supercell.SupercellStats.Clan("#2Y0", "Catapult"), 412, 37,
+                java.util.List.of(new fr.enimaloc.catapult.service.enrichment.supercell.SupercellStats.Hero(
+                        "Archer Queen", 92, 95, "home")));
+        var stats = new fr.enimaloc.catapult.service.enrichment.supercell.SupercellStats(Status.OK,
+                fr.enimaloc.catapult.service.enrichment.supercell.SupercellGame.CLASH_OF_CLANS, "Chief", "#2PP", coc,
+                null, null, null);
+        when(supercellStats.forGame(eq(user),
+                eq(fr.enimaloc.catapult.service.enrichment.supercell.SupercellGame.CLASH_OF_CLANS), any(), eq(true)))
+                .thenReturn(Optional.of(stats));
+
+        mvc.perform(v3(get(STATS + "/supercell/clash-of-clans")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ok"))
+                .andExpect(jsonPath("$.game").value("clash-of-clans"))
+                .andExpect(jsonPath("$.account").value("Chief"))
+                .andExpect(jsonPath("$.tag").value("#2PP"))
+                .andExpect(jsonPath("$.clashOfClans.townHallLevel").value(16))
+                .andExpect(jsonPath("$.clashOfClans.heroes[0].name").value("Archer Queen"))
+                .andExpect(jsonPath("$.more")
+                        .value("http://localhost/api/me/stats/supercell/clash-of-clans?version=3"));
+    }
+
+    @Test
+    void supercellWithoutATag_is404_anUnknownGame400_andASpentBudget429() throws Exception {
+        when(supercellStats.forGame(any(), any(), any(), anyBoolean())).thenReturn(Optional.empty());
+
+        mvc.perform(v3(get(STATS + "/supercell/brawl-stars")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("not_found"));
+        mvc.perform(v3(get(STATS + "/supercell/hay-day")))
+                .andExpect(status().isBadRequest());
+
+        budgetLeft = false;
+        mvc.perform(v3(get(STATS + "/supercell/clash-royale")))
                 .andExpect(status().isTooManyRequests());
     }
 

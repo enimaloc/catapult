@@ -10,6 +10,7 @@ import fr.enimaloc.catapult.common.dto.channel.FaceitData;
 import fr.enimaloc.catapult.common.dto.channel.ChessData;
 import fr.enimaloc.catapult.common.dto.channel.OsuAccountData;
 import fr.enimaloc.catapult.common.dto.channel.HypixelData;
+import fr.enimaloc.catapult.common.dto.channel.SupercellData;
 import fr.enimaloc.catapult.common.dto.channel.SpeedrunData;
 import fr.enimaloc.catapult.common.dto.connect.EpicLinkStateResponse;
 import fr.enimaloc.catapult.common.dto.binding.CustomBindingsStateDto;
@@ -196,6 +197,12 @@ public class ChannelEventPublisher {
     public void hypixelAccountChanged(UUID channelOwnerId, HypixelData account) {
         publish(channelOwnerId, ChannelEvents.HYPIXEL_ACCOUNT_CHANGED,
                 (id, login) -> new ChannelEvents.HypixelAccountChanged(id, login, account));
+    }
+
+    /** The owner's Supercell settings now stand as {@code account} (the player tags and names only). */
+    public void supercellAccountChanged(UUID channelOwnerId, SupercellData account) {
+        publish(channelOwnerId, ChannelEvents.SUPERCELL_ACCOUNT_CHANGED,
+                (id, login) -> new ChannelEvents.SupercellAccountChanged(id, login, account));
     }
 
     /** The owner's RetroAchievements settings now stand as {@code account} (the name only, never the key). */
