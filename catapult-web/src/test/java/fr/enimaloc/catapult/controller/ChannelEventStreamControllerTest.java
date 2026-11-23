@@ -346,4 +346,18 @@ class ChannelEventStreamControllerTest {
         assertThat(moderator.getResponse().getContentAsString()).doesNotContain("Catapult#EUW");
         assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
     }
+
+    @Test
+    void theFaceitSettingsGoToTheOwnersStreams_aModeratorsGetNothing() throws Exception {
+        MvcResult owner = subscribe("enimaloc", member("EnimaLoc"));
+        MvcResult moderator = subscribe("enimaloc", member("a-moderator"));
+        var changed = new fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent("enimaloc", "Catapult",
+                "https://www.faceit.com/en/players/Catapult", true);
+
+        controller.onChannelUpdated(changed);
+
+        assertThat(owner.getResponse().getContentAsString()).contains("event:FaceitAccountChangedEvent", "Catapult");
+        assertThat(moderator.getResponse().getContentAsString()).doesNotContain("FaceitAccountChangedEvent");
+        assertThat(ChannelEventStreamController.forModerators(changed)).isNull();
+    }
 }

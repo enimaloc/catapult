@@ -18,6 +18,7 @@ import fr.enimaloc.catapult.common.dto.twitchat.TwitchatSettingsResponse;
 import fr.enimaloc.catapult.common.dto.channel.TwitchatData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardStatsData;
+import fr.enimaloc.catapult.common.dto.channel.FaceitData;
 import fr.enimaloc.catapult.common.dto.channel.BungieAccountData;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsData;
 import fr.enimaloc.catapult.common.dto.channel.RiotData;
@@ -132,6 +133,8 @@ public class MockData {
     private String speedrunUsername;
     private boolean speedrunKeySaved;
     /** The RetroAchievements card is offered to every mock session too; the mock has a shared key. */
+    /** The FACEIT nickname the mock session declared. */
+    private String faceitNickname;
     private String retroAchievementsUsername;
     private boolean retroAchievementsKeySaved;
     /** The Riot ID the mock session declared ({@code gameName#tagLine}), and its platform. */
@@ -394,7 +397,7 @@ public class MockData {
                 // drops: the mock has no experiments, they are offered
                 drops(), ankamaData(), epicData(), speedrunData(), retroAchievementsData(), blizzardStatsData(),
                 bungieData(),
-                riotData());
+                riotData(), faceitData());
     }
 
     /** The mock's one running drops campaign, on the first binding's category. */
@@ -490,6 +493,20 @@ public class MockData {
     public void deleteRiotAccount() {
         riotId = null;
         riotPlatform = null;
+    }
+
+    /** The FACEIT card: the mock has a key in its pool, so the card is usable. */
+    public FaceitData faceitData() {
+        return new FaceitData(faceitNickname,
+                faceitNickname == null ? null : "https://www.faceit.com/en/players/" + faceitNickname, true);
+    }
+
+    public void saveFaceitNickname(String nickname) {
+        this.faceitNickname = nickname;
+    }
+
+    public void deleteFaceitNickname() {
+        faceitNickname = null;
     }
 
     public RetroAchievementsData retroAchievementsData() {

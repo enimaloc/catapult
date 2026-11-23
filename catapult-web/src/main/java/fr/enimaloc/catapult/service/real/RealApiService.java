@@ -123,6 +123,7 @@ import fr.enimaloc.catapult.common.dto.channel.TwitchatBranchRequest;
 import fr.enimaloc.catapult.common.dto.channel.SaveBody;
 import fr.enimaloc.catapult.common.dto.channel.SearchResponse;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsApiKeyRequest;
+import fr.enimaloc.catapult.common.dto.channel.FaceitNicknameRequest;
 import fr.enimaloc.catapult.common.dto.channel.RetroAchievementsUsernameRequest;
 import fr.enimaloc.catapult.common.dto.channel.RiotAccountRequest;
 import fr.enimaloc.catapult.common.dto.channel.BlizzardRegionRequest;
@@ -393,6 +394,18 @@ public class RealApiService implements ApiService {
     @Override
     public int deleteRiotAccount(String username) {
         return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/riot/account", id),
+                status -> status);
+    }
+
+    @Override
+    public int saveFaceitNickname(String username, String nickname) {
+        return onChannel(username, id -> client.putVoid("/api/internal/users/{userId}/settings/faceit/nickname",
+                new FaceitNicknameRequest(nickname), id), status -> status);
+    }
+
+    @Override
+    public int deleteFaceitNickname(String username) {
+        return onChannel(username, id -> client.delete("/api/internal/users/{userId}/settings/faceit/nickname", id),
                 status -> status);
     }
 

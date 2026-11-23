@@ -1585,4 +1585,22 @@ class MockApiServiceTest {
         assertThat(events).hasSize(2).allSatisfy(event ->
                 assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.riot.RiotAccountChangedEvent.class));
     }
+
+    @Test
+    void faceitNickname_followsTheSettingsAndTellsThePage() {
+        assertThat(data.faceitData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.FaceitData(null, null, true));
+
+        assertThat(service.saveFaceitNickname(username, " Catapult ")).isEqualTo(204);
+        assertThat(data.faceitData()).isEqualTo(new fr.enimaloc.catapult.common.dto.channel.FaceitData("Catapult",
+                "https://www.faceit.com/en/players/Catapult", true));
+        assertThat(service.saveFaceitNickname(username, "Ghost")).isEqualTo(400);
+        assertThat(service.saveFaceitNickname(username, "x")).isEqualTo(400);
+        assertThat(service.saveFaceitNickname(username, "has space")).isEqualTo(400);
+        assertThat(service.saveFaceitNickname(username, null)).isEqualTo(400);
+
+        assertThat(service.deleteFaceitNickname(username)).isEqualTo(204);
+        assertThat(data.faceitData().nickname()).isNull();
+        assertThat(events).hasSize(2).allSatisfy(event ->
+                assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent.class));
+    }
 }

@@ -110,6 +110,8 @@ class ChannelDashboardAssemblerTest {
             mock(fr.enimaloc.catapult.service.speedrun.SpeedrunAccountService.class);
     private final fr.enimaloc.catapult.service.blizzard.BlizzardAccountService blizzardAccounts =
             mock(fr.enimaloc.catapult.service.blizzard.BlizzardAccountService.class);
+    private final fr.enimaloc.catapult.service.faceit.FaceitAccountService faceitAccounts =
+            mock(fr.enimaloc.catapult.service.faceit.FaceitAccountService.class);
     private final fr.enimaloc.catapult.service.bungie.BungieLinkService bungieLinks =
             mock(fr.enimaloc.catapult.service.bungie.BungieLinkService.class);
     private final fr.enimaloc.catapult.service.riot.RiotAccountService riotAccounts =
@@ -148,7 +150,7 @@ class ChannelDashboardAssemblerTest {
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.repository.binding.CustomBindingScheduleRepository.class),
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumService.class)), categoryCache,
                 streamTitle, dropsGate, dropsCatalog, speedrunAccounts, raAccounts, java.util.Optional.of(blizzardAccounts),
-                bungieLinks, riotAccounts);
+                bungieLinks, riotAccounts, faceitAccounts);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }
@@ -614,6 +616,20 @@ class ChannelDashboardAssemblerTest {
             assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.RiotData.class
                     .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
                     .containsExactly("riotId", "platform", "available");
+        }
+
+        @Test
+        void dashboardCarriesTheFaceitSettingsForTheOwnerOnly() {
+            var account = new fr.enimaloc.catapult.common.dto.channel.FaceitData("Catapult",
+                    "https://www.faceit.com/en/players/Catapult", true);
+            when(faceitAccounts.data(owner)).thenReturn(account);
+
+            assertThat(assembler().page(owner, owner, "streamer", 0, null, null).faceit()).isEqualTo(account);
+            assertThat(assembler().page(moderator, owner, "streamer", 0, null, null).faceit()).isNull();
+            verify(faceitAccounts, never()).data(moderator);
+            assertThat(java.util.Arrays.stream(fr.enimaloc.catapult.common.dto.channel.FaceitData.class
+                    .getRecordComponents()).map(java.lang.reflect.RecordComponent::getName))
+                    .containsExactly("nickname", "profileUrl", "available");
         }
 
         @Test

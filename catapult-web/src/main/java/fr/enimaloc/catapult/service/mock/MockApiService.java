@@ -675,6 +675,31 @@ public class MockApiService implements ApiService {
         return NO_CONTENT;
     }
 
+    /** Like catapult-api: 2 to 32 letters, digits, dots, dashes or underscores; the nickname "ghost" is unknown. */
+    @Override
+    public int saveFaceitNickname(String username, String nickname) {
+        log.trace("saveFaceitNickname({}, {})", username, nickname);
+        String name = nickname == null ? "" : nickname.strip();
+        if (!name.matches("[\\p{L}\\p{N}._-]{2,32}") || name.equalsIgnoreCase("ghost")) {
+            return BAD_REQUEST;
+        }
+        return faceitChanged(username, data -> data.saveFaceitNickname(name));
+    }
+
+    @Override
+    public int deleteFaceitNickname(String username) {
+        log.trace("deleteFaceitNickname({})", username);
+        return faceitChanged(username, MockData::deleteFaceitNickname);
+    }
+
+    private int faceitChanged(String username, java.util.function.Consumer<MockData> change) {
+        MockData data = currentData();
+        change.accept(data);
+        eventPublisher.publishEvent(fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent.of(username,
+                data.faceitData()));
+        return NO_CONTENT;
+    }
+
     private int retroAchievementsChanged(String username, java.util.function.Consumer<MockData> change) {
         MockData data = currentData();
         change.accept(data);

@@ -871,4 +871,27 @@ class ChannelActionsControllerTest {
                         .content("{\"riotId\":\"Down#EUW\",\"platform\":\"euw1\"}"))
                 .andExpect(status().isServiceUnavailable());
     }
+
+    @Test
+    void faceitNickname_isSavedAndForgottenThroughTheApi_andRefusalsKeepTheirStatus() throws Exception {
+        mvc.perform(post("/channel/enimaloc/settings/faceit/nickname").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"Catapult\"}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/channel/enimaloc/settings/faceit/nickname/delete").with(csrf()))
+                .andExpect(status().isNoContent());
+        verify(apiService).saveFaceitNickname("enimaloc", "Catapult");
+        verify(apiService).deleteFaceitNickname("enimaloc");
+
+        when(apiService.saveFaceitNickname("enimaloc", "Ghost")).thenReturn(400);
+        when(apiService.saveFaceitNickname("enimaloc", "Down")).thenReturn(503);
+        mvc.perform(post("/channel/enimaloc/settings/faceit/nickname").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"Ghost\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post("/channel/enimaloc/settings/faceit/nickname").with(csrf())
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"Down\"}"))
+                .andExpect(status().isServiceUnavailable());
+    }
 }
