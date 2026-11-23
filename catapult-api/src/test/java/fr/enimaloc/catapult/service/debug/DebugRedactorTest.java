@@ -324,4 +324,18 @@ class DebugRedactorTest {
                 .isEqualTo("FACEIT refused Bearer [masqué] at 10:00");
         assertThat(redactor.text("refused Bearer " + key, true)).contains(key);
     }
+
+    @Test
+    void osusCredentialsAreMasked_inHeadersBodiesAndText() {
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.set("Authorization", "Bearer MEMBERTOKEN");
+        assertThat(redactor.headers(headers, false)).doesNotContain("MEMBERTOKEN");
+        assertThat(redactor.body(b("client_id=1&client_secret=CSECRET&grant_type=refresh_token&refresh_token=RSECRET"),
+                MediaType.APPLICATION_FORM_URLENCODED, false)).doesNotContain("CSECRET").doesNotContain("RSECRET");
+        assertThat(redactor.body(b("{\"access_token\":\"ATOKEN\",\"refresh_token\":\"RTOKEN\","
+                + "\"expires_in\":86400}"), MediaType.APPLICATION_JSON, false))
+                .doesNotContain("ATOKEN").doesNotContain("RTOKEN").contains("expires_in");
+        assertThat(redactor.text("osu! refused client_secret=CSECRET&refresh_token=RSECRET", false))
+                .doesNotContain("CSECRET").doesNotContain("RSECRET");
+    }
 }

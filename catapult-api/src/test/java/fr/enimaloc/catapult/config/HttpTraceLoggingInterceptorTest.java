@@ -241,4 +241,30 @@ class HttpTraceLoggingInterceptorTest {
 
         assertThat(messages()).contains("auth=Bearer").contains("nickname=Catapult").doesNotContain("12345678-abcd");
     }
+
+    @Test
+    void osusTokenRefreshIsMasked() throws IOException {
+        MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.POST,
+                URI.create("https://osu.ppy.sh/oauth/token"));
+
+        interceptor.intercept(request, ("client_id=12345&client_secret=CSECRET&grant_type=refresh_token"
+                        + "&refresh_token=RSECRET&scope=identify+public").getBytes(),
+                respondWith("{\"token_type\":\"Bearer\",\"expires_in\":86400,\"access_token\":\"ATOKEN\","
+                        + "\"refresh_token\":\"RTOKEN\"}"));
+
+        assertThat(messages()).contains("refresh_token=***").contains("client_id=12345").contains("expires_in")
+                .doesNotContain("CSECRET").doesNotContain("RSECRET").doesNotContain("ATOKEN")
+                .doesNotContain("RTOKEN");
+    }
+
+    @Test
+    void osusMemberTokenIsNeverEchoed() throws IOException {
+        MockClientHttpRequest request = new MockClientHttpRequest(HttpMethod.GET,
+                URI.create("https://osu.ppy.sh/api/v2/me"));
+        request.getHeaders().set("Authorization", "Bearer MEMBERTOKEN");
+
+        interceptor.intercept(request, new byte[0], respondWith("{\"id\":1}"));
+
+        assertThat(messages()).doesNotContain("MEMBERTOKEN");
+    }
 }

@@ -72,6 +72,9 @@ class SimulatedEnrichmentClientsWiringTest {
         @Bean HttpXboxStatsClient xboxStats() { return mock(HttpXboxStatsClient.class); }
         @Bean HttpRetroAchievementsClient raStats() { return mock(HttpRetroAchievementsClient.class); }
         @Bean HttpBlizzardClient blizzard() { return mock(HttpBlizzardClient.class); }
+        @Bean fr.enimaloc.catapult.service.enrichment.osu.HttpOsuClient osu() {
+            return mock(fr.enimaloc.catapult.service.enrichment.osu.HttpOsuClient.class);
+        }
         @Bean fr.enimaloc.catapult.service.enrichment.bungie.HttpBungieClient bungie() {
             return mock(fr.enimaloc.catapult.service.enrichment.bungie.HttpBungieClient.class);
         }
@@ -87,7 +90,7 @@ class SimulatedEnrichmentClientsWiringTest {
     @Configuration(proxyBeanMethods = false)
     @ComponentScan(basePackageClasses = SimulatedProtonDbClient.class, useDefaultFilters = false,
             includeFilters = @ComponentScan.Filter(type = FilterType.REGEX,
-                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity|SteamStats|XboxStats|RetroAchievements|Blizzard|Bungie|Riot|Faceit)Client|.*SimulatedBlizzardAppTokenService"))
+                    pattern = ".*Simulated(ProtonDb|SteamDeck|PcGamingWiki|SteamGridDb|Itad|OpenCritic|Speedrun|TwitchActivity|SteamStats|XboxStats|RetroAchievements|Blizzard|Bungie|Riot|Faceit|Osu)Client|.*SimulatedBlizzardAppTokenService"))
     static class SimulatedClients {
     }
 
@@ -116,6 +119,8 @@ class SimulatedEnrichmentClientsWiringTest {
                     .isInstanceOf(SimulatedBlizzardAppTokenService.class);
             assertThat(ctx.getBean(fr.enimaloc.catapult.service.enrichment.bungie.BungieClient.class))
                     .isInstanceOf(SimulatedBungieClient.class);
+            assertThat(ctx.getBean(fr.enimaloc.catapult.service.enrichment.osu.OsuClient.class))
+                    .isInstanceOf(SimulatedOsuClient.class);
         });
     }
 
@@ -138,6 +143,8 @@ class SimulatedEnrichmentClientsWiringTest {
                     .isInstanceOf(fr.enimaloc.catapult.service.enrichment.bungie.HttpBungieClient.class);
             assertThat(ctx.getBean(RiotClient.class)).isInstanceOf(HttpRiotClient.class);
             assertThat(ctx.getBean(FaceitClient.class)).isInstanceOf(HttpFaceitClient.class);
+            assertThat(ctx.getBean(fr.enimaloc.catapult.service.enrichment.osu.OsuClient.class))
+                    .isInstanceOf(fr.enimaloc.catapult.service.enrichment.osu.HttpOsuClient.class);
         });
     }
 
@@ -243,6 +250,16 @@ class SimulatedEnrichmentClientsWiringTest {
         assertThatThrownBy(() -> ra.profile("simulated", new RaCredentials("other", false)))
                 .isInstanceOf(RaKeyRejectedException.class);
         assertThat(new SimulatedRetroAchievementsClient()).isNotNull();
+    }
+
+    @Test
+    void simulatedOsu_answersDeterministically() {
+        var osu = new SimulatedOsuClient();
+        assertThat(osu.refresh("any").refreshToken()).isNotBlank();
+        assertThat(osu.me("t").id()).isEqualTo(SimulatedOsuClient.USER_ID);
+        assertThat(osu.me("t").statistics().pp()).isPositive();
+        assertThat(osu.recentScores(SimulatedOsuClient.USER_ID, "osu", 5, "t")).hasSize(2);
+        assertThat(osu.recentScores(SimulatedOsuClient.USER_ID, "osu", 1, "t")).hasSize(1);
     }
 
     @Test

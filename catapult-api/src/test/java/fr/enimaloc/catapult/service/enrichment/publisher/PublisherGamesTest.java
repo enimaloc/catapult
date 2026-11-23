@@ -84,4 +84,13 @@ class PublisherGamesTest {
         assertThat(JsonMapper.builder().build().writeValueAsString(PublisherGames.FaceitGame.CS2))
                 .isEqualTo("\"cs2\"");
     }
+
+    @Test
+    void osuAndLazer_byIgdbId() {
+        assertThat(PublisherGames.osu("3012")).contains(PublisherGames.OsuGame.OSU);
+        assertThat(PublisherGames.osu("412517")).contains(PublisherGames.OsuGame.OSU);
+        assertThat(PublisherGames.osu("1")).isEmpty();
+        assertThat(PublisherGames.osu(null)).isEmpty();
+        assertThat(JsonMapper.builder().build().writeValueAsString(PublisherGames.OsuGame.OSU)).isEqualTo("\"osu\"");
+    }
 }

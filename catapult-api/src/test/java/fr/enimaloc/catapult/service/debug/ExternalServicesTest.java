@@ -21,6 +21,7 @@ class ExternalServicesTest {
             "https://oauth.battle.net/token, battlenet",
             "https://eu.api.blizzard.com/x, battlenet",
             "https://www.bungie.net/Platform/Settings/, bungie",
+            "https://osu.ppy.sh/api/v2/me, osu",
             "https://haapi.ankama.com/json/Ankama/v5/Account/Account, ankama",
             "https://api.twitch.tv/helix/users, twitch",
             "https://example.org/x, example.org",

@@ -117,6 +117,14 @@ public class EnrichmentProperties {
         private String cs2IgdbId = "242408";
     }
 
+    /** osu! API settings that are not a source's own ({@code catapult.enrichment.osu.*}). */
+    @Getter
+    @Setter
+    public static class Osu {
+        /** Upstream calls per minute: osu! asks for no more than 60, this one keeps a margin. */
+        private int perMinute = 50;
+    }
+
     private SourceSettings hltb = new SourceSettings();
     private SourceSettings protondb = new SourceSettings();
     private SourceSettings steamgriddb = new SourceSettings();
@@ -171,6 +179,9 @@ public class EnrichmentProperties {
     private SourceSettings chessChesscomStats = new SourceSettings();
     private SourceSettings chessChesscomGames = new SourceSettings();
     private SourceSettings chessLichessUser = new SourceSettings();
+    private SourceSettings osuProfile = new SourceSettings();
+    private SourceSettings osuRecent = new SourceSettings();
+    private Osu osu = new Osu();
     private Speedrun speedrun = new Speedrun();
     private RetroAchievements retroachievements = new RetroAchievements();
     private XboxStats xboxStats = new XboxStats();
@@ -249,6 +260,10 @@ public class EnrichmentProperties {
 
     public BlizzardRegion blizzardDefaultRegion() {
         return blizzard.getDefaultRegion();
+    }
+
+    public int osuPerMinute() {
+        return osu.getPerMinute();
     }
 
     public int bungiePerHour() {
@@ -331,6 +346,8 @@ public class EnrichmentProperties {
             case CHESS_CHESSCOM_STATS -> chessChesscomStats;
             case CHESS_CHESSCOM_GAMES -> chessChesscomGames;
             case CHESS_LICHESS_USER -> chessLichessUser;
+            case OSU_PROFILE -> osuProfile;
+            case OSU_RECENT -> osuRecent;
         };
     }
 
@@ -366,6 +383,7 @@ public class EnrichmentProperties {
             case FACEIT_LAST_MATCH -> Duration.ofMinutes(5);
             case CHESS_CHESSCOM_STATS -> Duration.ofMinutes(10);
             case CHESS_CHESSCOM_GAMES, CHESS_LICHESS_USER -> Duration.ofMinutes(2);
+            case OSU_PROFILE, OSU_RECENT -> Duration.ofMinutes(2);
         };
     }
 }

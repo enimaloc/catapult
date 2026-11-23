@@ -92,6 +92,22 @@ public final class PublisherGames {
         return Optional.empty();
     }
 
+    /** The osu! games the enrichment knows (osu! and osu!lazer are the one game, the same account). */
+    public enum OsuGame {
+        @JsonProperty("osu") OSU
+    }
+
+    /**
+     * IGDB's ids of osu! ({@code osu}) and osu!lazer ({@code osu-lazer}), checked on IGDB on 2026-11-23: both are the
+     * one osu! account and rulesets.
+     */
+    static final java.util.Set<String> OSU_IGDB_IDS = java.util.Set.of("3012", "412517");
+
+    /** The osu! game of a detected one, by IGDB id (osu! has no detection source of its own). */
+    public static Optional<OsuGame> osu(String igdbId) {
+        return igdbId != null && OSU_IGDB_IDS.contains(igdbId) ? Optional.of(OsuGame.OSU) : Optional.empty();
+    }
+
     /** A Battle.net variant of a game (the source id carries a {@code :}, like {@code WoW:Forever}). */
     public static boolean isBlizzardVariant(DetectedGame game) {
         return game != null && game.getSourceType() == SourceType.BATTLENET && game.getSourceId() != null
