@@ -1580,6 +1580,7 @@ describe("parts built only once shown (lazy.js)", () => {
               <div id="channel-api-connections">
                 <button id="faceit-delete-btn"></button>
                 <button id="osu-disconnect-btn"></button>
+                <button id="hypixel-delete-btn"></button>
               </div>
             </section>`);
         render();
@@ -1587,11 +1588,13 @@ describe("parts built only once shown (lazy.js)", () => {
         CatapultLazy.showIn(document.getElementById("integrations"));
         await click("#faceit-delete-btn");
         await click("#osu-disconnect-btn");
+        await click("#hypixel-delete-btn");
         await click("#battlenet-disconnect-btn");
 
         expect(posts()).toEqual([
             ["/channel/enimaloc/settings/faceit/nickname/delete", {}],
             ["/channel/enimaloc/settings/osu/delete", {}],
+            ["/channel/enimaloc/settings/hypixel/account/delete", {}],
             ["/channel/enimaloc/battlenet/disconnect", {}],
         ]);
     });

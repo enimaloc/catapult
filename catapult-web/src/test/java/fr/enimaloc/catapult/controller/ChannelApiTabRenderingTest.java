@@ -5,6 +5,7 @@ import fr.enimaloc.catapult.common.dto.channel.ChannelUserDto;
 import fr.enimaloc.catapult.common.dto.channel.ChessData;
 import fr.enimaloc.catapult.common.dto.channel.DtddMappingStatusDto;
 import fr.enimaloc.catapult.common.dto.channel.FaceitData;
+import fr.enimaloc.catapult.common.dto.channel.HypixelData;
 import fr.enimaloc.catapult.common.dto.channel.PagedBindings;
 import fr.enimaloc.catapult.common.dto.channel.UserSettingsDto;
 import fr.enimaloc.catapult.common.dto.channel.XboxData;
@@ -55,10 +56,14 @@ class ChannelApiTabRenderingTest {
     }
 
     private static ChannelPageData page(boolean owner, FaceitData faceit, ChessData chess) {
+        return page(owner, faceit, chess, null);
+    }
+
+    private static ChannelPageData page(boolean owner, FaceitData faceit, ChessData chess, HypixelData hypixel) {
         return new ChannelPageData(new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
                 "enimaloc", owner, true, true, null, new PagedBindings(0, 1, 0, List.of()), List.of(), Set.of(),
                 List.of(), Set.of(), null, null, null, owner ? new XboxData(true) : null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, faceit, chess);
+                null, null, null, null, null, null, null, null, faceit, chess, null, hypixel);
     }
 
     private String render(ChannelPageData data) throws Exception {
@@ -97,14 +102,15 @@ class ChannelApiTabRenderingTest {
 
     @Test
     void theStatsCards_areOnTheApiTab_theDetectionOnesOnIntegrations() throws Exception {
-        String html = render(page(true, new FaceitData("s1mple", null, true), new ChessData("hikaru", null)));
+        String html = render(page(true, new FaceitData("s1mple", null, true), new ChessData("hikaru", null),
+                new HypixelData("Technoblade", "b876ec32e396476ba1158438d83c67d4", true)));
 
         String api = panel(html, "api");
         assertThat(api).contains("id=\"channel-api-connections\"", "data-conn=\"faceit\"", "data-conn=\"chess\"",
-                "id=\"channel-api-stats-intro\"").doesNotContain("data-conn=\"xbox\"", "data-conn=\"twitch\"");
+                "data-conn=\"hypixel\"", "id=\"channel-api-stats-intro\"").doesNotContain("data-conn=\"xbox\"", "data-conn=\"twitch\"");
         String integrations = panel(html, "integrations");
         assertThat(integrations).contains("id=\"channel-connections\"", "data-conn=\"twitch\"", "data-conn=\"xbox\"")
-                .doesNotContain("data-conn=\"faceit\"", "data-conn=\"chess\"");
+                .doesNotContain("data-conn=\"faceit\"", "data-conn=\"chess\"", "data-conn=\"hypixel\"");
         // Both grids share the layout.
         assertThat(api).contains("class=\"connection-grid\"");
         assertThat(integrations).contains("class=\"connection-grid\"");
