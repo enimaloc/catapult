@@ -158,9 +158,9 @@ public class DebugRedactor {
             "(?<![\\w.-])([A-Za-z_][\\w.-]*)=[^&\\s\"'#<>,;)\\]}]*");
     /** The RetroAchievements key in a query string quoted in text; a bare {@code y=} (a coordinate) is left alone. */
     private static final Pattern RA_KEY_IN_TEXT = Pattern.compile("(?i)([?&]y=)(?!\\[masqué])[^&\\s\"'#<>,;)\\]}]+");
-    /** A Riot API key ({@code RGAPI-<uuid>}) wherever it is quoted, with or without a name before it. */
     /** A JWT (a Supercell API key is one, bound to IP addresses but a credential still) wherever it is quoted. */
     static final Pattern JWT = Pattern.compile("eyJ[A-Za-z0-9_-]{8,}\\.eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]+");
+    /** A Riot API key ({@code RGAPI-<uuid>}) wherever it is quoted, with or without a name before it. */
     static final Pattern RIOT_KEY = Pattern.compile("(?i)RGAPI-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
     /** {@code Name:} as a header is written; what follows, up to the end of the line or a quote, is its value. */
     private static final Pattern HEADER_IN_TEXT = Pattern.compile("(?<![\\w.-])([A-Za-z][\\w-]*)[ \\t]*:[ \\t]*");
