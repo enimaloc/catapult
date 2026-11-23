@@ -47,8 +47,9 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
             "bungie_unavailable", "bungie_failed", "bungie_mismatch", "bungie_cancelled",
             "osu_unavailable", "osu_failed", "osu_mismatch", "osu_cancelled");
     /**
-     * Refusals of a link the member started from their channel's integrations tab: they go back there, the code as
-     * {@code error}, for the card to tell why (TwitchLoginSuccessHandler sends a successful link to the same tab).
+     * Refusals of a link the member started from their channel's page: they go back to the card's tab (Integrations for
+     * Epic, API for the personal stats' Blizzard, Bungie and osu!), the code as {@code error}, for the card to tell why
+     * (TwitchLoginSuccessHandler sends a successful link to the same tab).
      */
     private static final Set<String> CHANNEL_LINK_ERROR_CODES = Set.of(
             "epic_unavailable", "epic_full", "epic_already_linked",
@@ -169,7 +170,7 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
                 return UriComponentsBuilder.fromUriString(webUrl)
                         .path("/channel/{username}")
                         .queryParam("error", errorCode)
-                        .fragment("integrations")
+                        .fragment(errorCode.startsWith("epic_") ? "integrations" : "api")
                         .buildAndExpand(login)
                         .toUriString();
             }

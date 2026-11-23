@@ -256,7 +256,7 @@ class TwitchLoginSuccessHandlerTest {
         verify(oAuthTokenRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());
         assertThat(response.getRedirectedUrl())
-                .isEqualTo("https://web.example.com/channel/jeb_?imported=wow#integrations");
+                .isEqualTo("https://web.example.com/channel/jeb_?imported=wow#api");
     }
 
     @Test
@@ -271,7 +271,7 @@ class TwitchLoginSuccessHandlerTest {
         handler.onAuthenticationSuccess(request, response, authToken);
 
         assertThat(response.getRedirectedUrl())
-                .isEqualTo("https://web.example.com/channel/jeb_?imported=wow-empty#integrations");
+                .isEqualTo("https://web.example.com/channel/jeb_?imported=wow-empty#api");
     }
 
     @Test
@@ -381,7 +381,7 @@ class TwitchLoginSuccessHandlerTest {
         verify(authorizedClientRepository).removeAuthorizedClient("bungie", authToken, request, response);
         verify(oAuthTokenRepository, never()).save(any());
         assertThat(response.getRedirectedUrl())
-                .isEqualTo("https://web.example.com/channel/jeb_?linked=bungie#integrations");
+                .isEqualTo("https://web.example.com/channel/jeb_?linked=bungie#api");
     }
 
     @Test
@@ -400,7 +400,7 @@ class TwitchLoginSuccessHandlerTest {
         verify(bungieLinks, never()).complete(any(), any(), any(), any(), any());
         verify(authorizedClientRepository).removeAuthorizedClient("bungie", authToken, request, response);
         assertThat(response.getRedirectedUrl())
-                .isEqualTo("https://web.example.com/channel/jeb_?error=bungie_failed#integrations");
+                .isEqualTo("https://web.example.com/channel/jeb_?error=bungie_failed#api");
     }
 
     @Test
@@ -458,7 +458,7 @@ class TwitchLoginSuccessHandlerTest {
         verify(oAuthTokenRepository, never()).save(any());
         verifyNoInteractions(bungieLinks);
         assertThat(response.getRedirectedUrl())
-                .isEqualTo("https://web.example.com/channel/jeb_?linked=osu#integrations");
+                .isEqualTo("https://web.example.com/channel/jeb_?linked=osu#api");
     }
 
     @Test
@@ -479,7 +479,7 @@ class TwitchLoginSuccessHandlerTest {
         verify(osuLinks, never()).complete(any(), any(), any(), any(), any());
         verify(authorizedClientRepository).removeAuthorizedClient("osu", authToken, request, response);
         assertThat(response.getRedirectedUrl())
-                .isEqualTo("https://web.example.com/channel/jeb_?error=osu_failed#integrations");
+                .isEqualTo("https://web.example.com/channel/jeb_?error=osu_failed#api");
 
         response = new MockHttpServletResponse();
         org.mockito.Mockito.doThrow(new IllegalStateException("refresh-token")).when(osuLinks)
