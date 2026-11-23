@@ -16,6 +16,8 @@ import java.util.regex.Pattern;
  * unknown key id is a 404, and only the masked form ever leaves the store.
  */
 class MockKeysStore {
+    /** The shape an OAuth client secret takes (osu!, Bungie): checked like the API does. */
+    private static final Pattern SECRET_SHAPE = Pattern.compile("[A-Za-z0-9._~+/=-]{16,128}");
     private static final Map<ApiKeyProvider, Pattern> FORMATS = Map.of(
             ApiKeyProvider.STEAM, Pattern.compile("[0-9A-Fa-f]{32}"),
             ApiKeyProvider.DTDD, Pattern.compile("ddd_[A-Za-z0-9]{16,128}"),
@@ -100,7 +102,7 @@ class MockKeysStore {
     synchronized int saveOsu(String clientId, String clientSecret) {
         String id = clientId == null ? "" : clientId.trim();
         String secret = clientSecret == null ? "" : clientSecret.trim();
-        if (!id.matches("[0-9]{1,20}") || (!secret.isEmpty() && !secret.matches("[A-Za-z0-9._~+/=-]{16,128}"))) {
+        if (!id.matches("[0-9]{1,20}") || (!secret.isEmpty() && !SECRET_SHAPE.matcher(secret).matches())) {
             return 400;
         }
         if ((osuClientId == null || !osuClientId.equals(id)) && secret.isEmpty()) return 400;
@@ -128,7 +130,7 @@ class MockKeysStore {
         String id = clientId == null ? "" : clientId.trim();
         String secret = clientSecret == null ? "" : clientSecret.trim();
         String key = apiKey == null ? "" : apiKey.trim();
-        if (!id.matches("[0-9]{1,20}") || (!secret.isEmpty() && !secret.matches("[A-Za-z0-9._~+/=-]{16,128}"))
+        if (!id.matches("[0-9]{1,20}") || (!secret.isEmpty() && !SECRET_SHAPE.matcher(secret).matches())
                 || (!key.isEmpty() && !key.matches("[0-9A-Fa-f]{32}"))) {
             return 400;
         }

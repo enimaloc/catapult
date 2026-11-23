@@ -86,8 +86,8 @@ class HttpOsuClientTest {
 
         OsuData.TokenGrant grant = client.refresh("old+refresh");
 
-        assertThat(grant.accessToken()).isEqualTo("eyJ0eXAiOiJKV1Qi-access");
-        assertThat(grant.refreshToken()).isEqualTo("def50200-refresh");
+        assertThat(grant.accessToken()).isEqualTo("fake-access-token");
+        assertThat(grant.refreshToken()).isEqualTo("fake-refresh-token");
         assertThat(grant.expiresAt()).isEqualTo(NOW.plusSeconds(86_400));
         assertThat(grant.toString()).doesNotContain("eyJ0").doesNotContain("def50200");
         assertThat(acquired).hasValue(1);
