@@ -63,6 +63,7 @@ import fr.enimaloc.catapult.common.dto.admin.ItadKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.OpenCriticKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.RetroAchievementsKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.RiotKeysPageData;
+import fr.enimaloc.catapult.common.dto.admin.FaceitKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.SteamKeysPageData;
 import fr.enimaloc.catapult.common.dto.admin.WhitelistPageDto;
 import fr.enimaloc.catapult.common.dto.admin.MemberTargetingDto;
@@ -1589,6 +1590,10 @@ public class RealApiService implements ApiService {
                 RiotKeysPageData page = client.get("/api/internal/admin/riot-keys", RiotKeysPageData.class);
                 yield page == null ? null : ApiKeysPageDto.of(page);
             }
+            case FACEIT -> {
+                FaceitKeysPageData page = client.get("/api/internal/admin/faceit-keys", FaceitKeysPageData.class);
+                yield page == null ? null : ApiKeysPageDto.of(page);
+            }
         };
     }
 
@@ -1603,6 +1608,7 @@ public class RealApiService implements ApiService {
             case OPENCRITIC -> client.call(HttpMethod.POST, "/api/internal/admin/opencritic-keys", body, Void.class);
             case RETROACHIEVEMENTS -> client.call(HttpMethod.POST, "/api/internal/admin/retroachievements-keys", body, Void.class);
             case RIOT -> client.call(HttpMethod.POST, "/api/internal/admin/riot-keys", body, Void.class);
+            case FACEIT -> client.call(HttpMethod.POST, "/api/internal/admin/faceit-keys", body, Void.class);
         };
         return result.status();
     }
@@ -1617,6 +1623,7 @@ public class RealApiService implements ApiService {
             case OPENCRITIC -> client.call(HttpMethod.DELETE, "/api/internal/admin/opencritic-keys/{keyId}", null, Void.class, keyId);
             case RETROACHIEVEMENTS -> client.call(HttpMethod.DELETE, "/api/internal/admin/retroachievements-keys/{keyId}", null, Void.class, keyId);
             case RIOT -> client.call(HttpMethod.DELETE, "/api/internal/admin/riot-keys/{keyId}", null, Void.class, keyId);
+            case FACEIT -> client.call(HttpMethod.DELETE, "/api/internal/admin/faceit-keys/{keyId}", null, Void.class, keyId);
         };
         return result.status();
     }
@@ -1631,6 +1638,7 @@ public class RealApiService implements ApiService {
             case OPENCRITIC -> client.call(HttpMethod.POST, "/api/internal/admin/opencritic-keys/refresh", null, Void.class);
             case RETROACHIEVEMENTS -> client.call(HttpMethod.POST, "/api/internal/admin/retroachievements-keys/refresh", null, Void.class);
             case RIOT -> client.call(HttpMethod.POST, "/api/internal/admin/riot-keys/refresh", null, Void.class);
+            case FACEIT -> client.call(HttpMethod.POST, "/api/internal/admin/faceit-keys/refresh", null, Void.class);
         };
         return result.status();
     }

@@ -489,6 +489,7 @@ public class AdminTabsFragmentController {
             model.addAttribute("retroachievements", apiService.adminApiKeys(ApiKeyProvider.RETROACHIEVEMENTS));
             model.addAttribute("bungie", apiService.adminBungieCredentials());
             model.addAttribute("riot", apiService.adminApiKeys(ApiKeyProvider.RIOT));
+            model.addAttribute("faceit", apiService.adminApiKeys(ApiKeyProvider.FACEIT));
             model.addAttribute("minecraft", apiService.adminMinecraftAccounts());
             model.addAttribute("battlenet", apiService.adminBattleNetAccounts());
             model.addAttribute("ankama", apiService.adminAnkamaAccounts());

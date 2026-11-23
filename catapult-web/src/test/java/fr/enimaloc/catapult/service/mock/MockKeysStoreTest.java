@@ -38,6 +38,8 @@ class MockKeysStoreTest {
         assertThat(store.add(ApiKeyProvider.RETROACHIEVEMENTS, " " + RAW + " ")).isEqualTo(204);
         assertThat(store.add(ApiKeyProvider.RIOT, RAW)).isEqualTo(400);
         assertThat(store.add(ApiKeyProvider.RIOT, " RGAPI-12345678-abcd-4ef0-9abc-0123456789ab ")).isEqualTo(204);
+        assertThat(store.add(ApiKeyProvider.FACEIT, RAW)).isEqualTo(400);
+        assertThat(store.add(ApiKeyProvider.FACEIT, " 12345678-abcd-4ef0-9abc-0123456789ab ")).isEqualTo(204);
     }
 
     @Test

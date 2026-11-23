@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * The mock's Steam, DTDD, SteamGridDB, IsThereAnyDeal, OpenCritic, RetroAchievements and Riot shared API keys: one store for the whole application. Answers like
+ * The mock's Steam, DTDD, SteamGridDB, IsThereAnyDeal, OpenCritic, RetroAchievements, Riot and FACEIT shared API keys: one store for the whole application. Answers like
  * catapult-api: the same key formats (400 otherwise), an already listed key changes nothing, an
  * unknown key id is a 404, and only the masked form ever leaves the store.
  */
@@ -24,7 +24,9 @@ class MockKeysStore {
             ApiKeyProvider.OPENCRITIC, Pattern.compile("[A-Za-z0-9]{40,60}"),
             ApiKeyProvider.RETROACHIEVEMENTS, Pattern.compile("[A-Za-z0-9]{16,64}"),
             ApiKeyProvider.RIOT, Pattern.compile(
-                    "RGAPI-[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"));
+                    "RGAPI-[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"),
+            ApiKeyProvider.FACEIT, Pattern.compile(
+                    "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"));
 
     private final Map<ApiKeyProvider, List<String>> keys = new EnumMap<>(ApiKeyProvider.class);
 
@@ -37,6 +39,7 @@ class MockKeysStore {
                 new ArrayList<>(List.of("MockRapidApiKey0123456789MockRapidApiKey0123456789")));
         keys.put(ApiKeyProvider.RETROACHIEVEMENTS, new ArrayList<>(List.of("MockRaKey0123456789abcdefghijklmn")));
         keys.put(ApiKeyProvider.RIOT, new ArrayList<>(List.of("RGAPI-00000000-0000-4000-8000-000000000000")));
+        keys.put(ApiKeyProvider.FACEIT, new ArrayList<>(List.of("00000000-0000-4000-8000-0000000fac17")));
     }
 
     private static String mask(String key) {
@@ -54,7 +57,8 @@ class MockKeysStore {
         int window = (int) (tick % 4);
         if (provider == ApiKeyProvider.STEAMGRIDDB || provider == ApiKeyProvider.ITAD
                 || provider == ApiKeyProvider.OPENCRITIC || provider == ApiKeyProvider.RETROACHIEVEMENTS
-                || provider == ApiKeyProvider.RIOT) {
+                || provider == ApiKeyProvider.RIOT
+                || provider == ApiKeyProvider.FACEIT) {
             return new KeyUsageDto(window, null, 60, null, "DAY", 40 + tick % 20, null, null);
         }
         return provider == ApiKeyProvider.STEAM

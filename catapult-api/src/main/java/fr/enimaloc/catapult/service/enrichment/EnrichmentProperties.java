@@ -100,6 +100,23 @@ public class EnrichmentProperties {
         private String valorantIgdbId = "126459";
     }
 
+    /**
+     * FACEIT Data API settings that are not a source's own ({@code catapult.enrichment.faceit.*}). The gateway was
+     * seen answering {@code ratelimit-limit: 20, 20;w=1}: half of it is used. The hourly cap is a choice (FACEIT
+     * documents none). The IGDB id tells Counter-Strike 2 (an empty one maps it by its Steam app id only).
+     */
+    @Getter
+    @Setter
+    public static class Faceit {
+        /** The whole FACEIT source; it also stays off while the key pool is empty. */
+        private boolean enabled = true;
+        /** Calls per second (spaced: a call too close to the previous one waits). */
+        private int perSecond = 10;
+        /** Calls per hour (refused beyond). */
+        private int perHour = 10_000;
+        private String cs2IgdbId = "242408";
+    }
+
     private SourceSettings hltb = new SourceSettings();
     private SourceSettings protondb = new SourceSettings();
     private SourceSettings steamgriddb = new SourceSettings();
@@ -147,6 +164,7 @@ public class EnrichmentProperties {
     private SourceSettings bungieSeason = new SourceSettings();
     private Bungie bungie = new Bungie();
     private Riot riot = new Riot();
+    private Faceit faceit = new Faceit();
     private Speedrun speedrun = new Speedrun();
     private RetroAchievements retroachievements = new RetroAchievements();
     private XboxStats xboxStats = new XboxStats();
@@ -237,6 +255,10 @@ public class EnrichmentProperties {
 
     public boolean riotEnabled() {
         return riot.isEnabled();
+    }
+
+    public boolean faceitEnabled() {
+        return faceit.isEnabled();
     }
 
     public int speedrunPerMinute() {
