@@ -46,6 +46,8 @@ class TokenKeyRotationRunnerTest {
     @BeforeEach
     void clean() {
         jdbc.update("DELETE FROM oauth_token");
+        // Not tied to an account (one application row): left over, it would be seen by every other test
+        jdbc.update("DELETE FROM bungie_app_credentials");
         jdbc.update("DELETE FROM user_account");
     }
 

@@ -14,6 +14,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -149,7 +151,7 @@ public class BungieTokenService {
             String refreshToken;
             try {
                 if (pending != null && !(Objects.equals(pending.expectedVersion(), read.getVersion())
-                        && Objects.equals(pending.expectedEnc(), read.getRefreshTokenEnc()))) {
+                        && sameSecret(pending.expectedEnc(), read.getRefreshTokenEnc()))) {
                     // The row changed since this token was rotated (linked again elsewhere): it is not this row's
                     unsaved.remove(userId);
                     pending = null;
@@ -196,7 +198,7 @@ public class BungieTokenService {
      */
     public void refused(UUID userId, String token) {
         Held known = held.get(userId);
-        if (known != null && known.token().equals(token)) {
+        if (known != null && sameSecret(known.token(), token)) {
             held.remove(userId, known);
             if (known.obtainedAt().plus(REFUSED_COOLDOWN).isAfter(clock.instant())) {
                 cooldown.put(userId, clock.instant().plus(REFUSED_COOLDOWN));
@@ -217,6 +219,14 @@ public class BungieTokenService {
         unsaved.remove(userId);
         cooldown.remove(userId);
         // The lock entry stays: evict runs under it, and a fresh one would let two renewals race on one token
+    }
+
+    /** Two secrets compared in constant time; two nulls are the same. */
+    private static boolean sameSecret(String a, String b) {
+        if (a == null || b == null) {
+            return a == b;
+        }
+        return MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8));
     }
 
     private Object lock(UUID userId) {
@@ -307,7 +317,7 @@ public class BungieTokenService {
         try {
             Optional<BungieAccount> row = accounts.findById(userId);
             if (row.isEmpty() || !Objects.equals(row.get().getVersion(), version)
-                    || !Objects.equals(row.get().getRefreshTokenEnc(), refreshEnc)
+                    || !sameSecret(row.get().getRefreshTokenEnc(), refreshEnc)
                     || !Objects.equals(row.get().getMembershipId(), membershipId)) {
                 return false;
             }
