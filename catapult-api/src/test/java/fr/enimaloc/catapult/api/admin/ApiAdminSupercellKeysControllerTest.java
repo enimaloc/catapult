@@ -84,7 +84,7 @@ class ApiAdminSupercellKeysControllerTest {
     @Test
     void add_takesAKeyWhosePayloadCannotBeRead() {
         String key = SupercellTestKeys.unreadable();
-        when(repository.existsById(key)).thenReturn(false);
+        when(repository.findById(key)).thenReturn(java.util.Optional.empty());
 
         controller.add("brawl-stars", new AddKeyRequest(key));
 
@@ -93,7 +93,7 @@ class ApiAdminSupercellKeysControllerTest {
 
     @Test
     void add_savesTheTrimmedKeyInItsGame_andTellsTheAdminMasked() {
-        when(repository.existsById(COC)).thenReturn(false);
+        when(repository.findById(COC)).thenReturn(java.util.Optional.empty());
 
         controller.add("Clash-Of-Clans", new AddKeyRequest("  " + COC + " "));
 
@@ -108,9 +108,20 @@ class ApiAdminSupercellKeysControllerTest {
 
     @Test
     void add_aKeyAlreadyThere_changesNothing() {
-        when(repository.existsById(COC)).thenReturn(true);
+        when(repository.findById(COC)).thenReturn(java.util.Optional.of(new SupercellApiKeyEntry(COC, "clash-of-clans")));
 
         controller.add("clash-of-clans", new AddKeyRequest(COC));
+
+        verify(repository, never()).save(any());
+        verifyNoInteractions(events);
+    }
+
+    @Test
+    void add_aKeyAlreadyInAnotherGamesPool_is409() {
+        String key = SupercellTestKeys.unreadable();
+        when(repository.findById(key)).thenReturn(java.util.Optional.of(new SupercellApiKeyEntry(key, "clash-royale")));
+
+        assertStatus(() -> controller.add("brawl-stars", new AddKeyRequest(key)), HttpStatus.CONFLICT);
 
         verify(repository, never()).save(any());
         verifyNoInteractions(events);

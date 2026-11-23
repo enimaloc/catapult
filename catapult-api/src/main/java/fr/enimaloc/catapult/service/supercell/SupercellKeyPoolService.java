@@ -75,9 +75,19 @@ public class SupercellKeyPoolService {
         return cidrs.isEmpty() ? masked : masked + " (IP " + String.join(", ", cidrs) + ")";
     }
 
-    /** Adds the (trimmed, well-formed) key to {@code game}'s pool unless the pool has it already. */
+    /**
+     * Adds the (trimmed, well-formed) key to {@code game}'s pool unless the pool has it already; a key already in
+     * another game's pool is a 409 (a key opens one game only).
+     */
     public void add(SupercellGame game, String apiKey) {
-        if (!repository.existsById(apiKey)) {
+        Optional<SupercellApiKeyEntry> existing = repository.findById(apiKey);
+        if (existing.isPresent()) {
+            Optional<SupercellGame> owner = SupercellGame.parse(existing.get().getGame());
+            if (owner.isPresent() && owner.get() != game) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "This key is already in the " + owner.get().title() + " pool");
+            }
+        } else {
             repository.save(new SupercellApiKeyEntry(apiKey, game.key()));
             rotator.refreshKeys();
             events.keyAdded(provider(game),
