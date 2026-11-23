@@ -35,7 +35,7 @@ import java.util.function.Supplier;
  * <p>
  * A logged-in member also gets their keys above Swagger UI ({@code #api-docs-keys-card}): their OBS widget's token
  * (a capability: rendered in the card only, never logged) and their personal API tokens' cards, the full one only
- * while the custom bindings' experiment is open to them; both read off their own channel's page, as its Account and
+ * while the custom bindings' experiment is open to them; both read off their own channel's page, as its API and
  * Integrations tabs do. A failing catapult-api leaves the row it feeds unavailable, never the page. A spa.js prefetch
  * ({@code Purpose: prefetch}) asks catapult-api nothing: the card is rendered pending, and api-docs.js fetches it
  * once the page is shown.
@@ -48,7 +48,7 @@ public class ApiDocsController {
     static final String SWAGGER_UI = "/_static/swagger-ui/" + ApiDocsAssets.SWAGGER_UI_VERSION;
     private static final DateTimeFormatter FETCHED_AT = DateTimeFormatter.ofPattern("dd/MM HH:mm");
 
-    /** The full token's example binding when the member has none of their own (as on the Account tab). */
+    /** The full token's example binding when the member has none of their own (as on the API tab). */
     static final String EXAMPLE_BINDING = "Art";
     /** The {@code Purpose} spa.js's prefetches carry (spa.js fetchPage). */
     static final String PREFETCH = "prefetch";

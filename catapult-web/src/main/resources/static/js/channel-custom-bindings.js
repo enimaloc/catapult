@@ -22,7 +22,7 @@
  * - The status card's "active binding" line names the active one and links to its row (#custom-binding-<id>), which
  *   a click opens and scrolls to; hidden while none is (showActiveStatus, after each change of the active one or
  *   its name).
- * - The personal API token card (Account tab) is api-token-cards.js's.
+ * - The personal API token card (API tab) is api-token-cards.js's.
  *
  * Every text goes in through textContent or a property, never as markup.
  */

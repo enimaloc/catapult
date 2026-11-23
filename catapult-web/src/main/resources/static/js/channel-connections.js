@@ -1,5 +1,6 @@
 /**
- * Handlers for the Steam/Minecraft/Battle.net/Ankama/Epic/Speedrun.com/RetroAchievements/Blizzard stats/Hypixel/Riot/FACEIT/Xbox/OBS connection cards. The Steam/Minecraft cards' elements are all
+ * Handlers for the Steam/Minecraft/Battle.net/Ankama/Epic/Speedrun.com/RetroAchievements/Blizzard stats/Hypixel/Riot/FACEIT/Xbox/OBS connection cards,
+ * on the Integrations tab or, for the cards that only feed the API's personal stats, on the API tab. The Steam/Minecraft cards' elements are all
  * pre-rendered and only toggled via the `hidden` class (spa:if/spa:switch, see
  * channel.html) instead of being created/destroyed per SSE event, so handlers only
  * need attaching once, at render — no refresh() either: the SSE echo updates the cards.
@@ -157,10 +158,14 @@ window.CatapultConnections = (function () {
         }
     }
 
-    // The Integrations tab is built only once picked (lazy.js): its cards are bound then, as with the page otherwise.
-    document.addEventListener("catapult:render", bind);
+    // The cards' grids: the Integrations tab's (#channel-connections) and the API tab's (#channel-api-connections).
+    const GRIDS = "#channel-connections, #channel-api-connections";
+
+    // Every grid there at render is bound then. The Integrations tab is built only once picked (lazy.js): its cards
+    // are bound then, and only those, so the API tab's, bound at render, never get a second handler.
+    document.addEventListener("catapult:render", () => bind(document));
     document.addEventListener("catapult:lazy", event => {
-        if (event.detail.root.contains(document.getElementById("channel-connections"))) bind();
+        if (event.detail.root.querySelector(GRIDS)) bind(event.detail.root);
     });
 
     // The import day comes as yyyy-MM-dd (UTC), from the page and from the event: shown in the viewer's format.
@@ -181,12 +186,18 @@ window.CatapultConnections = (function () {
         }
     }
 
-    function bind() {
-        if (!document.getElementById("channel-connections")) return;
+    // Binds the cards under `root` (the document at render, a tab just built after): an element outside it is either
+    // not built yet or bound already.
+    function bind(root) {
+        if (!root.querySelector(GRIDS)) return;
         showTwitchatPresence();
         showEpicLinkError();
 
-        const { on, postJson, postSwitch } = CatapultChannel;
+        const { postJson, postSwitch } = CatapultChannel;
+        const on = (id, type, handler) => {
+            const el = document.getElementById(id);
+            return el && root.contains(el) ? CatapultChannel.on(id, type, handler) : null;
+        };
         const baseUrl = CatapultChannel.baseUrl();
         const value = id => document.getElementById(id).value;
         const checked = id => document.getElementById(id).checked;

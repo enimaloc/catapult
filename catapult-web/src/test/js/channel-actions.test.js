@@ -1568,4 +1568,41 @@ describe("parts built only once shown (lazy.js)", () => {
             ["/channel/enimaloc/settings/twitchat/branch", { branch: "beta" }],
         ]);
     });
+
+    it("binds the API tab's cards at render, and the Integrations tab's once built, each once", async () => {
+        html(`
+            <section id="integrations"><template data-lazy>
+              <div id="channel-connections">
+                <button id="battlenet-disconnect-btn"></button>
+              </div>
+            </template></section>
+            <section id="api">
+              <div id="channel-api-connections">
+                <button id="faceit-delete-btn"></button>
+                <button id="osu-disconnect-btn"></button>
+              </div>
+            </section>`);
+        render();
+
+        CatapultLazy.showIn(document.getElementById("integrations"));
+        await click("#faceit-delete-btn");
+        await click("#osu-disconnect-btn");
+        await click("#battlenet-disconnect-btn");
+
+        expect(posts()).toEqual([
+            ["/channel/enimaloc/settings/faceit/nickname/delete", {}],
+            ["/channel/enimaloc/settings/osu/delete", {}],
+            ["/channel/enimaloc/battlenet/disconnect", {}],
+        ]);
+    });
+
+    it("leaves a page without any grid of cards alone", async () => {
+        html(`<section id="other"><template data-lazy><button id="faceit-delete-btn"></button></template></section>`);
+        render();
+
+        CatapultLazy.showIn(document.getElementById("other"));
+        await click("#faceit-delete-btn");
+
+        expect(posts()).toEqual([]);
+    });
 });
