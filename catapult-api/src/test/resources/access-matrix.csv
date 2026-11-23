@@ -221,6 +221,8 @@ DELETE,/api/internal/users/{userId}/settings/chess/chesscom,,,401,401,403,403,PA
 PUT,/api/internal/users/{userId}/settings/chess/lichess,,"{""username"":""matrix""}",401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/settings/chess/lichess,,,401,401,403,403,PASS,403,401
 DELETE,/api/internal/users/{userId}/settings/osu,,,401,401,403,403,PASS,403,401
+PUT,/api/internal/users/{userId}/settings/hypixel/account,,"{""player"":""!""}",401,401,403,403,PASS,403,401
+DELETE,/api/internal/users/{userId}/settings/hypixel/account,,,401,401,403,403,PASS,403,401
 GET,/api/internal/users/{userId}/settings/twitchat,,,401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat,,"{""enabled"":false}",401,401,403,403,PASS,403,401
 PUT,/api/internal/users/{userId}/settings/twitchat/branch,,,401,401,403,403,PASS,403,401
@@ -560,4 +562,5 @@ GET,/api/me/stats/riot/{game},game=lol;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/faceit/{game},game=cs2;?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/chess,?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/osu/{game},game=osu;?version=3,,401,401,401,401,401,401,PASS
+GET,/api/me/stats/hypixel,?version=3,,401,401,401,401,401,401,PASS
 GET,/api/me/stats/retroachievements,?version=3,,401,401,401,401,401,401,PASS

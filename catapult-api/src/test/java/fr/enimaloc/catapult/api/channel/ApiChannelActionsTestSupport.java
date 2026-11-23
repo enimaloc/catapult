@@ -95,6 +95,7 @@ abstract class ApiChannelActionsTestSupport {
     @MockitoBean fr.enimaloc.catapult.service.faceit.FaceitAccountService faceitAccountService;
     @MockitoBean fr.enimaloc.catapult.service.chess.ChessAccountService chessAccountService;
     @MockitoBean fr.enimaloc.catapult.service.osu.OsuLinkService osuLinkService;
+    @MockitoBean fr.enimaloc.catapult.service.hypixel.HypixelAccountService hypixelAccountService;
 
     static RequestPostProcessor userJwt(UUID id) {
         return jwt().jwt(j -> j.subject(id.toString()).claim("twitchId", "123"))

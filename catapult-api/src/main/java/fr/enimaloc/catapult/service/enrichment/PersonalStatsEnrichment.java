@@ -5,20 +5,28 @@ import fr.enimaloc.catapult.service.enrichment.blizzard.BlizzardStats;
 import fr.enimaloc.catapult.service.enrichment.bungie.BungieStats;
 import fr.enimaloc.catapult.service.enrichment.chess.ChessStats;
 import fr.enimaloc.catapult.service.enrichment.faceit.FaceitStats;
+import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStats;
 import fr.enimaloc.catapult.service.enrichment.osu.OsuStats;
 import fr.enimaloc.catapult.service.enrichment.riot.RiotStats;
 import fr.enimaloc.catapult.service.enrichment.steamstats.PersonalStats.PlatformStats;
 
 /**
  * The member's own stats on the game played now, per platform (Steam, Xbox, RetroAchievements) and publisher
- * (Blizzard, Bungie, Riot, FACEIT, Chess.com and Lichess, osu!), each null when it does not apply (no link, no match, source off, too late).
+ * (Blizzard, Bungie, Riot, FACEIT, Chess.com and Lichess, osu!, Hypixel), each null when it does not apply (no link, no match, source off, too late).
  * {@code detectedOn} is the platform the game was detected on, which the summary takes its numbers from first.
  * Personal data: only ever served under {@code /api/me}.
  */
 public record PersonalStatsEnrichment(PlatformStats steam, PlatformStats xbox, PlatformStats retroachievements,
                                       BlizzardStats blizzard, GameBinding.SourceType detectedOn,
                                       BungieStats bungie, RiotStats riot, FaceitStats faceit, ChessStats chess,
-                                      OsuStats osu) {
+                                      OsuStats osu, HypixelStats hypixel) {
+
+    /** Without the Hypixel stats. */
+    public PersonalStatsEnrichment(PlatformStats steam, PlatformStats xbox, PlatformStats retroachievements,
+                                   BlizzardStats blizzard, GameBinding.SourceType detectedOn, BungieStats bungie,
+                                   RiotStats riot, FaceitStats faceit, ChessStats chess, OsuStats osu) {
+        this(steam, xbox, retroachievements, blizzard, detectedOn, bungie, riot, faceit, chess, osu, null);
+    }
 
     /** Without the osu! stats. */
     public PersonalStatsEnrichment(PlatformStats steam, PlatformStats xbox, PlatformStats retroachievements,
@@ -121,11 +129,19 @@ public record PersonalStatsEnrichment(PlatformStats steam, PlatformStats xbox, P
                                              BlizzardStats blizzard, GameBinding.SourceType detectedOn,
                                              BungieStats bungie, RiotStats riot, FaceitStats faceit,
                                              ChessStats chess, OsuStats osu) {
+        return of(steam, xbox, retroachievements, blizzard, detectedOn, bungie, riot, faceit, chess, osu, null);
+    }
+
+    /** The stats of the platforms and publishers that apply, Hypixel included; null when none does. */
+    public static PersonalStatsEnrichment of(PlatformStats steam, PlatformStats xbox, PlatformStats retroachievements,
+                                             BlizzardStats blizzard, GameBinding.SourceType detectedOn,
+                                             BungieStats bungie, RiotStats riot, FaceitStats faceit,
+                                             ChessStats chess, OsuStats osu, HypixelStats hypixel) {
         if (steam == null && xbox == null && retroachievements == null && blizzard == null && bungie == null
-                && riot == null && faceit == null && chess == null && osu == null) {
+                && riot == null && faceit == null && chess == null && osu == null && hypixel == null) {
             return null;
         }
         return new PersonalStatsEnrichment(steam, xbox, retroachievements, blizzard, detectedOn, bungie, riot,
-                faceit, chess, osu);
+                faceit, chess, osu, hypixel);
     }
 }

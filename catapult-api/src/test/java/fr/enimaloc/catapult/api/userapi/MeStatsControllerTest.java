@@ -91,6 +91,7 @@ class MeStatsControllerTest {
     @MockitoBean fr.enimaloc.catapult.service.enrichment.faceit.FaceitStatsService faceitStats;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.chess.ChessStatsService chessStats;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService osuStats;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService hypixelStats;
 
     private UserAccount user;
     private boolean budgetLeft = true;
@@ -465,6 +466,44 @@ class MeStatsControllerTest {
 
         budgetLeft = false;
         mvc.perform(v3(get(STATS + "/bungie/destiny2")))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void hypixelDetailIsTheSameProjection_withTheModesDetails() throws Exception {
+        var stats = new fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStats(Status.OK,
+                fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.HypixelGame.HYPIXEL, "Notch",
+                new fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStats.HypixelNetworkStats(87, 9_997_500L,
+                        1_234_567, 5_420, "MVP_PLUS", null),
+                new fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStats.HypixelBedWarsStats(4, 120, 98, 310,
+                        102, 145),
+                null,
+                new fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStats.HypixelOnlineStatus(Status.PRIVATE,
+                        null, null, null, null, null),
+                null);
+        when(hypixelStats.forMember(eq(user), any(), eq(true))).thenReturn(Optional.of(stats));
+
+        mvc.perform(v3(get(STATS + "/hypixel")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ok"))
+                .andExpect(jsonPath("$.game").value("hypixel"))
+                .andExpect(jsonPath("$.account").value("Notch"))
+                .andExpect(jsonPath("$.network.level").value(87))
+                .andExpect(jsonPath("$.bedwars.finalKills").value(310))
+                .andExpect(jsonPath("$.online.status").value("private"))
+                .andExpect(jsonPath("$.more").value("http://localhost/api/me/stats/hypixel?version=3"));
+    }
+
+    @Test
+    void hypixelWithoutAnAccount_is404_andASpentBudget429() throws Exception {
+        when(hypixelStats.forMember(any(), any(), anyBoolean())).thenReturn(Optional.empty());
+
+        mvc.perform(v3(get(STATS + "/hypixel")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("not_found"));
+
+        budgetLeft = false;
+        mvc.perform(v3(get(STATS + "/hypixel")))
                 .andExpect(status().isTooManyRequests());
     }
 

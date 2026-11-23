@@ -19,6 +19,8 @@ import fr.enimaloc.catapult.service.enrichment.bungie.BungieStats;
 import fr.enimaloc.catapult.service.enrichment.bungie.BungieStatsService;
 import fr.enimaloc.catapult.service.enrichment.osu.OsuStats;
 import fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService;
+import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStats;
+import fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService;
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.OsuGame;
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.BungieGame;
 import fr.enimaloc.catapult.service.enrichment.publisher.PublisherGames.RiotGame;
@@ -68,8 +70,8 @@ import static fr.enimaloc.catapult.api.userapi.RequestLocale.LANG_DESCRIPTION;
 @RequestMapping(path = ApiV2.ME_STATS_PATH, version = ApiV2.VERSION_3 + "+")
 @RequiredArgsConstructor
 @Tag(name = "Me — stats", description = "Your own play time and achievements on Steam, Xbox and "
-        + "RetroAchievements, and your Blizzard stats, by your personal API token (Authorization: Bearer cat_… or "
-        + "catr_…).")
+        + "RetroAchievements, and your Blizzard, Bungie, Riot, FACEIT, chess, osu! and Hypixel stats, by your "
+        + "personal API token (Authorization: Bearer cat_… or catr_…).")
 public class MeStatsController {
 
     private static final String BUDGET_NOTE = " Each call takes one of your refreshes (20 a minute by default).";
@@ -85,6 +87,7 @@ public class MeStatsController {
     private final RiotStatsService riotStatsService;
     private final FaceitStatsService faceitStatsService;
     private final OsuStatsService osuStatsService;
+    private final HypixelStatsService hypixelStatsService;
     private final MemberFetchBudgets memberFetchBudgets;
     private final ApiUserResolver userResolver;
     private final PublicBaseUrl publicBaseUrl;
@@ -97,15 +100,16 @@ public class MeStatsController {
     @GetMapping
     @Operation(summary = "Get your stats on the game your channel plays now",
             description = "The stats object of GET /api/me/game (version 3): steam, xbox, retroachievements, "
-                    + "blizzard, bungie, riot, faceit, chess and osu, each null when it does not apply (not linked, game not "
-                    + "found there), each with its status and a \"more\" link to its detail; the platforms with their "
+                    + "blizzard, bungie, riot, faceit, chess, osu and hypixel, each null when it does not apply (not "
+                    + "linked, game not found there), each with its status and a \"more\" link to its detail; the platforms with their "
                     + "play time and achievements summary (unlocked, total, percent, the 5 latest, the rarest), "
                     + "blizzard with your BattleTag, region and the game's object (wow main character, sc2 or d3 "
                     + "profile), bungie with your Bungie Name and destiny2 profile, riot with your Riot ID, platform "
                     + "and the game's object (lol summoner, ranks and game in progress, tft rank), faceit with your "
                     + "nickname and your CS2 level, Elo and last match, chess with your Chess.com and Lichess ratings "
                     + "(see GET /api/me/stats/chess), osu with your osu! username and profile (pp, ranks, accuracy, "
-                    + "play count and time, latest score). stats is null when nothing applies.")
+                    + "play count and time, latest score), hypixel with your Minecraft name, network level, Bed Wars / "
+                    + "SkyWars and online status. stats is null when nothing applies.")
     @ApiResponse(responseCode = "200", description = "inGame=false while no game is detected; otherwise your stats.")
     public CurrentStats current(
             @AuthenticationPrincipal UUID userId,
@@ -251,6 +255,25 @@ public class MeStatsController {
         OsuStats stats = detail(userId, notFound, (user, budget) -> osuStatsService.forGame(user, OsuGame.OSU,
                 budget, true));
         return GameInfoV3Response.osuStats(stats, links());
+    }
+
+    @GetMapping("/hypixel")
+    @Operation(summary = "Get your Hypixel stats",
+            description = "The hypixel object of GET /api/me/stats (status, game hypixel, account = your Minecraft "
+                    + "name, network: level, experience, karma, achievement points, rank; bedwars and skywars: stars "
+                    + "and wins; online: where you are now, private when you hide it in your Hypixel API settings), "
+                    + "plus what only the detail has: bedwars losses, final kills / deaths and beds broken, skywars "
+                    + "losses, kills and deaths. status not_found: the Minecraft account you declared never joined "
+                    + "Hypixel." + STATUS_NOTE + BUDGET_NOTE)
+    @ApiResponse(responseCode = "200", description = "Your Hypixel stats.")
+    @ApiResponse(responseCode = "404", description = "No Minecraft account declared for Hypixel, or Hypixel stats "
+            + "unavailable on this instance.", content = @Content)
+    @ApiResponse(responseCode = "429", description = "Your refreshes are spent; retry after Retry-After seconds.",
+            content = @Content)
+    public HypixelStats hypixel(@AuthenticationPrincipal UUID userId) {
+        HypixelStats stats = detail(userId, "No Hypixel stats for you: no Minecraft account declared, or Hypixel "
+                + "stats unavailable", (user, budget) -> hypixelStatsService.forMember(user, budget, true));
+        return GameInfoV3Response.hypixelStats(stats, links());
     }
 
     @GetMapping("/bungie/{game}")

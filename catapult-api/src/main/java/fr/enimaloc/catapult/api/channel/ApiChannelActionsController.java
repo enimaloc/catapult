@@ -112,6 +112,7 @@ public class ApiChannelActionsController {
     private final FaceitAccountService faceitAccountService;
     private final ChessAccountService chessAccountService;
     private final fr.enimaloc.catapult.service.osu.OsuLinkService osuLinkService;
+    private final fr.enimaloc.catapult.service.hypixel.HypixelAccountService hypixelAccountService;
 
 
     // ── Binding actions ───────────────────────────────────────────────────────
@@ -492,6 +493,30 @@ public class ApiChannelActionsController {
             @PathVariable UUID userId) {
 
         osuLinkService.unlink(userResolver.user(userId));
+    }
+
+    /**
+     * 400 for a malformed entry, an unknown Minecraft name or an account that never joined Hypixel; 429 when the
+     * member's refreshes are spent (the check calls Hypixel); 503 when Hypixel or Mojang cannot be asked (down, or
+     * the source off: no key in the pool).
+     */
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @PutMapping("/settings/hypixel/account")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void saveHypixelAccount(
+            @PathVariable UUID userId,
+            @RequestBody fr.enimaloc.catapult.common.dto.channel.HypixelAccountRequest body) {
+
+        hypixelAccountService.save(userResolver.user(userId), body == null ? null : body.player());
+    }
+
+    @PreAuthorize("@authz.ownsChannel(#userId)")
+    @DeleteMapping("/settings/hypixel/account")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteHypixelAccount(
+            @PathVariable UUID userId) {
+
+        hypixelAccountService.delete(userResolver.user(userId));
     }
 
     private BlizzardAccountService blizzard() {

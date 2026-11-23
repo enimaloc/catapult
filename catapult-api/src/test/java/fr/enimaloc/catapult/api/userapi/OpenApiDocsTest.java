@@ -122,6 +122,7 @@ class OpenApiDocsTest {
     @MockitoBean fr.enimaloc.catapult.service.enrichment.riot.RiotStatsService riotStatsService;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.faceit.FaceitStatsService faceitStatsService;
     @MockitoBean fr.enimaloc.catapult.service.enrichment.osu.OsuStatsService osuStatsService;
+    @MockitoBean fr.enimaloc.catapult.service.enrichment.hypixel.HypixelStatsService hypixelStatsService;
 
     private JsonNode docs() throws Exception {
         String body = mvc.perform(get("/api/v3/api-docs")).andExpect(status().isOk())
@@ -285,6 +286,13 @@ class OpenApiDocsTest {
                 .contains("FaceitStats");
         assertThat(schemas.at("/StatsObject/properties").has("faceit")).isTrue();
         assertThat(schemas.at("/FaceitStats/properties").has("more")).isTrue();
+        // Hypixel: the same, the detail answering the aggregate's own record
+        assertThat(paths(docs)).contains("/api/me/stats/hypixel");
+        assertThat(docs.at("/paths/~1api~1me~1stats~1hypixel/get/responses/200/content").toString())
+                .contains("HypixelStats");
+        assertThat(schemas.at("/StatsObject/properties").has("hypixel")).isTrue();
+        assertThat(schemas.at("/HypixelStats/properties").has("more")).isTrue();
+        assertThat(schemas.at("/PublisherObject/properties").has("hypixel")).isTrue();
     }
 
     /**
