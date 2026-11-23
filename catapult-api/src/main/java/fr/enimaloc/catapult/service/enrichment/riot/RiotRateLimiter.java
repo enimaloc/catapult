@@ -18,7 +18,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * the wait happens outside it; a slot more than {@link #MAX_WAIT} away is refused) and a sliding window that
  * refuses. Until Riot's {@code X-App-Rate-Limit} header is read, the limits are the configured ones (the personal
  * key's 20 / s and 100 / 2 min); a header read replaces them, with a margin. A 429 {@linkplain #pause pauses} the
- * bucket. Not shared with the presence detection.
+ * bucket: Riot's method limits are not modelled apart, so a method 429 pauses every route of that key on that host
+ * (a conservative choice). The window is counted per second (one counter per second that had calls), so a bucket
+ * holds at most one entry per second of its window whatever the limit. Not shared with the presence detection.
  */
 @Component
 public class RiotRateLimiter {
@@ -38,7 +40,9 @@ public class RiotRateLimiter {
         Duration spacing;
         int cap;
         Duration window;
-        final Deque<Instant> calls = new ArrayDeque<>();
+        /** Per second of the window that had calls: {epoch second, calls}. */
+        final Deque<long[]> seconds = new ArrayDeque<>();
+        int inWindow;
         Instant last = Instant.MIN;
         Instant pausedUntil = Instant.MIN;
 
@@ -94,11 +98,11 @@ public class RiotRateLimiter {
             if (now.isBefore(b.pausedUntil)) {
                 return null;
             }
-            Instant limit = now.minus(b.window);
-            while (!b.calls.isEmpty() && !b.calls.peekFirst().isAfter(limit)) {
-                b.calls.removeFirst();
+            long limit = now.minus(b.window).getEpochSecond();
+            while (!b.seconds.isEmpty() && b.seconds.peekFirst()[0] <= limit) {
+                b.inWindow -= (int) b.seconds.removeFirst()[1];
             }
-            if (b.calls.size() >= b.cap) {
+            if (b.inWindow >= b.cap) {
                 return null;
             }
             Instant slot = b.last.plus(b.spacing).isAfter(now) ? b.last.plus(b.spacing) : now;
@@ -107,7 +111,13 @@ public class RiotRateLimiter {
                 return null;
             }
             b.last = slot;
-            b.calls.addLast(slot);
+            long second = slot.getEpochSecond();
+            if (!b.seconds.isEmpty() && b.seconds.peekLast()[0] == second) {
+                b.seconds.peekLast()[1]++;
+            } else {
+                b.seconds.addLast(new long[]{second, 1});
+            }
+            b.inWindow++;
             return wait;
         }
     }
@@ -180,6 +190,14 @@ public class RiotRateLimiter {
             b.spacing = spacing;
             b.cap = cap;
             b.window = window;
+        }
+    }
+
+    /** How many seconds a bucket keeps a counter for, for the tests. */
+    int remembered(String bucket) {
+        Bucket b = bucket(bucket);
+        synchronized (b) {
+            return b.seconds.size();
         }
     }
 

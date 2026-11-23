@@ -146,4 +146,20 @@ class RiotRateLimiterTest {
         assertThat(interrupted.acquire("k@euw1")).isFalse();
         assertThat(Thread.interrupted()).isTrue();
     }
+
+    @Test
+    void theWindow_keepsOneCounterPerSecond_whateverTheLimit() {
+        RiotRateLimiter limiter = limiter();
+        limiter.learn("k@euw1", "500:10,30000:600");
+
+        for (int i = 0; i < 400; i++) {
+            assertThat(limiter.acquire("k@euw1")).isTrue();
+        }
+
+        // 400 calls spaced 22 ms apart span about 9 seconds: about one counter per second
+        assertThat(limiter.remembered("k@euw1")).isBetween(8, 10);
+        advance(Duration.ofMinutes(10));
+        assertThat(limiter.acquire("k@euw1")).isTrue();
+        assertThat(limiter.remembered("k@euw1")).isEqualTo(1);
+    }
 }
