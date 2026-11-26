@@ -133,6 +133,8 @@ class ChannelDashboardAssemblerTest {
     private final fr.enimaloc.catapult.service.binding.CustomBindingService customBindings =
             mock(fr.enimaloc.catapult.service.binding.CustomBindingService.class);
     private final TwitchCategoryCacheRepository categoryCache = mock(TwitchCategoryCacheRepository.class);
+    private final fr.enimaloc.catapult.service.gueststar.GuestStarConsent guestStarConsent =
+            org.mockito.Mockito.mock(fr.enimaloc.catapult.service.gueststar.GuestStarConsent.class);
     private final fr.enimaloc.catapult.service.title.StreamTitleService streamTitle =
             mock(fr.enimaloc.catapult.service.title.StreamTitleService.class);
     private final fr.enimaloc.catapult.service.drops.DropsGate dropsGate =
@@ -159,7 +161,7 @@ class ChannelDashboardAssemblerTest {
                         org.mockito.Mockito.mock(fr.enimaloc.catapult.service.premium.PremiumService.class)), categoryCache,
                 streamTitle, dropsGate, dropsCatalog, speedrunAccounts, raAccounts, java.util.Optional.of(blizzardAccounts),
                 bungieLinks, riotAccounts, faceitAccounts, chessAccounts, osuLinks, hypixelAccounts,
-                supercellAccounts);
+                supercellAccounts, guestStarConsent);
         ReflectionTestUtils.setField(assembler, "xboxEnabled", xboxEnabled);
         return assembler;
     }
@@ -944,6 +946,32 @@ class ChannelDashboardAssemblerTest {
             assertThat(both.titleDropsAvailable()).isTrue();
             assertThat(noConditions.titleConditionsAvailable()).isFalse();
             assertThat(noConditions.titleDropsAvailable()).isFalse();
+        }
+
+        @Test
+        void titleGuestStarsOfferedWithState() {
+            when(streamTitle.isAvailableFor(owner)).thenReturn(true);
+            when(streamTitle.guestStarsAvailableFor(owner)).thenReturn(true);
+            when(guestStarConsent.state(owner)).thenReturn(
+                    fr.enimaloc.catapult.service.gueststar.GuestStarConsent.State.NEEDS_CONSENT);
+            assertThat(assembler().settings(owner).titleGuestStars()).isEqualTo("NEEDS_CONSENT");
+
+            when(guestStarConsent.state(owner)).thenReturn(
+                    fr.enimaloc.catapult.service.gueststar.GuestStarConsent.State.READY);
+            assertThat(assembler().settings(owner).titleGuestStars()).isEqualTo("READY");
+        }
+
+        @Test
+        void titleGuestStarsNullOutsideExperiment() {
+            when(streamTitle.isAvailableFor(owner)).thenReturn(true);
+            when(streamTitle.guestStarsAvailableFor(owner)).thenReturn(false);
+            assertThat(assembler().settings(owner).titleGuestStars()).isNull();
+
+            clearInvocations(streamTitle);
+            when(streamTitle.isAvailableFor(owner)).thenReturn(false);
+            when(streamTitle.guestStarsAvailableFor(owner)).thenReturn(true);
+            assertThat(assembler().settings(owner).titleGuestStars()).isNull();
+            verify(streamTitle, never()).guestStarsAvailableFor(owner);
         }
 
         @Test
