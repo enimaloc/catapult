@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.config;
 
+import fr.enimaloc.catapult.service.gueststar.GuestStarConsent;
 import fr.enimaloc.catapult.service.bungie.BungieCredentialsService;
 import fr.enimaloc.catapult.service.osu.OsuCredentialsService;
 import org.springframework.beans.factory.ObjectProvider;
@@ -60,6 +61,21 @@ public class OAuth2ClientConfig {
     static final String BUNGIE_TOKEN = "https://www.bungie.net/platform/app/oauth/token/";
     static final String BUNGIE_MEMBERSHIPS = "https://www.bungie.net/Platform/User/GetMembershipsForCurrentUser/";
     /** The osu! OAuth endpoints (its client id and secret in the token request's body, as osu! documents). */
+    static final String TWITCH_AUTHORIZE = "https://id.twitch.tv/oauth2/authorize";
+    static final String TWITCH_TOKEN = "https://id.twitch.tv/oauth2/token";
+    static final String TWITCH_USERS = "https://api.twitch.tv/helix/users";
+    /**
+     * One per Helix call or EventSub subscription made with the streamer's token (the system bot logs in through the
+     * same registration): changing it asks every streamer to log in again.
+     */
+    static final String[] TWITCH_SCOPES = {
+        "user:read:email",                    // GET /users email, at login
+        "channel:manage:broadcast",           // PATCH /channels: category, CCLs
+        "user:edit:broadcast",                // GET/PUT /users/extensions, GET /users/extensions/list
+        "user:read:chat", "user:write:chat",  // EventSub channel.chat.message, POST /chat/messages
+        "channel:read:redemptions",           // EventSub channel.channel_points_custom_reward_redemption.add
+        "user:read:moderated_channels"        // GET /moderation/channels
+    };
     static final String OSU_AUTHORIZE = "https://osu.ppy.sh/oauth/authorize";
     static final String OSU_TOKEN = "https://osu.ppy.sh/oauth/token";
     static final String OSU_ME = "https://osu.ppy.sh/api/v2/me";
@@ -72,17 +88,23 @@ public class OAuth2ClientConfig {
 
         registrations.add(authorizationCode("twitch", twitchClientId, twitchClientSecret)
             .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
-            // One per Helix call or EventSub subscription made with the streamer's token (the system bot
-            // logs in through this same registration): changing it asks every streamer to log in again.
-            .scope("user:read:email",                 // GET /users email, at login
-                   "channel:manage:broadcast",        // PATCH /channels: category, CCLs
-                   "user:edit:broadcast",             // GET/PUT /users/extensions, GET /users/extensions/list
-                   "user:read:chat", "user:write:chat", // EventSub channel.chat.message, POST /chat/messages
-                   "channel:read:redemptions",        // EventSub channel.channel_points_custom_reward_redemption.add
-                   "user:read:moderated_channels")    // GET /moderation/channels
-            .authorizationUri("https://id.twitch.tv/oauth2/authorize")
-            .tokenUri("https://id.twitch.tv/oauth2/token")
-            .userInfoUri("https://api.twitch.tv/helix/users")
+            .scope(TWITCH_SCOPES)
+            .authorizationUri(TWITCH_AUTHORIZE)
+            .tokenUri(TWITCH_TOKEN)
+            .userInfoUri(TWITCH_USERS)
+            .userNameAttributeName("id")
+            .build());
+
+        // The Guest Star consent (experiment stream.title.guest_stars): a login of its own, so that the one above
+        // never changes; the same scopes plus Guest Star's, its token replacing the Twitch one (same account). Its
+        // callback, <base>/login/oauth2/code/twitch-guest-star, must be declared on Twitch's console.
+        registrations.add(authorizationCode(GuestStarConsent.REGISTRATION_ID, twitchClientId, twitchClientSecret)
+            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
+            .scope(java.util.stream.Stream.concat(java.util.Arrays.stream(TWITCH_SCOPES),
+                    java.util.stream.Stream.of(GuestStarConsent.SCOPE)).toArray(String[]::new))
+            .authorizationUri(TWITCH_AUTHORIZE)
+            .tokenUri(TWITCH_TOKEN)
+            .userInfoUri(TWITCH_USERS)
             .userNameAttributeName("id")
             .build());
 

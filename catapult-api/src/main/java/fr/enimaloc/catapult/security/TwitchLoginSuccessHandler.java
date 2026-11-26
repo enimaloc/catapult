@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.event.GuestStarConsentGrantedEvent;
+import fr.enimaloc.catapult.service.gueststar.GuestStarConsent;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.event.TwitchLoginEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
@@ -135,6 +137,20 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                 authorizedClientRepository.removeAuthorizedClient("epic", authentication, request, response);
                 if (webUrl != null && !webUrl.isBlank()) {
                     response.sendRedirect(channelIntegrationsUrl(catUser));
+                    return;
+                }
+            } else if (GuestStarConsent.REGISTRATION_ID.equals(registrationId)) {
+                // The Guest Star consent: its token replaced the Twitch one (CatapultOAuth2UserService), its refresh
+                // token and scopes go with it; Spring's copy is forgotten, the channel subscribes again, and the
+                // member goes back to the settings, where they asked for it.
+                saveRefreshToken(request, authentication, catUser, GuestStarConsent.REGISTRATION_ID,
+                        OAuthToken.Provider.TWITCH);
+                authorizedClientRepository.removeAuthorizedClient(GuestStarConsent.REGISTRATION_ID, authentication,
+                        request, response);
+                eventPublisher.publishEvent(new GuestStarConsentGrantedEvent(this, catUser.getUserAccount()));
+                if (webUrl != null && !webUrl.isBlank()) {
+                    response.sendRedirect(UriComponentsBuilder.fromUriString(channelTabUrl(catUser, "settings"))
+                            .replaceQueryParam("guest_star", "ok").toUriString());
                     return;
                 }
             } else if ("xbox".equals(registrationId)) {

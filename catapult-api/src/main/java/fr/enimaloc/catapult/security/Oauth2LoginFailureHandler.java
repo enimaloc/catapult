@@ -56,7 +56,8 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
             "battlenet_stats_unavailable", "battlenet_stats_failed", "battlenet_stats_mismatch",
             "battlenet_stats_cancelled",
             "bungie_unavailable", "bungie_failed", "bungie_mismatch", "bungie_cancelled",
-            "osu_unavailable", "osu_failed", "osu_mismatch", "osu_cancelled");
+            "osu_unavailable", "osu_failed", "osu_mismatch", "osu_cancelled",
+            "guest_star_mismatch", "guest_star_failed", "guest_star_cancelled");
     /** The World of Warcraft import: a failure that is not one of its refusals is a failed import on the card. */
     private static final String WOW_IMPORT = "battlenet-stats";
     private static final Set<String> WOW_IMPORT_ERROR_CODES = Set.of(
@@ -72,6 +73,11 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
     private static final String OSU = "osu";
     private static final Set<String> OSU_ERROR_CODES = Set.of(
             "osu_unavailable", "osu_failed", "osu_mismatch", "osu_cancelled");
+
+    /** The Guest Star consent: a failure that is not one of its refusals is a failed consent, back in the settings. */
+    private static final String GUEST_STAR = "twitch-guest-star";
+    private static final Set<String> GUEST_STAR_ERROR_CODES = Set.of(
+            "guest_star_mismatch", "guest_star_failed", "guest_star_cancelled");
 
     @Value("${app.web-url:http://localhost:8080}")
     private String webUrl;
@@ -105,6 +111,14 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
         }
         if (OSU.equals(registrationId) && !"unauthorized".equals(errorCode) && !OSU_ERROR_CODES.contains(errorCode)) {
             errorCode = "osu_failed";
+        }
+        if (GUEST_STAR.equals(registrationId) && "access_denied".equals(errorCode)) {
+            // The member declined on Twitch's consent page: not a failure
+            errorCode = "guest_star_cancelled";
+        }
+        if (GUEST_STAR.equals(registrationId) && !"unauthorized".equals(errorCode)
+                && !GUEST_STAR_ERROR_CODES.contains(errorCode)) {
+            errorCode = "guest_star_failed";
         }
         if ("twitch".equals(registrationId) && !BUSINESS_ERROR_CODES.contains(errorCode) && !alreadyRetried(request)) {
             markRetried(request, response);
@@ -170,7 +184,8 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
                 return UriComponentsBuilder.fromUriString(webUrl)
                         .path("/channel/{username}")
                         .queryParam("error", errorCode)
-                        .fragment(errorCode.startsWith("epic_") ? "integrations" : "api")
+                        .fragment(errorCode.startsWith("epic_") ? "integrations"
+                                : errorCode.startsWith("guest_star_") ? "settings" : "api")
                         .buildAndExpand(login)
                         .toUriString();
             }

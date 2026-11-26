@@ -249,4 +249,18 @@ class Oauth2LoginFailureHandlerTest {
         assertThat(response.getRedirectedUrl())
                 .isEqualTo("http://localhost:8081/channel/jeb_?error=osu_cancelled#api");
     }
+
+    @Test
+    void guestStarRefusals_goBackToTheSettings_andAnyOtherFailureIsAFailedConsent() throws Exception {
+        String[][] cases = {{"guest_star_mismatch", "guest_star_mismatch"}, {"access_denied", "guest_star_cancelled"},
+                {"invalid_token_response", "guest_star_failed"}};
+        for (String[] c : cases) {
+            request = callbackOf("twitch-guest-star", "jeb_");
+            response = new MockHttpServletResponse();
+            handler.onAuthenticationFailure(request, response,
+                    new OAuth2AuthenticationException(new OAuth2Error(c[0])));
+            assertThat(response.getRedirectedUrl())
+                    .isEqualTo("http://localhost:8081/channel/jeb_?error=" + c[1] + "#settings");
+        }
+    }
 }
