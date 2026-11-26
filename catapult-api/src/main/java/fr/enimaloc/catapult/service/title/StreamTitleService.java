@@ -27,7 +27,8 @@ import java.util.function.Supplier;
  * game's, a custom binding's, a fallback's), else the channel-wide template. A template's variables are written
  * {@code {{NAME}}} exactly: {@code {{GAME}}} the game detected (a custom binding's name, nothing without a game),
  * {@code {{CATEGORY}}} the Twitch category's name, {@code {{TITLE}}} the title the stream has just before the change,
- * {@code {{ORIGINAL_TITLE}}} the one the streamer set themselves, before Catapult changed it; anything else (another
+ * {@code {{ORIGINAL_TITLE}}} the one the streamer set themselves, before Catapult changed it, {@code {{GUEST_STARS}}} the
+ * Guest Star guests on air (experiment {@value #GUEST_STARS_KEY}); anything else (another
  * case, spaces, another name) stays as typed. Nothing while the streamer hasn't turned it on, so their title is left alone.
  */
 @Slf4j
@@ -40,6 +41,8 @@ public class StreamTitleService {
     public static final String CONDITIONS_KEY = "stream.title.conditions";
     /** The title's preview under its fields, within {@value #EXPERIMENT_KEY}. */
     public static final String PREVIEW_KEY = "stream.title.preview";
+    /** The Guest Star guests ({@code {{GUEST_STARS}}}, {@code HAS_GUEST_STARS}) in the titles, within {@value #EXPERIMENT_KEY}. */
+    public static final String GUEST_STARS_KEY = "stream.title.guest_stars";
     /** Twitch refuses a longer title. */
     public static final int MAX_LENGTH = TitleTemplate.MAX_LENGTH;
 

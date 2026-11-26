@@ -155,4 +155,39 @@ class TitleTemplateTest {
     void aStrayDoubleBrace_afterAResolvedTernary_leavesTheRestRendered() {
         assertThat(render("{{HAS_GAME ? [[a]] : [[b]]}} {{ {{GAME}}", Map.of("HAS_GAME", true))).contains("a {{ Doom");
     }
+
+    private static TitleContext guests(String names) {
+        return new TitleContext("Doom", "DOOM", UNREAD, UNREAD, Map.of(), null, null, null).withGuestStars(names);
+    }
+
+    @Test
+    void guestStarsReplacedByTheirNames() {
+        assertThat(TitleTemplate.render("Live {{GUEST_STARS}}", guests("Alice, Bob"), false)).contains("Live Alice, Bob");
+    }
+
+    @Test
+    void guestStarsEmptyWhenNull() {
+        assertThat(TitleTemplate.render("Live {{GUEST_STARS}}", guests(null), false)).contains("Live");
+    }
+
+    @Test
+    void hasGuestStarsCondition() {
+        String template = "X{{HAS_GUEST_STARS ? [[ avec {{GUEST_STARS}}]] : [[]]}}";
+        assertThat(TitleTemplate.render(template, guests("Alice"), true)).contains("X avec Alice");
+        assertThat(TitleTemplate.render(template, guests(null), true)).contains("X");
+        assertThat(TitleTemplate.render(template, guests(" "), true)).as("blank is no guest").contains("X");
+    }
+
+    @Test
+    void hasGuestStarsIgnoredWithoutConditions() {
+        String template = "X{{HAS_GUEST_STARS ? [[ avec]] : [[]]}}";
+        assertThat(TitleTemplate.render(template, guests("Alice"), false)).contains(template);
+    }
+
+    @Test
+    void withGuestStars_keepsTheOtherConditions() {
+        TitleContext context = new TitleContext("Doom", "DOOM", UNREAD, UNREAD, Map.of("HAS_GAME", true), null, null,
+                null).withGuestStars("Alice");
+        assertThat(context.conditions()).containsEntry("HAS_GAME", true).containsEntry("HAS_GUEST_STARS", true);
+    }
 }
