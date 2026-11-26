@@ -354,4 +354,71 @@ class StreamTitleServiceTest {
         assertThat(titleFor(binding("Hades", "{{GAME}} {{GUEST_STARS}}"), current("x"))).contains("Hades");
         verify(roster, org.mockito.Mockito.never()).names(any());
     }
+
+    /** A title sent normally with the guests experiment on: {@code template} for Hades, {@code before} on Twitch. */
+    private void sentNormally(String template, String before) {
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
+        PlannedTitle planned = service.titleFor(user, settings, binding("Hades", template), false, current(before))
+                .orElseThrow();
+        service.sent(user, planned);
+    }
+
+    @Test
+    void refreshKeepsFrozenTitle() {
+        when(roster.names(user.getId())).thenReturn(Optional.empty());
+        sentNormally("{{TITLE}} | {{GUEST_STARS}}", "X");
+
+        when(roster.names(user.getId())).thenReturn(Optional.of("A"));
+        assertThat(service.guestStarsRefresh(user)).contains("X | A");
+        when(roster.names(user.getId())).thenReturn(Optional.of("A, B"));
+        assertThat(service.guestStarsRefresh(user)).as("no piling up").contains("X | A, B");
+    }
+
+    @Test
+    void refreshDoesNotPushNewDrop() {
+        when(experimentService.isRolledOut(user, StreamTitleService.CONDITIONS_KEY)).thenReturn(true);
+        when(dropsGate.isAvailableReadOnly(user)).thenReturn(true);
+        sentNormally("{{DROP_ENABLED ? [[[Drops] ]] : [[]]}}{{GAME}} {{GUEST_STARS}}", "X");
+
+        user.setTwitchId("42");
+        when(dropsCatalog.runningFor(any(), any())).thenReturn(java.util.List.of(new fr.enimaloc.catapult.service.drops.DropCampaign(
+                "c", "S", null, "Hades", java.time.Instant.now(), java.time.Instant.now().plusSeconds(3600),
+                "https://example.test", null, false, java.util.Set.of())));
+        when(roster.names(user.getId())).thenReturn(Optional.of("A"));
+        assertThat(service.guestStarsRefresh(user)).contains("Hades A");
+    }
+
+    @Test
+    void noRefreshWithoutLastRender() {
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
+        when(roster.names(user.getId())).thenReturn(Optional.of("A"));
+        assertThat(service.guestStarsRefresh(user)).isEmpty();
+    }
+
+    @Test
+    void noRefreshOutsideTheExperiment() {
+        sentNormally("{{GAME}} {{GUEST_STARS}}", "X");
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(false);
+        assertThat(service.guestStarsRefresh(user)).isEmpty();
+    }
+
+    @Test
+    void aPlannedTitleNeverSent_isNotRemembered() {
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
+        service.titleFor(user, settings, binding("Hades", "{{GAME}} {{GUEST_STARS}}"), false, current("X"));
+        assertThat(service.guestStarsRefresh(user)).isEmpty();
+    }
+
+    @Test
+    void sentRefresh_movesTheLastSentTitle_only() {
+        remembered("Chill night", "Chill night — Doom");
+
+        service.sentRefresh(user, "Chill night — Doom avec A");
+
+        ArgumentCaptor<StreamTitleState> saved = ArgumentCaptor.forClass(StreamTitleState.class);
+        verify(stateRepository).save(saved.capture());
+        assertThat(saved.getValue().getOriginalTitle()).isEqualTo("Chill night");
+        assertThat(saved.getValue().getLastSentTitle()).isEqualTo("Chill night — Doom avec A");
+        assertThat(service.lastSentTitle(user)).contains("Chill night — Doom avec A");
+    }
 }

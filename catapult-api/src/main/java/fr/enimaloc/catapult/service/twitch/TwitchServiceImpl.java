@@ -85,6 +85,35 @@ public class TwitchServiceImpl implements TwitchService {
     }
 
     @Override
+    public ChannelUpdateOutcome updateTitle(UserAccount user, String expectedCurrent, String title) {
+        siteRole.requireActive("twitch channel update");
+        if (!canActOnTwitch(user)) {
+            return ChannelUpdateOutcome.SKIPPED;
+        }
+        Optional<OAuthToken> token = oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH);
+        if (token.isEmpty()) {
+            log.warn("No Twitch token found for user {}", user.getId());
+            return ChannelUpdateOutcome.FAILED;
+        }
+        String accessToken = twitchTokenService.resolveAccessToken(token.get(), user);
+        Optional<String> current = currentTitle(user, accessToken);
+        if (current.isEmpty() || !current.get().equals(expectedCurrent) || current.get().equals(title)) {
+            log.debug("Title of user {} left alone — changed by hand, unreadable or unchanged", user.getId());
+            return ChannelUpdateOutcome.SKIPPED;
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("title", title);
+        try {
+            patchRefreshingTheToken(user, token.get(), accessToken, body);
+            log.info("Twitch title updated for user {} — title={}", user.getId(), title);
+            return ChannelUpdateOutcome.APPLIED;
+        } catch (RuntimeException e) {
+            log.warn("Twitch title update failed for user {}: {}", user.getId(), e.getMessage());
+            return ChannelUpdateOutcome.FAILED;
+        }
+    }
+
+    @Override
     public ChannelUpdateOutcome setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
         siteRole.requireActive("twitch channel update");
         if (!canActOnTwitch(user)) {

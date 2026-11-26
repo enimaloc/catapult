@@ -21,6 +21,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -62,6 +64,17 @@ public class StreamTitleService {
      * {@link #sent} remembers once Twitch took it.
      */
     public record PlannedTitle(String title, Optional<String> before) {}
+
+    /**
+     * A title as rendered: what it was rendered from, frozen ({@code {{TITLE}}} included), so that the guests can be
+     * swapped in it alone. In memory: a restart forgets it, the next title sent remembers it again.
+     */
+    private record LastRender(String title, String template, TitleContext context, boolean conditions) {}
+
+    /** The title each channel is about to send, until {@link #sent} tells Twitch took it. */
+    private final Map<UUID, LastRender> plannedRenders = new ConcurrentHashMap<>();
+    /** The last title each channel sent normally (a category change), what {@link #guestStarsRefresh} re-renders. */
+    private final Map<UUID, LastRender> lastRenders = new ConcurrentHashMap<>();
 
     /** User-facing paths (settings page and save): may assign the channel to the experiment. */
     public boolean isAvailableFor(UserAccount user) {
@@ -164,6 +177,10 @@ public class StreamTitleService {
      * last one Catapult sent, the streamer's own. A failure here is only logged: the title is on Twitch already.
      */
     public void sent(UserAccount user, PlannedTitle planned) {
+        LastRender render = plannedRenders.remove(user.getId());
+        if (render != null && render.title().equals(planned.title())) {
+            lastRenders.put(user.getId(), render);
+        }
         try {
             StreamTitleState state = stateRepository.findById(user.getId())
                     .orElseGet(() -> new StreamTitleState(user.getId()));
@@ -182,8 +199,45 @@ public class StreamTitleService {
                                         Supplier<Optional<String>> currentTitle) {
         if (!hasText(template)) return Optional.empty();
         Optional<String> before = currentTitle.get();
-        return TitleTemplate.render(template, context.apply(before), conditionsAvailableReadOnly(user))
-                .map(title -> new PlannedTitle(title, before));
+        TitleContext rendered = context.apply(before);
+        boolean conditions = conditionsAvailableReadOnly(user);
+        Optional<String> title = TitleTemplate.render(template, rendered, conditions);
+        title.ifPresentOrElse(
+                t -> plannedRenders.put(user.getId(), new LastRender(t, template, rendered, conditions)),
+                () -> plannedRenders.remove(user.getId()));
+        return title.map(t -> new PlannedTitle(t, before));
+    }
+
+    /**
+     * The last title sent normally rendered again with the guests on air now, nothing else changed (its
+     * {@code {{TITLE}}}, drops and category as they were); empty without such a title (never sent since the start) or
+     * outside {@value #GUEST_STARS_KEY}.
+     */
+    public Optional<String> guestStarsRefresh(UserAccount user) {
+        LastRender last = lastRenders.get(user.getId());
+        if (last == null || !isAvailableReadOnly(user) || !guestStarsAvailableReadOnly(user)) return Optional.empty();
+        String guests = guestStarRoster.names(user.getId()).orElse(null);
+        return TitleTemplate.render(last.template(), last.context().withGuestStars(guests), last.conditions());
+    }
+
+    /** The last title Catapult sent the channel, as remembered. */
+    public Optional<String> lastSentTitle(UserAccount user) {
+        return stateRepository.findById(user.getId()).map(StreamTitleState::getLastSentTitle);
+    }
+
+    /**
+     * Twitch took {@code title}, the guests' refresh: it is the last title Catapult sent; the streamer's own is left as
+     * it was. A failure here is only logged: the title is on Twitch already.
+     */
+    public void sentRefresh(UserAccount user, String title) {
+        try {
+            StreamTitleState state = stateRepository.findById(user.getId())
+                    .orElseGet(() -> new StreamTitleState(user.getId()));
+            state.setLastSentTitle(title);
+            stateRepository.save(state);
+        } catch (RuntimeException e) {
+            log.warn("Could not remember the title sent for user {}: {}", user.getId(), e.getMessage());
+        }
     }
 
     /**
