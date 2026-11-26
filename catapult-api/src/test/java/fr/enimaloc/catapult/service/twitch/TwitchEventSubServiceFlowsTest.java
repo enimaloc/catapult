@@ -327,4 +327,77 @@ class TwitchEventSubServiceFlowsTest {
             verify(twitchat).onCategoryChangedManually(user, "2", "Game Two", "Game One");
         }
     }
+
+    @Nested
+    class GuestStars {
+        private final fr.enimaloc.catapult.service.gueststar.GuestStarEventSub guestStars =
+                mock(fr.enimaloc.catapult.service.gueststar.GuestStarEventSub.class);
+
+        @BeforeEach
+        void wire() {
+            service.setGuestStars(guestStars);
+            when(guestStars.subscriptionsFor(user)).thenReturn(java.util.stream.Stream.of(
+                    "channel.guest_star_session.begin", "channel.guest_star_session.end",
+                    "channel.guest_star_guest.update")
+                .map(type -> new fr.enimaloc.catapult.service.gueststar.GuestStarEventSub.Spec(type, "beta",
+                        java.util.Map.of("broadcaster_user_id", "b-1", "moderator_user_id", "b-1")))
+                .toList());
+        }
+
+        @Test
+        void guestStarSubscriptionsAfterTheOthers_aFailureStoppingNothing() {
+            subscriptionsSucceed();
+            helix.expect(requestTo(SUBSCRIPTIONS)).andExpect(content().json(
+                    "{\"type\": \"channel.guest_star_session.begin\", \"version\": \"beta\","
+                    + " \"condition\": {\"broadcaster_user_id\": \"b-1\", \"moderator_user_id\": \"b-1\"},"
+                    + " \"transport\": {\"method\": \"websocket\", \"session_id\": \"s-1\"}}"))
+                    .andRespond(withStatus(HttpStatus.FORBIDDEN));
+            helix.expect(requestTo(SUBSCRIPTIONS)).andExpect(content().json(
+                    "{\"type\": \"channel.guest_star_session.end\"}")).andRespond(withSuccess());
+            helix.expect(requestTo(SUBSCRIPTIONS)).andExpect(content().json(
+                    "{\"type\": \"channel.guest_star_guest.update\"}")).andRespond(withSuccess());
+            json(CHANNELS, "{\"data\": []}");
+            json(STREAMS, "{\"data\": []}");
+
+            service.handleMessage(user, token, WELCOME, false);
+
+            helix.verify();
+            verify(guestStars).resync(user);
+        }
+
+        @Test
+        void guestNotificationGoesToGuestStars() {
+            service.handleMessage(user, token, """
+                    {"metadata": {"message_type": "notification", "subscription_type": "channel.guest_star_guest.update"},
+                     "payload": {"event": {"slot_id": "1", "guest_user_id": "10", "state": "live"}}}""", false);
+            when(guestStars.handles("channel.guest_star_guest.update")).thenReturn(true);
+            service.handleMessage(user, token, """
+                    {"metadata": {"message_type": "notification", "subscription_type": "channel.guest_star_guest.update"},
+                     "payload": {"event": {"slot_id": "1", "guest_user_id": "10", "state": "live"}}}""", false);
+
+            verify(guestStars, times(1)).onNotification(org.mockito.ArgumentMatchers.eq(user),
+                    org.mockito.ArgumentMatchers.eq("channel.guest_star_guest.update"), any());
+        }
+
+        @Test
+        void consentReconnectsAnActiveChannelWithTheBot() {
+            user.setBotEnabled(true);
+            user.setStatus(UserAccount.Status.ACTIVE);
+            when(users.findById(user.getId())).thenReturn(Optional.of(user));
+
+            service.onGuestStarConsent(new fr.enimaloc.catapult.event.GuestStarConsentGrantedEvent(this, user));
+
+            assertThat(listeners).hasSize(1);
+        }
+
+        @Test
+        void consentWithoutTheBotConnectsNothing() {
+            user.setBotEnabled(false);
+            when(users.findById(user.getId())).thenReturn(Optional.of(user));
+
+            service.onGuestStarConsent(new fr.enimaloc.catapult.event.GuestStarConsentGrantedEvent(this, user));
+
+            assertThat(listeners).isEmpty();
+        }
+    }
 }

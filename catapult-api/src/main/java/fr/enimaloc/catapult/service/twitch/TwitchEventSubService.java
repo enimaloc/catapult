@@ -3,6 +3,8 @@ package fr.enimaloc.catapult.service.twitch;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import fr.enimaloc.catapult.event.GuestStarConsentGrantedEvent;
+import fr.enimaloc.catapult.service.gueststar.GuestStarEventSub;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.event.AccountCreatedEvent;
@@ -78,6 +80,8 @@ public class TwitchEventSubService implements EventSubService {
     private final SiteRole siteRole;
     private final StreamSessionService streamSessionService;
     private final StreamCatchUp streamCatchUp;
+    /** The Guest Star subscriptions and notifications; null (none) when not wired, as in most tests. */
+    private GuestStarEventSub guestStars;
 
     public TwitchEventSubService(OAuthTokenRepository oAuthTokenRepository,
                                  UserAccountRepository userAccountRepository,
@@ -109,6 +113,19 @@ public class TwitchEventSubService implements EventSubService {
         this.streamCatchUp = streamCatchUp;
         this.connections = new EventSubConnections(
             "[EventSub]", "twitch-eventsub-watchdog", oAuthTokenRepository, this::handleMessage);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setGuestStars(GuestStarEventSub guestStars) {
+        this.guestStars = guestStars;
+    }
+
+    /** The Guest Star consent was given: an active channel with the bot subscribes again, Guest Star included. */
+    @EventListener
+    public void onGuestStarConsent(GuestStarConsentGrantedEvent event) {
+        userAccountRepository.findById(event.getUser().getId())
+            .filter(account -> account.isBotEnabled() && account.getStatus() == UserAccount.Status.ACTIVE)
+            .ifPresent(this::connect);
     }
 
     private record ChannelState(String categoryId, String categoryName, Set<String> cclIds) {}
@@ -326,6 +343,7 @@ public class TwitchEventSubService implements EventSubService {
                                 recordStreamStart(user, onlineEvent);
                                 eventPublisher.publishEvent(new StreamOnlineEvent(this, user));
                             }
+                            resyncGuestStars(user);
                         }
                         case "stream.offline" -> {
                             streamStateService.setLive(user, false);
@@ -335,6 +353,11 @@ public class TwitchEventSubService implements EventSubService {
                         case "channel.update" -> handleChannelUpdate(user, root.path("payload").path("event"));
                         case "channel.raid" -> handleRaid(user, root.path("payload").path("event"),
                             root.path("metadata").path("message_timestamp").asText(""));
+                        default -> {
+                            if (guestStars != null && guestStars.handles(subscriptionType)) {
+                                guestStars.onNotification(user, subscriptionType, root.path("payload").path("event"));
+                            }
+                        }
                     }
                 }
                 case "session_keepalive" -> log.trace("EventSub keepalive for user {}", user.getId());
@@ -482,6 +505,7 @@ public class TwitchEventSubService implements EventSubService {
                 log.warn("Failed to subscribe to {} for user {}: {}", eventType, user.getId(), e.getMessage());
             }
         }
+        subscribeGuestStars(user, accessToken, sessionId);
         connections.onSubscribed(user);
         boolean channelSimulated = simulated.contains("channel.update");
         boolean streamSimulated = simulated.contains("stream.online") && simulated.contains("stream.offline");
@@ -490,6 +514,7 @@ public class TwitchEventSubService implements EventSubService {
             initStreamState(user, accessToken);
         }
         seedSimulatedState(user, channelSimulated, streamSimulated);
+        resyncGuestStars(user);
         // After the stream state, so a live that started or ended while the socket was down is settled first
         if (channelRead) {
             publishResynced(user);
@@ -628,16 +653,44 @@ public class TwitchEventSubService implements EventSubService {
         }
     }
 
+    /** The Guest Star subscriptions (beta) of a followed channel: a refusal is logged and stops nothing else. */
+    private void subscribeGuestStars(UserAccount user, String accessToken, String sessionId) {
+        if (guestStars == null) return;
+        for (GuestStarEventSub.Spec spec : guestStars.subscriptionsFor(user)) {
+            try {
+                postSubscription(accessToken, spec.type(), spec.version(), spec.condition(), sessionId);
+                log.debug("Subscribed to {} for user {}", spec.type(), user.getId());
+            } catch (Exception e) {
+                log.warn("Failed to subscribe to {} for user {}: {}", spec.type(), user.getId(), e.getMessage());
+            }
+        }
+    }
+
+    /** The Guest Star guests read again; a failure is only logged. */
+    private void resyncGuestStars(UserAccount user) {
+        if (guestStars == null) return;
+        try {
+            guestStars.resync(user);
+        } catch (RuntimeException e) {
+            log.warn("Could not read the Guest Star guests of user {}: {}", user.getId(), e.getMessage());
+        }
+    }
+
     private void postSubscription(String accessToken, Subscription sub, String twitchId, String sessionId) {
+        postSubscription(accessToken, sub.type(), sub.version(), Map.of(sub.conditionKey(), twitchId), sessionId);
+    }
+
+    private void postSubscription(String accessToken, String type, String version, Map<String, String> condition,
+                                  String sessionId) {
         restClient.post()
             .uri(EVENTSUB_API)
             .header("Authorization", "Bearer " + accessToken)
             .header("Client-ID", twitchClientId)
             .header("Content-Type", "application/json")
             .body(Map.of(
-                "type", sub.type(),
-                "version", sub.version(),
-                "condition", Map.of(sub.conditionKey(), twitchId),
+                "type", type,
+                "version", version,
+                "condition", condition,
                 "transport", Map.of("method", "websocket", "session_id", sessionId)
             ))
             .retrieve()
