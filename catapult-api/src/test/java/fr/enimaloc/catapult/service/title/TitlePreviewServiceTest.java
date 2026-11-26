@@ -30,6 +30,8 @@ import static org.mockito.Mockito.when;
 class TitlePreviewServiceTest {
 
     private final ExperimentService experiments = mock(ExperimentService.class);
+    private final fr.enimaloc.catapult.service.gueststar.GuestStarRoster roster =
+            mock(fr.enimaloc.catapult.service.gueststar.GuestStarRoster.class);
     private final StreamTitleStateRepository states = mock(StreamTitleStateRepository.class);
     private final GameBindingRepository bindings = mock(GameBindingRepository.class);
     private final CustomBindingRepository customBindings = mock(CustomBindingRepository.class);
@@ -37,7 +39,7 @@ class TitlePreviewServiceTest {
     private final GameStateService gameState = mock(GameStateService.class);
     private final GameBindingLookup lookup = mock(GameBindingLookup.class);
     private final StreamTitleService titles = new StreamTitleService(experiments, states, mock(DropsGate.class),
-            mock(DropsCatalog.class));
+            mock(DropsCatalog.class), roster);
     private final TitlePreviewService previews = new TitlePreviewService(titles, states, bindings, customBindings,
             settingsRepository, gameState, lookup);
     private UserAccount user;
@@ -142,5 +144,15 @@ class TitlePreviewServiceTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> preview(deep, "NO_GAME", null, null))
                 .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
                 .hasMessageContaining("400");
+    }
+
+    @Test
+    void previewUsesRoster() {
+        when(experiments.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
+        when(roster.names(user.getId())).thenReturn(Optional.of("Alice, Bob"));
+        GameBinding doom = binding("Doom Eternal", "DOOM");
+        when(bindings.findByIdAndUser(doom.getId(), user)).thenReturn(Optional.of(doom));
+        assertThat(preview("{{GAME}} avec {{GUEST_STARS}}", "BINDING", doom.getId(), null))
+                .contains("Doom Eternal avec Alice, Bob");
     }
 }

@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.service.drops.DropCampaign;
 import fr.enimaloc.catapult.service.drops.DropsCatalog;
 import fr.enimaloc.catapult.service.drops.DropsGate;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
+import fr.enimaloc.catapult.service.gueststar.GuestStarRoster;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -54,6 +55,7 @@ public class StreamTitleService {
     private final StreamTitleStateRepository stateRepository;
     private final DropsGate dropsGate;
     private final DropsCatalog dropsCatalog;
+    private final GuestStarRoster guestStarRoster;
 
     /**
      * A title to send, with the one the stream had before ({@code before}, empty when it couldn't be read), what
@@ -79,6 +81,16 @@ public class StreamTitleService {
     /** Whether the titles {@code user} writes read their conditions, asked by the settings page: may assign the channel. */
     public boolean conditionsAvailableFor(UserAccount user) {
         return experimentService.evaluateGate(user, CONDITIONS_KEY);
+    }
+
+    /** Whether the titles sent for {@code user} show their Guest Star guests; read-only, never assigns. */
+    public boolean guestStarsAvailableReadOnly(UserAccount user) {
+        return experimentService.isRolledOut(user, GUEST_STARS_KEY);
+    }
+
+    /** Whether the settings page offers {@code user} the Guest Star guests in the titles: may assign the channel. */
+    public boolean guestStarsAvailableFor(UserAccount user) {
+        return experimentService.evaluateGate(user, GUEST_STARS_KEY);
     }
 
     /** Whether the settings page offers {@code user} the title's preview: may assign the channel. */
@@ -109,7 +121,8 @@ public class StreamTitleService {
     /**
      * What a title is rendered with for {@code binding} ({@code noGame}: the "no game" reset, without a binding):
      * its game and category, the title {@code before} it and the streamer's own, and its conditions — the drops ones
-     * only while the channel is in both {@value DropsGate#EXPERIMENT_KEY} and {@value #CONDITIONS_KEY}.
+     * only while the channel is in both {@value DropsGate#EXPERIMENT_KEY} and {@value #CONDITIONS_KEY}, its Guest Star
+     * guests only in {@value #GUEST_STARS_KEY}.
      */
     TitleContext context(UserAccount user, UserSettings settings, GameBinding binding, boolean noGame,
                          boolean labelSent, Optional<String> before) {
@@ -139,8 +152,11 @@ public class StreamTitleService {
                 .filter(state -> current.equals(state.getLastSentTitle()) && state.getOriginalTitle() != null)
                 .map(StreamTitleState::getOriginalTitle)
                 .orElse(current));
+        String guestStars = guestStarsAvailableReadOnly(user)
+                ? guestStarRoster.names(user.getId()).orElse(null) : null;
         return new TitleContext(game, category, () -> before, () -> original, conditions,
-                drop == null ? null : drop.name(), drop == null ? null : DROP_END.format(drop.endAt()));
+                drop == null ? null : drop.name(), drop == null ? null : DROP_END.format(drop.endAt()))
+                .withGuestStars(guestStars);
     }
 
     /**

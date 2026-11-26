@@ -38,6 +38,7 @@ class StreamTitleServiceTest {
     @Mock StreamTitleStateRepository stateRepository;
     @Mock fr.enimaloc.catapult.service.drops.DropsGate dropsGate;
     @Mock fr.enimaloc.catapult.service.drops.DropsCatalog dropsCatalog;
+    @Mock fr.enimaloc.catapult.service.gueststar.GuestStarRoster roster;
 
     StreamTitleService service;
     UserAccount user;
@@ -45,7 +46,7 @@ class StreamTitleServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new StreamTitleService(experimentService, stateRepository, dropsGate, dropsCatalog);
+        service = new StreamTitleService(experimentService, stateRepository, dropsGate, dropsCatalog, roster);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         settings = new UserSettings();
@@ -327,5 +328,30 @@ class StreamTitleServiceTest {
         assertThat(StreamTitleService.cleaned("   ")).isNull();
         assertThatThrownBy(() -> StreamTitleService.cleaned("x".repeat(141)))
                 .isInstanceOf(ResponseStatusException.class).hasMessageContaining("400");
+    }
+
+    @Test
+    void guestStarsInTitleWhenRolledOut() {
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
+        when(roster.names(user.getId())).thenReturn(Optional.of("Alice"));
+        assertThat(titleFor(binding("Hades", "{{GAME}} {{GUEST_STARS}}"), current("x"))).contains("Hades Alice");
+    }
+
+    @Test
+    void hasGuestStarsWithTheConditions() {
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
+        when(experimentService.isRolledOut(user, StreamTitleService.CONDITIONS_KEY)).thenReturn(true);
+        when(roster.names(user.getId())).thenReturn(Optional.of("Alice"));
+        String t = "{{GAME}}{{HAS_GUEST_STARS ? [[ avec {{GUEST_STARS}}]] : [[ solo]]}}";
+        assertThat(titleFor(binding("Hades", t), current("x"))).contains("Hades avec Alice");
+        when(roster.names(user.getId())).thenReturn(Optional.empty());
+        assertThat(titleFor(binding("Hades", t), current("x"))).contains("Hades solo");
+    }
+
+    @Test
+    void guestStarsEmptyOutsideExperiment() {
+        when(roster.names(user.getId())).thenReturn(Optional.of("Alice"));
+        assertThat(titleFor(binding("Hades", "{{GAME}} {{GUEST_STARS}}"), current("x"))).contains("Hades");
+        verify(roster, org.mockito.Mockito.never()).names(any());
     }
 }

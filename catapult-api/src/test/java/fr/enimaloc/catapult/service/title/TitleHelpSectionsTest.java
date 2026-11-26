@@ -28,7 +28,7 @@ class TitleHelpSectionsTest {
         when(drops.isAvailableReadOnly(account)).thenReturn(true);
 
         when(streamTitle.conditionsAvailableReadOnly(account)).thenReturn(true);
-        assertThat(sections.forAccount(id)).isEqualTo(new TitleHelpSections.Offered(true, true));
+        assertThat(sections.forAccount(id)).isEqualTo(new TitleHelpSections.Offered(true, true, false, false));
         when(streamTitle.conditionsAvailableReadOnly(account)).thenReturn(false);
         assertThat(sections.forAccount(id)).isEqualTo(TitleHelpSections.Offered.NONE);
     }
@@ -38,5 +38,16 @@ class TitleHelpSectionsTest {
         when(accounts.findById(id)).thenReturn(Optional.empty());
 
         assertThat(sections.forAccount(id)).isEqualTo(TitleHelpSections.Offered.NONE);
+    }
+
+    @Test
+    void guestStarsConditionNeedsConditions() {
+        when(accounts.findById(id)).thenReturn(Optional.of(account));
+        when(streamTitle.guestStarsAvailableReadOnly(account)).thenReturn(true);
+
+        when(streamTitle.conditionsAvailableReadOnly(account)).thenReturn(true);
+        assertThat(sections.forAccount(id)).isEqualTo(new TitleHelpSections.Offered(true, false, true, true));
+        when(streamTitle.conditionsAvailableReadOnly(account)).thenReturn(false);
+        assertThat(sections.forAccount(id)).isEqualTo(new TitleHelpSections.Offered(false, false, true, false));
     }
 }
