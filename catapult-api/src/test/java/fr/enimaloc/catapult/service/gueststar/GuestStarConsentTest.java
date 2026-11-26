@@ -45,4 +45,12 @@ class GuestStarConsentTest {
         when(tokens.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)).thenReturn(Optional.empty());
         assertThat(consent.state(user)).isEqualTo(GuestStarConsent.State.NEEDS_CONSENT);
     }
+
+    @Test
+    void readyWithTheScopesAsSpringStoresTwitchsArray() {
+        scopes("[user:read:email, channel:read:guest_star]");
+        assertThat(consent.hasScope(user)).isTrue();
+        scopes("[user:read:email,  channel:read:guest_star]");
+        assertThat(consent.hasScope(user)).isTrue();
+    }
 }

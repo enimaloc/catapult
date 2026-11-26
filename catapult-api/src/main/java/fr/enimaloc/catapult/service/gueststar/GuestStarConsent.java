@@ -1,12 +1,12 @@
 package fr.enimaloc.catapult.service.gueststar;
 
+import fr.enimaloc.catapult.domain.account.OAuthScopes;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.Arrays;
 
 /**
  * Whether the streamer gave Catapult their Guest Star consent: the login {@value #REGISTRATION_ID} asks the Twitch
@@ -32,7 +32,7 @@ public class GuestStarConsent {
     public boolean hasScope(UserAccount user) {
         return tokens.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
                 .map(OAuthToken::getGrantedScopes)
-                .map(scopes -> Arrays.asList(scopes.split(" ")).contains(SCOPE))
+                .map(scopes -> OAuthScopes.parse(scopes).contains(SCOPE))
                 .orElse(false);
     }
 }

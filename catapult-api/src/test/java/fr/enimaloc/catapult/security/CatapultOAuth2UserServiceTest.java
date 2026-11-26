@@ -748,11 +748,11 @@ class CatapultOAuth2UserServiceTest {
         when(oAuthTokenRepository.findByUserAndProvider(account, OAuthToken.Provider.TWITCH))
             .thenReturn(Optional.of(existing));
 
-        service.loadUser(guestStarRequest(java.util.Set.of("user:read:email", "channel:read:guest_star")));
+        service.loadUser(guestStarRequest(java.util.Set.of("[user:read:email,", "channel:read:guest_star]")));
 
         verify(oAuthTokenRepository).save(existing);
         assertThat(existing.getAccessToken()).isEqualTo("encrypted");
-        assertThat(existing.getGrantedScopes()).contains("channel:read:guest_star");
+        assertThat(existing.getGrantedScopes()).contains("channel:read:guest_star").doesNotContain("[", "]", ",");
     }
 
     @Test

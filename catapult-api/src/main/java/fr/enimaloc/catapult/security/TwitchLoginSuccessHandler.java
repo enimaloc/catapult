@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.domain.account.OAuthScopes;
 import fr.enimaloc.catapult.event.GuestStarConsentGrantedEvent;
 import fr.enimaloc.catapult.service.gueststar.GuestStarConsent;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
@@ -258,7 +259,7 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                     if (client.getAccessToken().getExpiresAt() != null) {
                         token.setExpiresAt(client.getAccessToken().getExpiresAt());
                     }
-                    token.setGrantedScopes(String.join(" ", client.getAccessToken().getScopes()));
+                    token.setGrantedScopes(OAuthScopes.join(client.getAccessToken().getScopes()));
                     oAuthTokenRepository.save(token);
                     log.debug("Saved {} refresh token for user {}", provider, catUser.getUserAccount().getId());
                 });

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.domain.account.OAuthScopes;
 import fr.enimaloc.catapult.service.gueststar.GuestStarConsent;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
@@ -522,7 +523,7 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             token.setExpiresAt(userRequest.getAccessToken().getExpiresAt());
         }
         if (!userRequest.getAccessToken().getScopes().isEmpty()) {
-            token.setGrantedScopes(String.join(" ", userRequest.getAccessToken().getScopes()));
+            token.setGrantedScopes(OAuthScopes.join(userRequest.getAccessToken().getScopes()));
         }
 
         oAuthTokenRepository.save(token);
