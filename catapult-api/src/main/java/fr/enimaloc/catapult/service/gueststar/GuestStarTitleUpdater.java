@@ -7,6 +7,7 @@ import fr.enimaloc.catapult.repository.account.UserAccountRepository;
 import fr.enimaloc.catapult.repository.account.UserSettingsRepository;
 import fr.enimaloc.catapult.service.binding.StreamStateService;
 import fr.enimaloc.catapult.service.title.StreamTitleService;
+import fr.enimaloc.catapult.service.title.TitleSendLocks;
 import fr.enimaloc.catapult.service.twitch.ChannelUpdateOutcome;
 import fr.enimaloc.catapult.service.twitch.TwitchService;
 import fr.enimaloc.catapult.site.SiteRole;
@@ -68,9 +69,13 @@ public class GuestStarTitleUpdater {
             Optional<String> title = streamTitleService.guestStarsRefresh(user);
             Optional<String> lastSent = streamTitleService.lastSentTitle(user);
             if (title.isEmpty() || lastSent.isEmpty() || title.get().equals(lastSent.get())) return;
-            if (twitchService.updateTitle(user, lastSent.get(), title.get()) == ChannelUpdateOutcome.APPLIED) {
-                streamTitleService.sentRefresh(user, title.get());
-            }
+            // Sent and remembered under the channel's title lock: a category change can't slip in between
+            TitleSendLocks.exclusively(userId, () -> {
+                if (twitchService.updateTitle(user, lastSent.get(), title.get()) == ChannelUpdateOutcome.APPLIED) {
+                    streamTitleService.sentRefresh(user, title.get());
+                }
+                return null;
+            });
         } catch (RuntimeException e) {
             log.warn("Could not update the title of user {} for its Guest Star guests: {}", userId, e.getMessage());
         }

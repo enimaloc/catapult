@@ -13,6 +13,7 @@ import fr.enimaloc.catapult.service.account.BotToggleService;
 import fr.enimaloc.catapult.service.metrics.ExternalApiObservations;
 import fr.enimaloc.catapult.service.notification.CatapultCategoryChangeStateService;
 import fr.enimaloc.catapult.service.title.StreamTitleService;
+import fr.enimaloc.catapult.service.title.TitleSendLocks;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -76,7 +77,9 @@ public class TwitchServiceImpl implements TwitchService {
                     log.warn("No Twitch token found for user {}", user.getId());
                     return ChannelUpdateOutcome.FAILED;
                 }
-                return doUpdateChannel(user, binding, token.get(), refused);
+                // One title send at a time per channel (the Guest Star refresh too)
+                return TitleSendLocks.exclusively(user.getId(),
+                    () -> doUpdateChannel(user, binding, token.get(), refused));
             });
         } catch (RuntimeException e) {
             if (e != refused[0]) throw e;
@@ -355,7 +358,7 @@ public class TwitchServiceImpl implements TwitchService {
                     return ChannelUpdateOutcome.SKIPPED;
                 }
                 return oAuthTokenRepository.findByUserAndProvider(user, OAuthToken.Provider.TWITCH)
-                    .map(token -> doResetToDefault(user, settings, token))
+                    .map(token -> TitleSendLocks.exclusively(user.getId(), () -> doResetToDefault(user, settings, token)))
                     .orElseGet(() -> {
                         log.warn("No Twitch token for user {} during reset", user.getId());
                         return ChannelUpdateOutcome.FAILED;

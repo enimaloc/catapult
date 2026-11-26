@@ -141,4 +141,29 @@ class GuestStarTitleUpdaterTest {
         runScheduled(1);
         verify(titles, never()).sentRefresh(any(), anyString());
     }
+
+    @Test
+    void theRefreshWaitsForATitleBeingSent() throws Exception {
+        when(twitch.updateTitle(user, "X", "X | A")).thenReturn(ChannelUpdateOutcome.APPLIED);
+        updater.onGuestStarsChanged(new GuestStarsChangedEvent(this, user));
+        java.util.concurrent.CountDownLatch inside = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        Thread sending = Thread.ofVirtual().start(() -> fr.enimaloc.catapult.service.title.TitleSendLocks
+                .exclusively(user.getId(), () -> {
+                    inside.countDown();
+                    try { release.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                    return null;
+                }));
+        inside.await();
+        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
+        verify(scheduler).schedule(task.capture(), any(Instant.class));
+        Thread refresh = Thread.ofVirtual().start(task.getValue());
+        Thread.sleep(100);
+        verify(twitch, never()).updateTitle(any(), anyString(), anyString());
+
+        release.countDown();
+        sending.join();
+        refresh.join();
+        verify(titles).sentRefresh(user, "X | A");
+    }
 }
