@@ -263,4 +263,14 @@ class Oauth2LoginFailureHandlerTest {
                     .isEqualTo("http://localhost:8081/channel/jeb_?error=" + c[1] + "#settings");
         }
     }
+
+    @Test
+    void aGuestStarFailureWithoutCode_isAFailedConsent() throws Exception {
+        request = callbackOf("twitch-guest-star", "jeb_");
+        response = new MockHttpServletResponse();
+        handler.onAuthenticationFailure(request, response,
+                new org.springframework.security.authentication.BadCredentialsException("boom"));
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("http://localhost:8081/channel/jeb_?error=guest_star_failed#settings");
+    }
 }

@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.service.gueststar.GuestStarConsent;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -75,7 +76,7 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
             "osu_unavailable", "osu_failed", "osu_mismatch", "osu_cancelled");
 
     /** The Guest Star consent: a failure that is not one of its refusals is a failed consent, back in the settings. */
-    private static final String GUEST_STAR = "twitch-guest-star";
+    private static final String GUEST_STAR = GuestStarConsent.REGISTRATION_ID;
     private static final Set<String> GUEST_STAR_ERROR_CODES = Set.of(
             "guest_star_mismatch", "guest_star_failed", "guest_star_cancelled");
 
@@ -117,7 +118,7 @@ public class Oauth2LoginFailureHandler implements AuthenticationFailureHandler {
             errorCode = "guest_star_cancelled";
         }
         if (GUEST_STAR.equals(registrationId) && !"unauthorized".equals(errorCode)
-                && !GUEST_STAR_ERROR_CODES.contains(errorCode)) {
+                && (errorCode == null || !GUEST_STAR_ERROR_CODES.contains(errorCode))) {
             errorCode = "guest_star_failed";
         }
         if ("twitch".equals(registrationId) && !BUSINESS_ERROR_CODES.contains(errorCode) && !alreadyRetried(request)) {
