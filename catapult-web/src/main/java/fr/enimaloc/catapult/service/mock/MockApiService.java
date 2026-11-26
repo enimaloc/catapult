@@ -274,6 +274,19 @@ public class MockApiService implements ApiService {
         return token != null ? data.get(token) : null;
     }
 
+    /**
+     * The Guest Star consent given (catapult-api's twitch-guest-star login, without leaving): the settings follow.
+     * The member's username, null without a session.
+     */
+    public String guestStarConnect() {
+        MockData current = currentData();
+        if (current == null) return null;
+        current.setGuestStarsState("READY");
+        String username = current.getChannelDto().twitchUsername();
+        publishSettings(username);
+        return username;
+    }
+
     /** Exposes the calling session's live instance for {@link fr.enimaloc.catapult.controller.mock.MockAdminController} to read and mutate. */
     public MockData getData() {
         return currentData();
@@ -1001,6 +1014,11 @@ public class MockApiService implements ApiService {
     }
 
     /** The settings cards' whole state, as ChannelEventRedisBridge relays catapult-api's settings.updated. */
+    /** Tells the channel's pages its settings changed (the mock admin page changed them). */
+    public void publishSettingsOf(String username) {
+        publishSettings(username);
+    }
+
     private void publishSettings(String username) {
         UserSettingsDto s = currentData().getUserSettings();
         eventPublisher.publishEvent(new ChannelSettingsUpdatedEvent(username, ChannelState.settings(s)));
@@ -1046,13 +1064,18 @@ public class MockApiService implements ApiService {
     /** The game a title is previewed with in the mock. */
     static final String PREVIEW_GAME = "Hades II";
 
-    /** Only the game and category are replaced, by examples: the mock has no conditions to evaluate. */
+    /**
+     * Only the game and category are replaced, by examples, and the Guest Star guests by the mock's: the mock has no
+     * conditions to evaluate.
+     */
     @Override
     public fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto previewTitle(String username,
             fr.enimaloc.catapult.common.dto.channel.TitlePreviewRequest request) {
         log.trace("previewTitle({}, {})", username, request);
         String template = request.template() == null ? "" : request.template();
-        String title = template.replace("{{GAME}}", PREVIEW_GAME).replace("{{CATEGORY}}", PREVIEW_GAME).strip();
+        MockData data = currentData();
+        String title = data != null ? data.renderTitle(template)
+                : template.replace("{{GAME}}", PREVIEW_GAME).replace("{{CATEGORY}}", PREVIEW_GAME).strip();
         return new fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto(title.isEmpty() ? null : title);
     }
 

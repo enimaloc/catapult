@@ -1670,4 +1670,33 @@ class MockApiServiceTest {
         assertThat(events).hasSize(2).allSatisfy(event ->
                 assertThat(event).isInstanceOf(fr.enimaloc.catapult.event.faceit.FaceitAccountChangedEvent.class));
     }
+
+    @Test
+    void mockGuestStarsOfferedNeedingConsent_untilConnected() {
+        assertThat(service.channelSettings(username).titleGuestStars()).isEqualTo("NEEDS_CONSENT");
+
+        assertThat(service.guestStarConnect()).isEqualTo(username);
+
+        assertThat(service.channelSettings(username).titleGuestStars()).isEqualTo("READY");
+    }
+
+    @Test
+    void mockPreviewRendersGuestStars() {
+        var request = new fr.enimaloc.catapult.common.dto.channel.TitlePreviewRequest(
+                "{{GAME}} avec {{GUEST_STARS}}", "TEMPLATE", null, null);
+        assertThat(service.previewTitle(username, request).title()).as("not authorized yet").isEqualTo(
+                MockApiService.PREVIEW_GAME + " avec");
+
+        service.guestStarConnect();
+        service.getData().setChannelLive(true);
+        assertThat(service.previewTitle(username, request).title())
+                .isEqualTo(MockApiService.PREVIEW_GAME + " avec MockGuest1, MockGuest2");
+    }
+
+    @Test
+    void mockSettingsSaveKeepsTheGuestStarState() {
+        service.guestStarConnect();
+        service.saveTitleSettings(username, true, "{{GAME}} {{GUEST_STARS}}");
+        assertThat(service.channelSettings(username).titleGuestStars()).isEqualTo("READY");
+    }
 }

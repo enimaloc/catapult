@@ -56,6 +56,13 @@ public class MockAuthController {
         return username == null ? "redirect:/" : "redirect:/channel/" + username + "#integrations";
     }
 
+    /** Twitch's Guest Star consent, given at once and sending the member back to their settings, as catapult-api does. */
+    @GetMapping("/oauth2/authorization/twitch-guest-star")
+    public String authorizeGuestStar() {
+        String username = mockApiService.guestStarConnect();
+        return username == null ? "redirect:/" : "redirect:/channel/" + username + "?guest_star=ok#settings";
+    }
+
     /** The account picker, reachable even when logging in skips it (the popout's "switch account"). */
     @GetMapping("/mock/login")
     public String loginPage(Model model) {

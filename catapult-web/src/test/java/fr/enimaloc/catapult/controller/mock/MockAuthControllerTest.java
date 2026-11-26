@@ -37,6 +37,19 @@ class MockAuthControllerTest {
     }
 
     @Test
+    void mockConsentSetsReady_andGoesBackToTheSettings() throws Exception {
+        when(mockApiService.guestStarConnect()).thenReturn("enimaloc");
+
+        mvc.perform(get("/oauth2/authorization/twitch-guest-star"))
+                .andExpect(redirectedUrl("/channel/enimaloc?guest_star=ok#settings"));
+    }
+
+    @Test
+    void guestStarWithoutASession_goesHome() throws Exception {
+        mvc.perform(get("/oauth2/authorization/twitch-guest-star")).andExpect(redirectedUrl("/"));
+    }
+
+    @Test
     void xboxWithoutASession_goesHome() throws Exception {
         mvc.perform(get("/oauth2/authorization/xbox")).andExpect(redirectedUrl("/"));
     }

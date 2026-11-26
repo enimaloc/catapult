@@ -451,4 +451,53 @@ class MockAdminControllerTest {
 
         verify(mockApiService, never()).adminBroadcast(any());
     }
+
+    private void readyWithTemplate(String template) {
+        data.setGuestStarsState("READY");
+        data.saveTitleSettings(true, template);
+        data.setChannelLive(true);
+    }
+
+    @Test
+    void mockGuestArrivalUpdatesTitle() throws Exception {
+        readyWithTemplate("Live {{GUEST_STARS}}");
+
+        mvc.perform(post("/mock/admin/guest-star/add").with(csrf()).param("name", "Alice"))
+                .andExpect(redirectedUrl("/mock/admin"));
+
+        assertThat(data.getGuestStars()).containsExactly("MockGuest1", "MockGuest2", "Alice");
+        assertThat(data.getStreamTitle()).isEqualTo("Live MockGuest1, MockGuest2, Alice");
+
+        mvc.perform(post("/mock/admin/guest-star/remove").with(csrf()).param("name", "MockGuest1"));
+        assertThat(data.getStreamTitle()).isEqualTo("Live MockGuest2, Alice");
+    }
+
+    @Test
+    void mockHandEditedTitleKept() throws Exception {
+        readyWithTemplate("Live {{GUEST_STARS}}");
+        mvc.perform(post("/mock/admin/guest-star/title").with(csrf()).param("title", "Mon titre à moi"));
+
+        mvc.perform(post("/mock/admin/guest-star/add").with(csrf()).param("name", "Alice"));
+
+        assertThat(data.getStreamTitle()).isEqualTo("Mon titre à moi");
+    }
+
+    @Test
+    void mockGuestStarStateChangedFromTheAdmin() throws Exception {
+        mvc.perform(post("/mock/admin/guest-star/state").with(csrf()).param("state", "READY"));
+        assertThat(data.getUserSettings().titleGuestStars()).isEqualTo("READY");
+
+        mvc.perform(post("/mock/admin/guest-star/state").with(csrf()).param("state", "bogus"));
+        assertThat(data.getUserSettings().titleGuestStars()).as("unknown state ignored").isEqualTo("READY");
+    }
+
+    @Test
+    void theAdminPageShowsTheGuestStarSection() throws Exception {
+        readyWithTemplate("Live {{GUEST_STARS}}");
+        mvc.perform(post("/mock/admin/guest-star/add").with(csrf()).param("name", "Alice"));
+
+        String page = mvc.perform(get("/mock/admin")).andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("id=\"mock-guest-star-form\"", "Alice", "Live MockGuest1, MockGuest2, Alice");
+    }
 }
