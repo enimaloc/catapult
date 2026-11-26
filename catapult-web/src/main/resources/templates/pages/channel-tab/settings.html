@@ -1,7 +1,7 @@
 <!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.channel.ChannelPageData"*/-->
 <!--/*@thymesVar id="channelSettings" type="fr.enimaloc.catapult.common.dto.channel.UserSettingsDto"*/-->
 <!--/* The channel's owner and its moderators alike: catapult-api lets both change these. */-->
-<mdui-tab-panel slot="panel" value="settings" th:with="settings=${channelSettings},titleHelperExtra=${(channelSettings?.titleConditionsAvailable() == true ? ' ' + #messages.msg('channel.title.helper_conditions') : '') + (channelSettings?.titleDropsAvailable() == true ? ' ' + #messages.msg('channel.title.helper_drops') : '')}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
+<mdui-tab-panel slot="panel" value="settings" th:with="settings=${channelSettings},titleHelperExtra=${(channelSettings?.titleConditionsAvailable() == true ? ' ' + #messages.msg('channel.title.helper_conditions') : '') + (channelSettings?.titleDropsAvailable() == true ? ' ' + #messages.msg('channel.title.helper_drops') : '') + (channelSettings?.titleGuestStars() != null ? ' ' + #messages.msg('channel.title.helper_guest_stars') : '') + (channelSettings?.titleGuestStars() != null and channelSettings?.titleConditionsAvailable() == true ? ' ' + #messages.msg('channel.title.helper_guest_stars_condition') : '')}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
 <!--/* Built only once the tab is picked (lazy.js): the page carries it, the browser builds nothing of it till then. */-->
 <template data-lazy>
     <div class="section-header">
@@ -110,6 +110,20 @@
            th:attr="data-none=#{channel.settings.stream_title.preview_none}"><span
                 th:text="#{channel.settings.stream_title.preview}">Aperçu :</span> <span class="title-preview-text"></span></p>
         <mdui-button id="title-settings-save-btn" th:text="#{channel.settings.save}">Enregistrer</mdui-button>
+        <!--/* Only while the channel is in the stream.title.guest_stars experiment: the Guest Star authorization
+             (a Twitch login of its own) to give, or given. channel-guest-stars.js binds the button and tells how
+             the authorization went. */-->
+        <div id="guest-stars-consent" class="guest-stars-consent" th:if="${settings.titleGuestStars() != null}"
+             th:attr="data-label-done=#{channel.settings.guest_stars.ok},data-label-failed=#{channel.settings.guest_stars.failed},
+                      data-label-mismatch=#{channel.settings.guest_stars.mismatch},data-label-cancelled=#{channel.settings.guest_stars.cancelled}">
+            <h4 th:text="#{channel.settings.guest_stars.title}">Invités Guest Star</h4>
+            <p th:text="#{channel.settings.guest_stars.description}">Description</p>
+            <mdui-button id="guest-stars-authorize-btn" variant="tonal" icon="group_add"
+                         th:if="${settings.titleGuestStars() == 'NEEDS_CONSENT'}"
+                         th:text="#{channel.settings.guest_stars.authorize}">Autoriser Guest Star</mdui-button>
+            <p class="guest-stars-ready" th:if="${settings.titleGuestStars() == 'READY'}"><mdui-icon name="check"></mdui-icon>
+                <span th:text="#{channel.settings.guest_stars.authorized}">Autorisé</span></p>
+        </div>
     </mdui-card>
 
     <!--/* Only while the channel is in the raid.restore-game experiment (catapult-api says so). Off: the delay

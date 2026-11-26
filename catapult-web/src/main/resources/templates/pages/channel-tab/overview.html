@@ -1,6 +1,6 @@
 <!--/*@thymesVar id="channelPage" type="fr.enimaloc.catapult.common.dto.channel.ChannelPageData"*/-->
 <!--/*@thymesVar id="app" type="fr.enimaloc.catapult.controller.ModelFiller$AppModel"*/-->
-<mdui-tab-panel slot="panel" value="overview" th:with="ch=${channelPage},titleHelperExtra=${(channelSettings?.titleConditionsAvailable() == true ? ' ' + #messages.msg('channel.title.helper_conditions') : '') + (channelSettings?.titleDropsAvailable() == true ? ' ' + #messages.msg('channel.title.helper_drops') : '')}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
+<mdui-tab-panel slot="panel" value="overview" th:with="ch=${channelPage},titleHelperExtra=${(channelSettings?.titleConditionsAvailable() == true ? ' ' + #messages.msg('channel.title.helper_conditions') : '') + (channelSettings?.titleDropsAvailable() == true ? ' ' + #messages.msg('channel.title.helper_drops') : '') + (channelSettings?.titleGuestStars() != null ? ' ' + #messages.msg('channel.title.helper_guest_stars') : '') + (channelSettings?.titleGuestStars() != null and channelSettings?.titleConditionsAvailable() == true ? ' ' + #messages.msg('channel.title.helper_guest_stars_condition') : '')}" th:fragment="panel" xmlns:spa="urn:fr.enimaloc.catapult:spa">
     <div class="section-header">
         <div class="title-row">
             <h2 th:text="#{channel.status.title}">Statut</h2>
