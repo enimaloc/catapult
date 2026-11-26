@@ -24,7 +24,8 @@ class DropsGateTest {
     private final ExperimentService experiments = mock(ExperimentService.class);
     private final DropsGate gate = new DropsGate(experiments);
     private final StreamTitleService title = new StreamTitleService(experiments, mock(StreamTitleStateRepository.class), gate, mock(DropsCatalog.class),
-            mock(fr.enimaloc.catapult.service.gueststar.GuestStarRoster.class));
+            mock(fr.enimaloc.catapult.service.gueststar.GuestStarRoster.class),
+            mock(fr.enimaloc.catapult.service.gueststar.GuestStarConsent.class));
     private final UserAccount user = new UserAccount();
 
     @Test

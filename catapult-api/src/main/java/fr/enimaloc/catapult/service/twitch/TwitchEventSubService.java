@@ -361,7 +361,11 @@ public class TwitchEventSubService implements EventSubService {
                     }
                 }
                 case "session_keepalive" -> log.trace("EventSub keepalive for user {}", user.getId());
-                case "revocation" -> log.warn("EventSub subscription revoked for user {}", user.getId());
+                case "revocation" -> {
+                    String revokedType = root.path("payload").path("subscription").path("type").asText("");
+                    log.warn("EventSub subscription {} revoked for user {}", revokedType, user.getId());
+                    if (guestStars != null) guestStars.onRevocation(user, revokedType);
+                }
                 default -> log.debug("Unhandled EventSub message type '{}' for user {}", messageType, user.getId());
             }
         } catch (Exception e) {

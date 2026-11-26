@@ -11,6 +11,7 @@ import fr.enimaloc.catapult.service.drops.DropCampaign;
 import fr.enimaloc.catapult.service.drops.DropsCatalog;
 import fr.enimaloc.catapult.service.drops.DropsGate;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
+import fr.enimaloc.catapult.service.gueststar.GuestStarConsent;
 import fr.enimaloc.catapult.service.gueststar.GuestStarRoster;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +59,7 @@ public class StreamTitleService {
     private final DropsGate dropsGate;
     private final DropsCatalog dropsCatalog;
     private final GuestStarRoster guestStarRoster;
+    private final GuestStarConsent guestStarConsent;
 
     /**
      * A title to send, with the one the stream had before ({@code before}, empty when it couldn't be read), what
@@ -99,6 +101,14 @@ public class StreamTitleService {
     /** Whether the titles sent for {@code user} show their Guest Star guests; read-only, never assigns. */
     public boolean guestStarsAvailableReadOnly(UserAccount user) {
         return experimentService.isRolledOut(user, GUEST_STARS_KEY);
+    }
+
+    /**
+     * Whether the titles sent for {@code user} show their guests now: in {@value #GUEST_STARS_KEY} and the consent
+     * still given (a later plain Twitch login takes it away, the subscriptions possibly still running).
+     */
+    private boolean followsGuestStars(UserAccount user) {
+        return guestStarsAvailableReadOnly(user) && guestStarConsent.hasScope(user);
     }
 
     /** Whether the settings page offers {@code user} the Guest Star guests in the titles: may assign the channel. */
@@ -165,8 +175,7 @@ public class StreamTitleService {
                 .filter(state -> current.equals(state.getLastSentTitle()) && state.getOriginalTitle() != null)
                 .map(StreamTitleState::getOriginalTitle)
                 .orElse(current));
-        String guestStars = guestStarsAvailableReadOnly(user)
-                ? guestStarRoster.names(user.getId()).orElse(null) : null;
+        String guestStars = followsGuestStars(user) ? guestStarRoster.names(user.getId()).orElse(null) : null;
         return new TitleContext(game, category, () -> before, () -> original, conditions,
                 drop == null ? null : drop.name(), drop == null ? null : DROP_END.format(drop.endAt()))
                 .withGuestStars(guestStars);
@@ -215,7 +224,7 @@ public class StreamTitleService {
      */
     public Optional<String> guestStarsRefresh(UserAccount user) {
         LastRender last = lastRenders.get(user.getId());
-        if (last == null || !isAvailableReadOnly(user) || !guestStarsAvailableReadOnly(user)) return Optional.empty();
+        if (last == null || !isAvailableReadOnly(user) || !followsGuestStars(user)) return Optional.empty();
         String guests = guestStarRoster.names(user.getId()).orElse(null);
         return TitleTemplate.render(last.template(), last.context().withGuestStars(guests), last.conditions());
     }

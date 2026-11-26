@@ -380,6 +380,16 @@ class TwitchEventSubServiceFlowsTest {
         }
 
         @Test
+        void aRevocationGoesToGuestStars() {
+            service.handleMessage(user, token, """
+                    {"metadata": {"message_type": "revocation", "subscription_type": "channel.guest_star_guest.update"},
+                     "payload": {"subscription": {"type": "channel.guest_star_guest.update", "status": "authorization_revoked"}}}""",
+                    false);
+
+            verify(guestStars).onRevocation(user, "channel.guest_star_guest.update");
+        }
+
+        @Test
         void consentReconnectsAnActiveChannelWithTheBot() {
             user.setBotEnabled(true);
             user.setStatus(UserAccount.Status.ACTIVE);

@@ -39,6 +39,7 @@ class StreamTitleServiceTest {
     @Mock fr.enimaloc.catapult.service.drops.DropsGate dropsGate;
     @Mock fr.enimaloc.catapult.service.drops.DropsCatalog dropsCatalog;
     @Mock fr.enimaloc.catapult.service.gueststar.GuestStarRoster roster;
+    @Mock fr.enimaloc.catapult.service.gueststar.GuestStarConsent consent;
 
     StreamTitleService service;
     UserAccount user;
@@ -46,7 +47,7 @@ class StreamTitleServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new StreamTitleService(experimentService, stateRepository, dropsGate, dropsCatalog, roster);
+        service = new StreamTitleService(experimentService, stateRepository, dropsGate, dropsCatalog, roster, consent);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         settings = new UserSettings();
@@ -54,6 +55,7 @@ class StreamTitleServiceTest {
         settings.setTitleTemplate("Playing {{GAME}} with chat");
         when(experimentService.isRolledOut(user, StreamTitleService.EXPERIMENT_KEY)).thenReturn(true);
         when(stateRepository.findById(user.getId())).thenReturn(Optional.empty());
+        when(consent.hasScope(user)).thenReturn(true);
     }
 
     private static Supplier<Optional<String>> current(String title) {
@@ -420,5 +422,42 @@ class StreamTitleServiceTest {
         assertThat(saved.getValue().getOriginalTitle()).isEqualTo("Chill night");
         assertThat(saved.getValue().getLastSentTitle()).isEqualTo("Chill night — Doom avec A");
         assertThat(service.lastSentTitle(user)).contains("Chill night — Doom avec A");
+    }
+
+    @Test
+    void guestStarsEmptyOnceTheConsentIsGone() {
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
+        when(roster.names(user.getId())).thenReturn(Optional.of("Alice"));
+        sentNormally("{{GAME}} {{GUEST_STARS}}", "X");
+
+        when(consent.hasScope(user)).thenReturn(false);
+
+        assertThat(titleFor(binding("Hades", "{{GAME}} {{GUEST_STARS}}"), current("x"))).contains("Hades");
+        assertThat(service.guestStarsRefresh(user)).isEmpty();
+    }
+
+    @Test
+    void exclusively_oneTitleSendAtATimePerChannel() throws Exception {
+        java.util.concurrent.CountDownLatch inside = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicBoolean secondRan = new java.util.concurrent.atomic.AtomicBoolean();
+        Thread first = Thread.ofVirtual().start(() -> TitleSendLocks.exclusively(user.getId(), () -> {
+            inside.countDown();
+            try { release.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            return null;
+        }));
+        inside.await();
+        Thread second = Thread.ofVirtual().start(() -> TitleSendLocks.exclusively(user.getId(), () -> {
+            secondRan.set(true);
+            return null;
+        }));
+        Thread.sleep(100);
+        assertThat(secondRan).as("waits for the first").isFalse();
+        assertThat(TitleSendLocks.exclusively(UUID.randomUUID(), () -> "other")).as("another channel isn't held")
+                .isEqualTo("other");
+        release.countDown();
+        first.join();
+        second.join();
+        assertThat(secondRan).isTrue();
     }
 }

@@ -58,6 +58,11 @@ public class GuestStarEventSub {
         }
     }
 
+    /** Twitch revoked a subscription: one of Guest Star's leaves its guests unknown, none is shown any more. */
+    public void onRevocation(UserAccount user, String subscriptionType) {
+        if (handles(subscriptionType)) roster.clear(user);
+    }
+
     /** The roster read again from Helix, or emptied while the channel isn't followed. */
     public void resync(UserAccount user) {
         if (!follows(user)) {

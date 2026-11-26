@@ -99,4 +99,12 @@ class GuestStarEventSubTest {
         assertThat(eventSub.handles("channel.guest_star_guest.update")).isTrue();
         assertThat(eventSub.handles("channel.update")).isFalse();
     }
+
+    @Test
+    void aRevokedGuestStarSubscriptionEmptiesTheRoster() {
+        eventSub.onRevocation(user, "channel.guest_star_guest.update");
+        verify(roster).clear(user);
+        eventSub.onRevocation(user, "channel.update");
+        verify(roster, org.mockito.Mockito.times(1)).clear(user);
+    }
 }

@@ -248,12 +248,12 @@ public class ChannelFixture {
         channelActionsController = new ApiChannelActionsController(
                 new ApiUserResolver(accountRepository),
                 new ChannelDashboardActions(bindingService, mock(SchedulerService.class), gameStateService,
-                        publisher, new fr.enimaloc.catapult.service.title.StreamTitleService(experimentService, mock(fr.enimaloc.catapult.repository.title.StreamTitleStateRepository.class), mock(fr.enimaloc.catapult.service.drops.DropsGate.class), mock(fr.enimaloc.catapult.service.drops.DropsCatalog.class), mock(fr.enimaloc.catapult.service.gueststar.GuestStarRoster.class))),
+                        publisher, new fr.enimaloc.catapult.service.title.StreamTitleService(experimentService, mock(fr.enimaloc.catapult.repository.title.StreamTitleStateRepository.class), mock(fr.enimaloc.catapult.service.drops.DropsGate.class), mock(fr.enimaloc.catapult.service.drops.DropsCatalog.class), mock(fr.enimaloc.catapult.service.gueststar.GuestStarRoster.class), mock(fr.enimaloc.catapult.service.gueststar.GuestStarConsent.class))),
                 mock(BotToggleService.class),
                 new ChannelSettingsService(settingsRepository, categoryChain,
                         new RaidRestoreGateService(experimentService), publisher,
                         mock(ExtensionLayoutApplier.class),
-                        new fr.enimaloc.catapult.service.title.StreamTitleService(experimentService, mock(fr.enimaloc.catapult.repository.title.StreamTitleStateRepository.class), mock(fr.enimaloc.catapult.service.drops.DropsGate.class), mock(fr.enimaloc.catapult.service.drops.DropsCatalog.class), mock(fr.enimaloc.catapult.service.gueststar.GuestStarRoster.class))),
+                        new fr.enimaloc.catapult.service.title.StreamTitleService(experimentService, mock(fr.enimaloc.catapult.repository.title.StreamTitleStateRepository.class), mock(fr.enimaloc.catapult.service.drops.DropsGate.class), mock(fr.enimaloc.catapult.service.drops.DropsCatalog.class), mock(fr.enimaloc.catapult.service.gueststar.GuestStarRoster.class), mock(fr.enimaloc.catapult.service.gueststar.GuestStarConsent.class))),
                 new SteamPersonalTokenService(
                         new SteamPersonalTokenStore(accountRepository, mock(SteamApiKeyRepository.class)),
                         mock(TokenEncryptionService.class), publisher, mock(SteamProfileDiagnostics.class),
