@@ -430,7 +430,7 @@ class ChannelVisibilityRenderingTest {
         assertThat(offered).contains("id=\"channel-title-settings-form\"", "id=\"title-settings-save-btn\"",
                 "data-help=\"title-settings\"", "class=\"binding-title-panel\"");
         assertThat(openingTagForId(offered, "title-enabled-checkbox")).contains("checked");
-        assertThat(openingTagForId(offered, "title-template-input")).contains("value=\"Playing {{GAME}}\"", "maxlength=\"140\"")
+        assertThat(openingTagForId(offered, "title-template-input")).contains("value=\"Playing {{GAME}}\"", "maxlength=\"500\"", "data-title-too-long=")
                 .doesNotContain("disabled");
         assertThat(offered).contains("data-title-preview", "data-preview-kind=\"TEMPLATE\"",
                 "data-preview-kind=\"BINDING\"", "data-preview-kind=\"NO_GAME\"", "data-preview-kind=\"INCOMPLETE\"");

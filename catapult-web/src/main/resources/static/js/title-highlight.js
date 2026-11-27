@@ -11,11 +11,17 @@
  * the field's shadow root, where the input is, so it sits exactly on it; it follows the typing, the scrolling and the
  * values set by the page's scripts. Until it is in place (or without it, as in a test) the field shows its text as
  * usual.
+ *
+ * Its suffix counts the text's own characters out of 140, as catapult-api limits them (literalLength): the variables
+ * and a ternary's syntax left out, a ternary by its longer branch. Past 140 the field is invalid, with its
+ * data-title-too-long message.
  */
 window.CatapultTitleHighlight = (function () {
     const VARIABLES = ["GAME", "CATEGORY", "TITLE", "ORIGINAL_TITLE", "DROP_NAME", "DROP_END", "GUEST_STARS"];
     const CONDITIONS = ["DROP_ENABLED", "HAS_GAME", "IS_CUSTOM", "IS_INCOMPLETE", "IS_NO_GAME", "HAS_TW", "IS_MATURE",
         "HAS_GUEST_STARS"];
+    /** Twitch's limit, on the text a title has of its own. */
+    const MAX_LENGTH = 140;
     const SELECTOR = "mdui-text-field[data-title-highlight]";
     // On the field itself: wired once, whichever copy of this script (a reloaded one) sees it
     const ATTACHED = Symbol.for("catapult.titleHighlight");
@@ -65,6 +71,50 @@ window.CatapultTitleHighlight = (function () {
                 i = open + 1;
             }
         }
+    }
+
+    /** The characters `text` puts in a title by itself, as TitleTemplate.literalLength counts them. */
+    function literalLength(text, from = 0, to = (text ?? "").length) {
+        text = text ?? "";
+        const count = (a, b) => [...text.slice(a, b)].length;
+        let length = 0;
+        let i = from;
+        while (i < to) {
+            const open = text.indexOf("{{", i);
+            if (open < 0 || open >= to) {
+                length += count(i, to);
+                break;
+            }
+            length += count(i, open);
+            const close = text.indexOf("}}", open + 2);
+            const ternary = ternaryAt(text, open);
+            let failed;
+            if (close >= 0 && close + 2 <= to && VARIABLES.includes(text.slice(open + 2, close))) {
+                i = close + 2;
+            } else if (ternary && ternary.end <= to) {
+                length += Math.max(literalLength(text, ternary.whenTrue[0], ternary.whenTrue[1] - 2),
+                    literalLength(text, ternary.whenFalse[0], ternary.whenFalse[1] - 2));
+                i = ternary.end;
+            } else if ((failed = failedTernaryEnd(text, open)) > 0 && failed <= to) {
+                length += count(open, failed);
+                i = failed;
+            } else {
+                length++;
+                i = open + 1;
+            }
+        }
+        return length;
+    }
+
+    /** The field's counter and validity, from its text's own length. */
+    function count(field) {
+        const length = literalLength(field.value);
+        field.suffix = `${length}/${MAX_LENGTH}`;
+        const message = length > MAX_LENGTH ? (field.dataset.titleTooLong || `${length}/${MAX_LENGTH}`) : "";
+        if ((field.customValidity ?? "") === message) return;
+        field.customValidity = message;
+        field.setCustomValidity?.(message);
+        field.reportValidity?.();
     }
 
     /** {{COND ? [[a]] : [[b]]}} at `open`: its branches' [text start, end after ]] ] and its end; null otherwise. */
@@ -230,6 +280,7 @@ window.CatapultTitleHighlight = (function () {
         const render = () => {
             line = fill(mirror, field.value);
             place(field, input, mirror, line);
+            count(field);
         };
         const scroll = () => place(field, input, mirror, line);
 
@@ -275,5 +326,5 @@ window.CatapultTitleHighlight = (function () {
     }))).observe(document.documentElement, { childList: true, subtree: true });
     scan(document);
 
-    return { segments };
+    return { segments, literalLength };
 })();

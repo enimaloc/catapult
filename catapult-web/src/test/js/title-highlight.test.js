@@ -15,6 +15,8 @@ beforeAll(() => {
         }
         get value() { return this.shadowRoot.querySelector("input").value; }
         set value(value) { this.shadowRoot.querySelector("input").value = value; }
+        setCustomValidity(message) { this.customValidity = message; }
+        reportValidity() { return !this.customValidity; }
     });
 });
 
@@ -107,6 +109,43 @@ describe("the guest stars", () => {
                 { text: "]] : [[", variable: false, syntax: true },
                 { text: "solo", variable: false },
                 { text: "]]}}", variable: false, syntax: true }]);
+    });
+});
+
+describe("literalLength", () => {
+    const length = text => window.CatapultTitleHighlight.literalLength(text);
+
+    it("leaves the variables out, as catapult-api counts", () => {
+        expect(length("{{GAME}} avec {{GUEST_STARS}}")).toBe(6);
+        expect(length("{{game}} ok")).toBe(11);
+        expect(length("🎮 {{TITLE}}")).toBe(2);
+        expect(length("")).toBe(0);
+    });
+
+    it("counts a ternary by its longer branch, one sent as typed as typed", () => {
+        expect(length("{{HAS_GUEST_STARS ? [[avec {{GUEST_STARS}}]] : [[solo]]}} !")).toBe(7);
+        expect(length("{{HAS_GAME ? [[a]] : [[{{IS_MATURE ? [[bbb]] : [[]]}}]]}}")).toBe(3);
+        expect(length("{{NOPE ? [[a]] : [[b]]}}")).toBe(24);
+        expect(length("{{{GAME}}}")).toBe(2);
+    });
+});
+
+describe("the field's counter", () => {
+    it("shows the text's own length out of 140", async () => {
+        const el = await field("{{GAME}} avec {{GUEST_STARS}}");
+        expect(el.suffix).toBe("6/140");
+    });
+
+    it("marks the field invalid past 140, its variables left out", async () => {
+        const el = await field("{{GAME}}".repeat(30) + "x".repeat(140));
+        el.dataset.titleTooLong = "Trop long";
+        el.value = "x".repeat(141);
+        await flush();
+        expect(el.suffix).toBe("141/140");
+        expect(el.customValidity).toBe("Trop long");
+        el.value = "x".repeat(140) + "{{GAME}}";
+        await flush();
+        expect(el.customValidity).toBe("");
     });
 });
 

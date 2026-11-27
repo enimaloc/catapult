@@ -391,7 +391,7 @@ public class MockApiService implements ApiService {
         return NO_CONTENT;
     }
 
-    /** Checked like catapult-api: at most 140 characters, blank for the channel-wide title. */
+    /** Checked like catapult-api ({@link #validTitle}), blank for the channel-wide title. */
     @Override
     public int bindingTitle(String username, String bindingId, String title) {
         log.trace("bindingTitle({}, {}, {})", username, bindingId, title);
@@ -1079,7 +1079,7 @@ public class MockApiService implements ApiService {
         return new fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto(title.isEmpty() ? null : title);
     }
 
-    /** Checked like catapult-api: a template of at most 140 characters, blank for none. */
+    /** Checked like catapult-api ({@link #validTitle}), blank for none. */
     @Override
     public int saveTitleSettings(String username, boolean enabled, String template) {
         log.trace("saveTitleSettings({}, {}, {})", username, enabled, template);
@@ -1090,9 +1090,18 @@ public class MockApiService implements ApiService {
         return NO_CONTENT;
     }
 
-    /** A title or template catapult-api would take: at most 140 characters. */
-    private static boolean validTitle(String title) {
-        return title == null || title.codePointCount(0, title.length()) <= 140;
+    /** The variables catapult-api replaces in a title, written exactly. */
+    private static final java.util.regex.Pattern TITLE_VARIABLE = java.util.regex.Pattern.compile(
+            "\\{\\{(GAME|CATEGORY|TITLE|ORIGINAL_TITLE|DROP_NAME|DROP_END|GUEST_STARS)}}");
+
+    /**
+     * A title or template catapult-api would take: at most 140 characters of its own, its variables left out, and 500
+     * as typed. Simpler than catapult-api: a ternary's syntax is counted.
+     */
+    static boolean validTitle(String title) {
+        if (title == null) return true;
+        String own = TITLE_VARIABLE.matcher(title).replaceAll("");
+        return title.codePointCount(0, title.length()) <= 500 && own.codePointCount(0, own.length()) <= 140;
     }
 
     /** Validated like catapult-api: 1..120 minutes, null or 0 for off, else 400. */

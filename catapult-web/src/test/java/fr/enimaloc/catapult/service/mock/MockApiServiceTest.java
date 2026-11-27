@@ -808,6 +808,14 @@ class MockApiServiceTest {
     }
 
     @Test
+    void titleLimit_leavesTheVariablesOut_likeCatapultApi() {
+        String template = "x".repeat(130) + " {{GAME}} {{GUEST_STARS}} {{CATEGORY}}";
+        assertThat(service.saveTitleSettings(username, true, template)).isEqualTo(204);
+        assertThat(service.bindingTitle(username, bindingId, template)).isEqualTo(204);
+        assertThat(service.saveTitleSettings(username, true, "{{GAME}}".repeat(63))).isEqualTo(400);
+    }
+
+    @Test
     void bindingTitle_isSaved_andToldAsAnEvent_blankBeingNone() {
         assertThat(service.bindingTitle(username, bindingId, "{{GAME}} blind")).isEqualTo(204);
         assertThat(binding().title()).isEqualTo("{{GAME}} blind");
