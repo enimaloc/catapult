@@ -86,6 +86,7 @@ class SimulationActionsTest {
 
     SimulationRegistry registry;
     TwitchEventSubService eventSub;
+    StaticListableBeanFactory beans;
     SimulationActions actions;
     UserAccount user = new UserAccount();
     /** A real account, with a Twitch token: its events can be set to REAL. */
@@ -114,12 +115,13 @@ class SimulationActionsTest {
         properties.setStateFile(dir.resolve("simulation.json").toString());
         registry = new SimulationRegistry(properties, accounts, tokens, mock(MinecraftFriendLinkRepository.class),
                 mock(MinecraftServiceAccountRepository.class), new MockEnvironment());
-        StaticListableBeanFactory beans = new StaticListableBeanFactory();
+        beans = new StaticListableBeanFactory();
         beans.addBean("simulationGate", new SimulationGate(registry));
         eventSub = new TwitchEventSubService(tokens, accounts, mock(TwitchTokenService.class), streamState,
                 publisher, RestClient.create(), new ObjectMapper(), twitchat, selfChanges, DebugRecording.OFF,
                 beans.getBeanProvider(SimulationGate.class), SiteRoles.active(),
-                sessions, mock(fr.enimaloc.catapult.service.stream.StreamCatchUp.class));
+                sessions, mock(fr.enimaloc.catapult.service.stream.StreamCatchUp.class),
+                beans.getBeanProvider(fr.enimaloc.catapult.service.gueststar.GuestStarEventSub.class));
         beans.addBean("twitchEventSubService", eventSub);
         actions = new SimulationActions(registry, journal, beans.getBeanProvider(TwitchEventSubService.class),
                 scheduler, getterConfigs, botToggle, twitch, publisher, systemAccount, accounts, sessions, timeline,
@@ -451,7 +453,7 @@ class SimulationActionsTest {
     /** A roster fed by the real EventSub handling, as when the channel's Guest Star subscriptions run. */
     private fr.enimaloc.catapult.service.gueststar.GuestStarRoster followGuests() {
         var roster = new fr.enimaloc.catapult.service.gueststar.GuestStarRoster(mock(ApplicationEventPublisher.class));
-        eventSub.setGuestStars(new fr.enimaloc.catapult.service.gueststar.GuestStarEventSub(roster,
+        beans.addBean("guestStarEventSub", new fr.enimaloc.catapult.service.gueststar.GuestStarEventSub(roster,
                 mock(fr.enimaloc.catapult.service.gueststar.GuestStarConsent.class),
                 mock(fr.enimaloc.catapult.service.title.StreamTitleService.class),
                 mock(fr.enimaloc.catapult.service.gueststar.GuestStarSessionClient.class)));

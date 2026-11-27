@@ -77,6 +77,9 @@ class TwitchEventSubServiceFlowsTest {
     private final WebSocket.Builder wsBuilder = mock(WebSocket.Builder.class);
     private final List<WebSocket.Listener> listeners = new CopyOnWriteArrayList<>();
     private MockRestServiceServer helix;
+    @SuppressWarnings("unchecked")
+    private final org.springframework.beans.factory.ObjectProvider<fr.enimaloc.catapult.service.gueststar.GuestStarEventSub>
+            guestStarEventSub = mock(org.springframework.beans.factory.ObjectProvider.class);
     private TwitchEventSubService service;
     private UserAccount user;
     private OAuthToken token;
@@ -88,7 +91,8 @@ class TwitchEventSubServiceFlowsTest {
         service = new TwitchEventSubService(tokens, users, tokenService, streamState, publisher, builder.build(),
                 new ObjectMapper(), twitchat, selfChanges, DebugRecording.OFF, SimulationGates.none(), SiteRoles.active(),
                 streamSessions, new fr.enimaloc.catapult.service.stream.StreamCatchUp(streamSessions, streamState,
-                    mock(fr.enimaloc.catapult.service.binding.GameStateService.class), publisher));
+                    mock(fr.enimaloc.catapult.service.binding.GameStateService.class), publisher),
+                guestStarEventSub);
         ReflectionTestUtils.setField(service, "twitchClientId", "client-id");
         ReflectionTestUtils.setField(ReflectionTestUtils.getField(service, "connections"), "httpClient", httpClient);
 
@@ -335,7 +339,7 @@ class TwitchEventSubServiceFlowsTest {
 
         @BeforeEach
         void wire() {
-            service.setGuestStars(guestStars);
+            when(guestStarEventSub.getIfAvailable()).thenReturn(guestStars);
             when(guestStars.subscriptionsFor(user)).thenReturn(java.util.stream.Stream.of(
                     "channel.guest_star_session.begin", "channel.guest_star_session.end",
                     "channel.guest_star_guest.update")

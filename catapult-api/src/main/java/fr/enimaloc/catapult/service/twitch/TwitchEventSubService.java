@@ -80,8 +80,8 @@ public class TwitchEventSubService implements EventSubService {
     private final SiteRole siteRole;
     private final StreamSessionService streamSessionService;
     private final StreamCatchUp streamCatchUp;
-    /** The Guest Star subscriptions and notifications; null (none) when not wired, as in most tests. */
-    private GuestStarEventSub guestStars;
+    /** The Guest Star subscriptions and notifications, through a provider: it depends back on the title services. */
+    private final ObjectProvider<GuestStarEventSub> guestStarEventSub;
 
     public TwitchEventSubService(OAuthTokenRepository oAuthTokenRepository,
                                  UserAccountRepository userAccountRepository,
@@ -96,7 +96,8 @@ public class TwitchEventSubService implements EventSubService {
                                  ObjectProvider<SimulationGate> simulationGate,
                                  SiteRole siteRole,
                                  StreamSessionService streamSessionService,
-                                 StreamCatchUp streamCatchUp) {
+                                 StreamCatchUp streamCatchUp,
+                                 ObjectProvider<GuestStarEventSub> guestStarEventSub) {
         this.oAuthTokenRepository = oAuthTokenRepository;
         this.userAccountRepository = userAccountRepository;
         this.twitchTokenService = twitchTokenService;
@@ -111,13 +112,14 @@ public class TwitchEventSubService implements EventSubService {
         this.siteRole = siteRole;
         this.streamSessionService = streamSessionService;
         this.streamCatchUp = streamCatchUp;
+        this.guestStarEventSub = guestStarEventSub;
         this.connections = new EventSubConnections(
             "[EventSub]", "twitch-eventsub-watchdog", oAuthTokenRepository, this::handleMessage);
     }
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    public void setGuestStars(GuestStarEventSub guestStars) {
-        this.guestStars = guestStars;
+    /** The Guest Star handler, or null when there is none (no bean, or no provider in a test). */
+    private @Nullable GuestStarEventSub guestStars() {
+        return guestStarEventSub == null ? null : guestStarEventSub.getIfAvailable();
     }
 
     /** The Guest Star consent was given: an active channel with the bot subscribes again, Guest Star included. */
@@ -354,6 +356,7 @@ public class TwitchEventSubService implements EventSubService {
                         case "channel.raid" -> handleRaid(user, root.path("payload").path("event"),
                             root.path("metadata").path("message_timestamp").asText(""));
                         default -> {
+                            GuestStarEventSub guestStars = guestStars();
                             if (guestStars != null && guestStars.handles(subscriptionType)) {
                                 guestStars.onNotification(user, subscriptionType, root.path("payload").path("event"));
                             }
@@ -364,6 +367,7 @@ public class TwitchEventSubService implements EventSubService {
                 case "revocation" -> {
                     String revokedType = root.path("payload").path("subscription").path("type").asText("");
                     log.warn("EventSub subscription {} revoked for user {}", revokedType, user.getId());
+                    GuestStarEventSub guestStars = guestStars();
                     if (guestStars != null) guestStars.onRevocation(user, revokedType);
                 }
                 default -> log.debug("Unhandled EventSub message type '{}' for user {}", messageType, user.getId());
@@ -667,6 +671,7 @@ public class TwitchEventSubService implements EventSubService {
 
     /** The Guest Star subscriptions (beta) of a followed channel: a refusal is logged and stops nothing else. */
     private void subscribeGuestStars(UserAccount user, String accessToken, String sessionId) {
+        GuestStarEventSub guestStars = guestStars();
         if (guestStars == null) return;
         for (GuestStarEventSub.Spec spec : guestStars.subscriptionsFor(user)) {
             // Kept out by the simulation: its events are injected instead
@@ -682,6 +687,7 @@ public class TwitchEventSubService implements EventSubService {
 
     /** The Guest Star guests read again; a failure is only logged. */
     private void resyncGuestStars(UserAccount user) {
+        GuestStarEventSub guestStars = guestStars();
         if (guestStars == null) return;
         try {
             guestStars.resync(user);
