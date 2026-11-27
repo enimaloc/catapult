@@ -301,6 +301,19 @@ function renderState(account, current) {
     ? current.detectedGame.name + ' (' + current.detectedGame.sourceType + ' ' + current.detectedGame.sourceId + ')'
     : 'none';
   $('category').textContent = (current.categoryName || '?') + (current.categoryId ? ' (' + current.categoryId + ')' : '');
+  renderGuestStars(account, current.data);
+}
+
+/** The Guest Star guests: the other accounts to check, and any other name in the free field. */
+function renderGuestStars(account, data) {
+  const onAir = (data.guestStars || []).map((guest) => guest.displayName);
+  $('guest-consent').checked = !!data.guestStarConsent;
+  $('guest-on-air').textContent = onAir.length ? onAir.join(', ') : 'none';
+  const choices = state.accounts.filter((other) => other.id !== state.selected)
+    .map((other) => other.username || other.twitchId);
+  $('guest-choices').replaceChildren(...choices.map((name) => el('label', {class: 'check'},
+    el('input', {type: 'checkbox', value: name, checked: onAir.includes(name)}), name)));
+  $('guest-extra').value = onAir.filter((name) => !choices.includes(name)).join(', ');
 }
 
 $('live').addEventListener('change', (event) => act(event.target.checked ? 'Live' : 'Offline',
@@ -383,6 +396,18 @@ $('category-form').addEventListener('submit', (event) => {
     categoryName: $('category-name').value.trim(),
   }));
 });
+
+$('guest-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const extra = $('guest-extra').value.split(',').map((name) => name.trim()).filter(Boolean);
+  act('Guests on air', () => call('POST', '/accounts/' + state.selected + '/guest-stars', {
+    names: [...checkedValues($('guest-choices')), ...extra],
+  }));
+});
+
+$('guest-consent').addEventListener('change', (event) => act(
+  event.target.checked ? 'Guest Star consent given' : 'Guest Star consent taken back',
+  () => call('POST', '/accounts/' + state.selected + '/guest-star-consent', {given: event.target.checked})));
 
 $('raid-form').addEventListener('submit', (event) => {
   event.preventDefault();

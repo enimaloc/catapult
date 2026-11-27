@@ -42,6 +42,17 @@ class OAuth2ClientConfigTest {
     }
 
     @Test
+    void everyTwitchLoginAsksTheGuestStarScope_theConsentLoginAsksTheSame() {
+        ClientRegistrationRepository repository = config.clientRegistrationRepository(NO_BUNGIE, NO_OSU);
+
+        ClientRegistration twitch = repository.findByRegistrationId("twitch");
+        ClientRegistration consent = repository.findByRegistrationId(
+                fr.enimaloc.catapult.service.gueststar.GuestStarConsent.REGISTRATION_ID);
+        assertThat(twitch.getScopes()).contains(fr.enimaloc.catapult.service.gueststar.GuestStarConsent.SCOPE);
+        assertThat(consent.getScopes()).isEqualTo(twitch.getScopes());
+    }
+
+    @Test
     void twitchIsAlwaysRegistered_withItsScopesAndPostAuth() {
         ClientRegistrationRepository repository = config.clientRegistrationRepository(NO_BUNGIE, NO_OSU);
 

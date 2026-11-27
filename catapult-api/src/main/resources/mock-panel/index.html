@@ -92,6 +92,20 @@
           <input id="raid-login" placeholder="Login of the raided channel" autocomplete="off">
           <button type="submit" class="btn">Raid out…</button>
         </form>
+        <form id="guest-form">
+          <div class="row">
+            Guest Star:
+            <label class="check"><input type="checkbox" id="guest-consent"> Consent given</label>
+            <span class="muted">on air: <b id="guest-on-air">none</b></span>
+          </div>
+          <div class="row" id="guest-choices"></div>
+          <div class="row">
+            <input id="guest-extra" placeholder="Other guests, comma-separated" autocomplete="off">
+            <button type="submit" class="btn">Put on air</button>
+          </div>
+          <p class="muted">Each arrival or departure is a real Guest Star notification (at most 6 guests). The titles show
+            them once the account is in <code>stream.title.guest_stars</code> with the consent given.</p>
+        </form>
         <form id="chat-form">
           <div class="row">
             <input id="chat-sender" value="viewer1" placeholder="Author's login" autocomplete="off">

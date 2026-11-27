@@ -128,6 +128,7 @@ public class ChannelDashboardAssembler {
     private final fr.enimaloc.catapult.service.osu.OsuLinkService osuLinks;
     private final fr.enimaloc.catapult.service.hypixel.HypixelAccountService hypixelAccounts;
     private final fr.enimaloc.catapult.service.supercell.SupercellAccountService supercellAccounts;
+    private final fr.enimaloc.catapult.service.gueststar.GuestStarConsent guestStarConsent;
 
     @Value("${xbox.enabled:false}")
     private boolean xboxEnabled;
@@ -343,6 +344,9 @@ public class ChannelDashboardAssembler {
         boolean titleConditions = titleAvailable && streamTitle.conditionsAvailableFor(channel);
         // What the title reads of the drops (StreamTitleService#context): the conditions and the drops both on
         boolean titleDrops = titleConditions && dropsGate.isAvailableFor(channel);
+        // Offered the guests, the channel may be enrolled; the settings tell whether the consent is still to give
+        String titleGuestStars = titleAvailable && streamTitle.guestStarsAvailableFor(channel)
+                ? guestStarConsent.state(channel).name() : null;
         return new UserSettingsDto(
                 settings.isCclFeatureEnabled(),
                 settings.getBlockedCcls(),
@@ -371,7 +375,8 @@ public class ChannelDashboardAssembler {
                 settings.getIncompleteFallbackTitle(),
                 streamTitle.previewAvailableFor(channel),
                 titleConditions,
-                titleDrops);
+                titleDrops,
+                titleGuestStars);
     }
 
     // --- DTDD mapping ----------------------------------------------------------------------------

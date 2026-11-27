@@ -53,6 +53,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -85,6 +86,7 @@ class SimulationActionsTest {
 
     SimulationRegistry registry;
     TwitchEventSubService eventSub;
+    StaticListableBeanFactory beans;
     SimulationActions actions;
     UserAccount user = new UserAccount();
     /** A real account, with a Twitch token: its events can be set to REAL. */
@@ -113,12 +115,13 @@ class SimulationActionsTest {
         properties.setStateFile(dir.resolve("simulation.json").toString());
         registry = new SimulationRegistry(properties, accounts, tokens, mock(MinecraftFriendLinkRepository.class),
                 mock(MinecraftServiceAccountRepository.class), new MockEnvironment());
-        StaticListableBeanFactory beans = new StaticListableBeanFactory();
+        beans = new StaticListableBeanFactory();
         beans.addBean("simulationGate", new SimulationGate(registry));
         eventSub = new TwitchEventSubService(tokens, accounts, mock(TwitchTokenService.class), streamState,
                 publisher, RestClient.create(), new ObjectMapper(), twitchat, selfChanges, DebugRecording.OFF,
                 beans.getBeanProvider(SimulationGate.class), SiteRoles.active(),
-                sessions, mock(fr.enimaloc.catapult.service.stream.StreamCatchUp.class));
+                sessions, mock(fr.enimaloc.catapult.service.stream.StreamCatchUp.class),
+                beans.getBeanProvider(fr.enimaloc.catapult.service.gueststar.GuestStarEventSub.class));
         beans.addBean("twitchEventSubService", eventSub);
         actions = new SimulationActions(registry, journal, beans.getBeanProvider(TwitchEventSubService.class),
                 scheduler, getterConfigs, botToggle, twitch, publisher, systemAccount, accounts, sessions, timeline,
@@ -443,5 +446,73 @@ class SimulationActionsTest {
         when(twitch.searchCategories(user, "portal")).thenReturn(found);
 
         assertThat(actions.searchGames(user, "portal")).isEqualTo(found);
+    }
+
+    // ---------------------------------------------------------------- Guest Star
+
+    /** A roster fed by the real EventSub handling, as when the channel's Guest Star subscriptions run. */
+    private fr.enimaloc.catapult.service.gueststar.GuestStarRoster followGuests() {
+        var roster = new fr.enimaloc.catapult.service.gueststar.GuestStarRoster(mock(ApplicationEventPublisher.class));
+        beans.addBean("guestStarEventSub", new fr.enimaloc.catapult.service.gueststar.GuestStarEventSub(roster,
+                mock(fr.enimaloc.catapult.service.gueststar.GuestStarConsent.class),
+                mock(fr.enimaloc.catapult.service.title.StreamTitleService.class),
+                mock(fr.enimaloc.catapult.service.gueststar.GuestStarSessionClient.class)));
+        return roster;
+    }
+
+    @Test
+    void guestStarsArriveThroughTheRealEventSubHandling() {
+        var roster = followGuests();
+
+        actions.setGuestStars(user, List.of("Carol", "Dave"));
+
+        assertThat(roster.names(user.getId())).contains("Carol, Dave");
+        assertThat(registry.data(user.getId()).guestStars())
+                .extracting(SimulatedData.SimulatedGuest::slotId, SimulatedData.SimulatedGuest::displayName)
+                .containsExactly(tuple("1", "Carol"), tuple("2", "Dave"));
+        assertThat(journal.recent(null)).extracting(SimulationJournal.Entry::key)
+                .contains(SimulatedCalls.TWITCH_EVENTSUB_GUEST_STAR_SESSION.id(),
+                        SimulatedCalls.TWITCH_EVENTSUB_GUEST_STAR_GUEST.id());
+    }
+
+    @Test
+    void aGuestLeavingFreesTheirSlotForTheNextOne() {
+        var roster = followGuests();
+        actions.setGuestStars(user, List.of("Carol", "Dave"));
+
+        actions.setGuestStars(user, List.of("Dave", "Erin"));
+
+        assertThat(roster.names(user.getId())).contains("Erin, Dave");
+        assertThat(registry.data(user.getId()).guestStars())
+                .extracting(SimulatedData.SimulatedGuest::slotId, SimulatedData.SimulatedGuest::displayName)
+                .containsExactly(tuple("1", "Erin"), tuple("2", "Dave"));
+    }
+
+    @Test
+    void noGuestLeftEndsTheSession() {
+        var roster = followGuests();
+        actions.setGuestStars(user, List.of("Carol"));
+
+        actions.setGuestStars(user, List.of());
+
+        assertThat(roster.names(user.getId())).isEmpty();
+        assertThat(registry.data(user.getId()).guestStars()).isEmpty();
+    }
+
+    @Test
+    void guestStarsAreRefusedWhileTheirEventsAreReal() {
+        registry.set(realUser.getId(), SimulatedCalls.TWITCH_EVENTSUB_GUEST_STAR_GUEST, CallSetting.real());
+
+        assertThatIllegalStateException().isThrownBy(() -> actions.setGuestStars(realUser, List.of("Carol")));
+        assertThat(registry.data(realUser.getId()).guestStars()).isEmpty();
+    }
+
+    @Test
+    void theGuestStarConsentIsKeptInTheSimulatedData() {
+        actions.setGuestStarConsent(user, true);
+        assertThat(registry.data(user.getId()).guestStarConsent()).isTrue();
+
+        actions.setGuestStarConsent(user, false);
+        assertThat(registry.data(user.getId()).guestStarConsent()).isFalse();
     }
 }

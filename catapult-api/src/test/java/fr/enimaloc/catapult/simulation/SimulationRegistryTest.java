@@ -175,6 +175,17 @@ class SimulationRegistryTest {
     }
 
     @Test
+    void guest_stars_and_their_consent_survive_a_reload() {
+        registry().update(fictitiousId, data -> data.withGuestStarConsent(true)
+                .withGuestStars(java.util.List.of(new SimulatedData.SimulatedGuest("1", "sim-guest-carol", "Carol"))));
+
+        SimulatedData data = registry().data(fictitiousId);
+
+        assertThat(data.guestStarConsent()).isTrue();
+        assertThat(data.guestStars()).containsExactly(new SimulatedData.SimulatedGuest("1", "sim-guest-carol", "Carol"));
+    }
+
+    @Test
     void error_needs_an_http_error_status() {
         SimulationRegistry registry = registry();
 

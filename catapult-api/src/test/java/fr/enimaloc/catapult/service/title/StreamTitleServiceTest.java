@@ -38,6 +38,8 @@ class StreamTitleServiceTest {
     @Mock StreamTitleStateRepository stateRepository;
     @Mock fr.enimaloc.catapult.service.drops.DropsGate dropsGate;
     @Mock fr.enimaloc.catapult.service.drops.DropsCatalog dropsCatalog;
+    @Mock fr.enimaloc.catapult.service.gueststar.GuestStarRoster roster;
+    @Mock fr.enimaloc.catapult.service.gueststar.GuestStarConsent consent;
 
     StreamTitleService service;
     UserAccount user;
@@ -45,7 +47,7 @@ class StreamTitleServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new StreamTitleService(experimentService, stateRepository, dropsGate, dropsCatalog);
+        service = new StreamTitleService(experimentService, stateRepository, dropsGate, dropsCatalog, roster, consent);
         user = new UserAccount();
         user.setId(UUID.randomUUID());
         settings = new UserSettings();
@@ -53,6 +55,7 @@ class StreamTitleServiceTest {
         settings.setTitleTemplate("Playing {{GAME}} with chat");
         when(experimentService.isRolledOut(user, StreamTitleService.EXPERIMENT_KEY)).thenReturn(true);
         when(stateRepository.findById(user.getId())).thenReturn(Optional.empty());
+        when(consent.hasScope(user)).thenReturn(true);
     }
 
     private static Supplier<Optional<String>> current(String title) {
@@ -327,5 +330,161 @@ class StreamTitleServiceTest {
         assertThat(StreamTitleService.cleaned("   ")).isNull();
         assertThatThrownBy(() -> StreamTitleService.cleaned("x".repeat(141)))
                 .isInstanceOf(ResponseStatusException.class).hasMessageContaining("400");
+    }
+
+    @Test
+    void cleaned_leavesTheVariablesOutOfTheLimit() {
+        String template = "x".repeat(130) + " {{GAME}} {{GUEST_STARS}} {{CATEGORY}}";
+        assertThat(StreamTitleService.cleaned(template)).isEqualTo(template);
+        assertThatThrownBy(() -> StreamTitleService.cleaned("{{GAME}}".repeat(63)))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("500");
+    }
+
+    @Test
+    void guestStarsInTitleWhenRolledOut() {
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
+        when(roster.names(user.getId())).thenReturn(Optional.of("Alice"));
+        assertThat(titleFor(binding("Hades", "{{GAME}} {{GUEST_STARS}}"), current("x"))).contains("Hades Alice");
+    }
+
+    @Test
+    void guestStarMentionsInTitle() {
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
+        when(roster.names(user.getId())).thenReturn(Optional.of("Alice"));
+        when(roster.mentions(user.getId())).thenReturn(Optional.of("@Alice"));
+        assertThat(titleFor(binding("Hades", "{{GAME}} avec {{@GUEST_STARS}}"), current("x")))
+                .contains("Hades avec @Alice");
+    }
+
+    @Test
+    void refreshFollowsTheMentionsToo() {
+        when(roster.names(user.getId())).thenReturn(Optional.empty());
+        sentNormally("{{TITLE}} | {{@GUEST_STARS}}", "X");
+
+        when(roster.names(user.getId())).thenReturn(Optional.of("A"));
+        when(roster.mentions(user.getId())).thenReturn(Optional.of("@A"));
+        assertThat(service.guestStarsRefresh(user)).contains("X | @A");
+    }
+
+    @Test
+    void hasGuestStarsWithTheConditions() {
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
+        when(experimentService.isRolledOut(user, StreamTitleService.CONDITIONS_KEY)).thenReturn(true);
+        when(roster.names(user.getId())).thenReturn(Optional.of("Alice"));
+        String t = "{{GAME}}{{HAS_GUEST_STARS ? [[ avec {{GUEST_STARS}}]] : [[ solo]]}}";
+        assertThat(titleFor(binding("Hades", t), current("x"))).contains("Hades avec Alice");
+        when(roster.names(user.getId())).thenReturn(Optional.empty());
+        assertThat(titleFor(binding("Hades", t), current("x"))).contains("Hades solo");
+    }
+
+    @Test
+    void guestStarsEmptyOutsideExperiment() {
+        when(roster.names(user.getId())).thenReturn(Optional.of("Alice"));
+        assertThat(titleFor(binding("Hades", "{{GAME}} {{GUEST_STARS}}"), current("x"))).contains("Hades");
+        verify(roster, org.mockito.Mockito.never()).names(any());
+    }
+
+    /** A title sent normally with the guests experiment on: {@code template} for Hades, {@code before} on Twitch. */
+    private void sentNormally(String template, String before) {
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
+        PlannedTitle planned = service.titleFor(user, settings, binding("Hades", template), false, current(before))
+                .orElseThrow();
+        service.sent(user, planned);
+    }
+
+    @Test
+    void refreshKeepsFrozenTitle() {
+        when(roster.names(user.getId())).thenReturn(Optional.empty());
+        sentNormally("{{TITLE}} | {{GUEST_STARS}}", "X");
+
+        when(roster.names(user.getId())).thenReturn(Optional.of("A"));
+        assertThat(service.guestStarsRefresh(user)).contains("X | A");
+        when(roster.names(user.getId())).thenReturn(Optional.of("A, B"));
+        assertThat(service.guestStarsRefresh(user)).as("no piling up").contains("X | A, B");
+    }
+
+    @Test
+    void refreshDoesNotPushNewDrop() {
+        when(experimentService.isRolledOut(user, StreamTitleService.CONDITIONS_KEY)).thenReturn(true);
+        when(dropsGate.isAvailableReadOnly(user)).thenReturn(true);
+        sentNormally("{{DROP_ENABLED ? [[[Drops] ]] : [[]]}}{{GAME}} {{GUEST_STARS}}", "X");
+
+        user.setTwitchId("42");
+        when(dropsCatalog.runningFor(any(), any())).thenReturn(java.util.List.of(new fr.enimaloc.catapult.service.drops.DropCampaign(
+                "c", "S", null, "Hades", java.time.Instant.now(), java.time.Instant.now().plusSeconds(3600),
+                "https://example.test", null, false, java.util.Set.of())));
+        when(roster.names(user.getId())).thenReturn(Optional.of("A"));
+        assertThat(service.guestStarsRefresh(user)).contains("Hades A");
+    }
+
+    @Test
+    void noRefreshWithoutLastRender() {
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
+        when(roster.names(user.getId())).thenReturn(Optional.of("A"));
+        assertThat(service.guestStarsRefresh(user)).isEmpty();
+    }
+
+    @Test
+    void noRefreshOutsideTheExperiment() {
+        sentNormally("{{GAME}} {{GUEST_STARS}}", "X");
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(false);
+        assertThat(service.guestStarsRefresh(user)).isEmpty();
+    }
+
+    @Test
+    void aPlannedTitleNeverSent_isNotRemembered() {
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
+        service.titleFor(user, settings, binding("Hades", "{{GAME}} {{GUEST_STARS}}"), false, current("X"));
+        assertThat(service.guestStarsRefresh(user)).isEmpty();
+    }
+
+    @Test
+    void sentRefresh_movesTheLastSentTitle_only() {
+        remembered("Chill night", "Chill night — Doom");
+
+        service.sentRefresh(user, "Chill night — Doom avec A");
+
+        ArgumentCaptor<StreamTitleState> saved = ArgumentCaptor.forClass(StreamTitleState.class);
+        verify(stateRepository).save(saved.capture());
+        assertThat(saved.getValue().getOriginalTitle()).isEqualTo("Chill night");
+        assertThat(saved.getValue().getLastSentTitle()).isEqualTo("Chill night — Doom avec A");
+        assertThat(service.lastSentTitle(user)).contains("Chill night — Doom avec A");
+    }
+
+    @Test
+    void guestStarsEmptyOnceTheConsentIsGone() {
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
+        when(roster.names(user.getId())).thenReturn(Optional.of("Alice"));
+        sentNormally("{{GAME}} {{GUEST_STARS}}", "X");
+
+        when(consent.hasScope(user)).thenReturn(false);
+
+        assertThat(titleFor(binding("Hades", "{{GAME}} {{GUEST_STARS}}"), current("x"))).contains("Hades");
+        assertThat(service.guestStarsRefresh(user)).isEmpty();
+    }
+
+    @Test
+    void exclusively_oneTitleSendAtATimePerChannel() throws Exception {
+        java.util.concurrent.CountDownLatch inside = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicBoolean secondRan = new java.util.concurrent.atomic.AtomicBoolean();
+        Thread first = Thread.ofVirtual().start(() -> TitleSendLocks.exclusively(user.getId(), () -> {
+            inside.countDown();
+            try { release.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            return null;
+        }));
+        inside.await();
+        Thread second = Thread.ofVirtual().start(() -> TitleSendLocks.exclusively(user.getId(), () -> {
+            secondRan.set(true);
+            return null;
+        }));
+        Thread.sleep(100);
+        assertThat(secondRan).as("waits for the first").isFalse();
+        assertThat(TitleSendLocks.exclusively(UUID.randomUUID(), () -> "other")).as("another channel isn't held")
+                .isEqualTo("other");
+        release.countDown();
+        first.join();
+        second.join();
+        assertThat(secondRan).isTrue();
     }
 }

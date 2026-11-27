@@ -26,6 +26,8 @@ public final class SimulatedCalls {
     public static final CallKey TWITCH_HELIX_REFRESH_TOKEN = new CallKey(HELIX, "refresh-token", ACCOUNT);
     /** Whether the system bot moderates the account's channel: asked on the streamer's channel. */
     public static final CallKey TWITCH_HELIX_BOT_MOD_STATUS = new CallKey(HELIX, "bot-mod-status", ACCOUNT);
+    /** The Guest Star session read again (connect, stream online): its guests on air. */
+    public static final CallKey TWITCH_HELIX_GUEST_STAR_SESSION = new CallKey(HELIX, "guest-star-session", ACCOUNT);
 
     public static final CallKey TWITCH_CHAT_CONNECT = new CallKey(CHAT, "connect", ACCOUNT);
     public static final CallKey TWITCH_CHAT_SEND_MESSAGE = new CallKey(CHAT, "send-message", ACCOUNT);
@@ -44,6 +46,11 @@ public final class SimulatedCalls {
     public static final CallKey TWITCH_EVENTSUB_CHANNEL_RAID = new CallKey(EVENTSUB, "channel-raid", ACCOUNT);
     /** A chat message the panel writes on the channel; the real chat is read by its own service. */
     public static final CallKey TWITCH_EVENTSUB_CHAT_MESSAGE = new CallKey(EVENTSUB, "chat-message", ACCOUNT);
+    /** A Guest Star session beginning or ending ({@code channel.guest_star_session.begin}/{@code .end}). */
+    public static final CallKey TWITCH_EVENTSUB_GUEST_STAR_SESSION =
+            new CallKey(EVENTSUB, "guest-star-session", ACCOUNT);
+    /** A Guest Star guest coming on air or leaving ({@code channel.guest_star_guest.update}). */
+    public static final CallKey TWITCH_EVENTSUB_GUEST_STAR_GUEST = new CallKey(EVENTSUB, "guest-star-guest", ACCOUNT);
 
     public static final CallKey TWITCH_APP_CATEGORY_SEARCH = new CallKey(TWITCH_APP, "category-search", GLOBAL);
     public static final CallKey TWITCH_APP_APP_TOKEN = new CallKey(TWITCH_APP, "app-token", GLOBAL);
@@ -78,11 +85,12 @@ public final class SimulatedCalls {
             TWITCH_HELIX_UPDATE_CHANNEL, TWITCH_HELIX_SET_CATEGORY, TWITCH_HELIX_RESET_TO_DEFAULT,
             TWITCH_HELIX_FIND_CATEGORY, TWITCH_HELIX_MODERATED_CHANNELS,
             TWITCH_HELIX_USER_EXTENSIONS, TWITCH_HELIX_ACTIVE_EXTENSIONS, TWITCH_HELIX_SET_EXTENSIONS,
-            TWITCH_HELIX_REFRESH_TOKEN, TWITCH_HELIX_BOT_MOD_STATUS,
+            TWITCH_HELIX_REFRESH_TOKEN, TWITCH_HELIX_BOT_MOD_STATUS, TWITCH_HELIX_GUEST_STAR_SESSION,
             TWITCH_CHAT_CONNECT, TWITCH_CHAT_SEND_MESSAGE, TWITCH_CHAT_TIMEOUT, TWITCH_CHAT_BAN, TWITCH_CHAT_UNBAN,
             TWITCH_CHAT_STREAM_INFO, TWITCH_CHAT_USER_PROFILE, TWITCH_CHAT_FOLLOWED_AT, TWITCH_CHAT_SHOUTOUT,
             TWITCH_EVENTSUB_STREAM_ONLINE, TWITCH_EVENTSUB_STREAM_OFFLINE, TWITCH_EVENTSUB_CHANNEL_UPDATE,
             TWITCH_EVENTSUB_CHANNEL_RAID, TWITCH_EVENTSUB_CHAT_MESSAGE,
+            TWITCH_EVENTSUB_GUEST_STAR_SESSION, TWITCH_EVENTSUB_GUEST_STAR_GUEST,
             TWITCH_APP_CATEGORY_SEARCH, TWITCH_APP_APP_TOKEN, TWITCH_APP_BOT_REFRESH,
             STEAM_PRESENCE, STEAM_PROFILE_STATUS, STEAM_OWNED_GAMES,
             STEAM_STORE_APP_DETAILS, STEAM_STORE_CCLS, STEAM_STORE_TW_SIGNALS, STEAM_STORE_LIBRARY,

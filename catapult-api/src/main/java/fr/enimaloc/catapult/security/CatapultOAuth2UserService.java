@@ -1,5 +1,7 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.domain.account.OAuthScopes;
+import fr.enimaloc.catapult.service.gueststar.GuestStarConsent;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.domain.account.UserAccount;
 import fr.enimaloc.catapult.domain.account.UserSettings;
@@ -113,6 +115,8 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
                 case "epic" -> handleEpicLink(userRequest);
                 case "bungie" -> handleBungieLink(userRequest);
                 case "osu" -> handleOsuLink(userRequest);
+                case GuestStarConsent.REGISTRATION_ID -> transactions.execute(status ->
+                    handleGuestStarConsent(userRequest));
                 default -> delegate.loadUser(userRequest);
             };
         } catch (OAuth2AuthenticationException e) {
@@ -177,6 +181,27 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
             throw new OAuth2AuthenticationException(new OAuth2Error("battlenet_full"), e);
         }
         log.info("BATTLENET linked for user {}", user.getId());
+        return existingUser;
+    }
+
+    /**
+     * The Guest Star consent of a member already logged in: the token, from the same Twitch account, replaces their
+     * Twitch one with its scopes (TwitchLoginSuccessHandler adds its refresh token). Another account is refused.
+     */
+    private OAuth2User handleGuestStarConsent(OAuth2UserRequest userRequest) {
+        Authentication currentAuth = SecurityContextHolder.getContext().getAuthentication();
+        if (currentAuth == null || !(currentAuth.getPrincipal() instanceof CatapultOAuth2User existingUser)) {
+            log.error("Guest Star consent without an authenticated Twitch session");
+            throw new OAuth2AuthenticationException(new OAuth2Error("unauthorized"));
+        }
+        UserAccount account = existingUser.getUserAccount();
+        Object twitchId = fetchTwitchUser(userRequest).getAttribute("id");
+        if (!Objects.equals(twitchId, account.getTwitchId())) {
+            log.warn("Guest Star consent for user {} given from another Twitch account", account.getId());
+            throw new OAuth2AuthenticationException(new OAuth2Error("guest_star_mismatch"));
+        }
+        saveToken(account, OAuthToken.Provider.TWITCH, userRequest);
+        log.info("Guest Star consent given by user {}", account.getId());
         return existingUser;
     }
 
@@ -496,6 +521,9 @@ public class CatapultOAuth2UserService implements OAuth2UserService<OAuth2UserRe
 
         if (userRequest.getAccessToken().getExpiresAt() != null) {
             token.setExpiresAt(userRequest.getAccessToken().getExpiresAt());
+        }
+        if (!userRequest.getAccessToken().getScopes().isEmpty()) {
+            token.setGrantedScopes(OAuthScopes.join(userRequest.getAccessToken().getScopes()));
         }
 
         oAuthTokenRepository.save(token);

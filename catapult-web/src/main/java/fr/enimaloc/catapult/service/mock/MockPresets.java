@@ -116,7 +116,9 @@ public final class MockPresets {
             null, null, Set.of(),
             AVAILABLE_CCLS, false, Set.of(), AVAILABLE_TWS,
             // raid.restore-game and stream.title: the mock has no experiments, the settings are offered
-            null, true, List.of(), List.of(), false, null, true, null, null, true, true, true);
+            null, true, List.of(), List.of(), false, null, true, null, null, true, true, true,
+            // stream.title.guest_stars: offered too, its consent still to give
+            "NEEDS_CONSENT");
 
     private MockPresets() {
     }

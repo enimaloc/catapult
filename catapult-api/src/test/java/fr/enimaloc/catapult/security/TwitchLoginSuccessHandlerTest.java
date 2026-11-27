@@ -487,4 +487,40 @@ class TwitchLoginSuccessHandlerTest {
         handler.onAuthenticationSuccess(request, response, authToken);
         assertThat(response.getRedirectedUrl()).contains("error=osu_failed");
     }
+
+    @Test
+    void guestStarConsent_savesTheTokenReconnectsAndGoesBackToTheSettings() throws Exception {
+        ReflectionTestUtils.setField(handler, "webUrl", "https://web.example.com");
+        userAccount.setTwitchUsername("jeb_");
+        var authToken = mock(OAuth2AuthenticationToken.class);
+        when(authToken.getAuthorizedClientRegistrationId()).thenReturn("twitch-guest-star");
+        when(authToken.getPrincipal()).thenReturn(catapultUser);
+
+        var refreshToken = mock(OAuth2RefreshToken.class);
+        when(refreshToken.getTokenValue()).thenReturn("raw-refresh");
+        var accessToken = mock(OAuth2AccessToken.class);
+        // As Spring reads Twitch's JSON array: "[a," "b]"
+        when(accessToken.getScopes()).thenReturn(java.util.Set.of("[user:read:email,", "channel:read:guest_star]"));
+        var client = mock(OAuth2AuthorizedClient.class);
+        when(client.getRefreshToken()).thenReturn(refreshToken);
+        when(client.getAccessToken()).thenReturn(accessToken);
+        when(authorizedClientRepository.loadAuthorizedClient("twitch-guest-star", authToken, request))
+            .thenReturn(client);
+        OAuthToken oauthToken = new OAuthToken();
+        when(oAuthTokenRepository.findByUserAndProvider(userAccount, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.of(oauthToken));
+        when(tokenEncryptionService.encrypt("raw-refresh")).thenReturn("encrypted-refresh");
+
+        handler.onAuthenticationSuccess(request, response, authToken);
+
+        assertThat(oauthToken.getRefreshToken()).isEqualTo("encrypted-refresh");
+        assertThat(fr.enimaloc.catapult.domain.account.OAuthScopes.parse(oauthToken.getGrantedScopes()))
+            .containsExactlyInAnyOrder("user:read:email", "channel:read:guest_star");
+        assertThat(oauthToken.getGrantedScopes()).doesNotContain("[", "]", ",");
+        verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.any(
+            fr.enimaloc.catapult.event.GuestStarConsentGrantedEvent.class));
+        verify(authorizedClientRepository).removeAuthorizedClient("twitch-guest-star", authToken, request, response);
+        assertThat(response.getRedirectedUrl())
+            .isEqualTo("https://web.example.com/channel/jeb_?guest_star=ok#settings");
+    }
 }

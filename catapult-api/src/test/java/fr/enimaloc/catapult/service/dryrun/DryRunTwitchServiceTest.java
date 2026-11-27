@@ -191,6 +191,14 @@ class DryRunTwitchServiceTest {
     }
 
     @Test
+    void blocksUpdateTitleAndLogsIt() {
+        assertThat(service.updateTitle(account, "X", "X | A")).isEqualTo(ChannelUpdateOutcome.DRY_RUN);
+
+        verifyNoInteractions(delegate);
+        verify(activityLog).addEntry(member, "INFO", "[dry run] would have changed the channel: title \"X | A\"");
+    }
+
+    @Test
     void blocksSetCategoryAndLogsIt() {
         assertThat(service.setCategory(account, "33214", "Factorio")).isEqualTo(ChannelUpdateOutcome.DRY_RUN);
 

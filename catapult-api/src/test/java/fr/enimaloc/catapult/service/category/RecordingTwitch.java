@@ -97,6 +97,12 @@ public class RecordingTwitch implements TwitchService {
         return answer;
     }
 
+    /** Titles alone are not what these scenarios record: skipped. */
+    @Override
+    public ChannelUpdateOutcome updateTitle(UserAccount user, String expectedCurrent, String title) {
+        return ChannelUpdateOutcome.SKIPPED;
+    }
+
     @Override
     public ChannelUpdateOutcome setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
         record(new Write(Kind.SET_CATEGORY, twitchGameId, twitchGameName, null, null, Set.of(), false, false, false,

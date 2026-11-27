@@ -703,4 +703,79 @@ class CatapultOAuth2UserServiceTest {
                 fr.enimaloc.catapult.service.osu.OsuLinkService.Refusal.MISMATCH));
         assertThat(errorCodeOf(osuRequest())).isEqualTo("osu_mismatch");
     }
+
+    private OAuth2UserRequest guestStarRequest(java.util.Set<String> scopes) {
+        ClientRegistration reg = ClientRegistration.withRegistrationId("twitch-guest-star")
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .clientId("client-id")
+            .redirectUri("http://localhost/callback")
+            .authorizationUri("https://id.twitch.tv/oauth2/authorize")
+            .tokenUri("https://id.twitch.tv/oauth2/token")
+            .userInfoUri("https://api.twitch.tv/helix/users")
+            .userNameAttributeName("id")
+            .build();
+        OAuth2AccessToken token = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, "guest-token",
+            Instant.now(), Instant.now().plusSeconds(3600), scopes);
+        return new OAuth2UserRequest(reg, token);
+    }
+
+    private void twitchUserIs(String twitchId) {
+        when(restClient.get()).thenReturn(getSpec);
+        when(getSpec.uri(anyString())).thenReturn(headersSpec);
+        when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
+        when(headersSpec.retrieve()).thenReturn(responseSpec);
+        when(responseSpec.body(Map.class)).thenReturn(Map.of("data", List.of(Map.of("id", twitchId))));
+    }
+
+    private UserAccount signedInAs(String twitchId) {
+        UserAccount account = new UserAccount();
+        account.setId(UUID.randomUUID());
+        account.setTwitchId(twitchId);
+        SecurityContextHolder.getContext().setAuthentication(
+            new TestingAuthenticationToken(new CatapultOAuth2User(null, account, false), null));
+        return account;
+    }
+
+    @Test
+    void guestStarConsentReplacesTwitchToken() {
+        UserAccount account = signedInAs("42");
+        twitchUserIs("42");
+        when(tokenEncryptionService.encrypt(anyString())).thenReturn("encrypted");
+        OAuthToken existing = new OAuthToken();
+        existing.setUser(account);
+        existing.setProvider(OAuthToken.Provider.TWITCH);
+        existing.setAccessToken("old");
+        when(oAuthTokenRepository.findByUserAndProvider(account, OAuthToken.Provider.TWITCH))
+            .thenReturn(Optional.of(existing));
+
+        service.loadUser(guestStarRequest(java.util.Set.of("[user:read:email,", "channel:read:guest_star]")));
+
+        verify(oAuthTokenRepository).save(existing);
+        assertThat(existing.getAccessToken()).isEqualTo("encrypted");
+        assertThat(existing.getGrantedScopes()).contains("channel:read:guest_star").doesNotContain("[", "]", ",");
+    }
+
+    @Test
+    void guestStarConsentFromAnotherTwitchAccountRefused() {
+        signedInAs("42");
+        twitchUserIs("43");
+
+        var e = org.junit.jupiter.api.Assertions.assertThrows(
+            org.springframework.security.oauth2.core.OAuth2AuthenticationException.class,
+            () -> service.loadUser(guestStarRequest(java.util.Set.of("channel:read:guest_star"))));
+
+        assertThat(e.getError().getErrorCode()).isEqualTo("guest_star_mismatch");
+        verify(oAuthTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void guestStarConsentWithoutSessionRefused() {
+        SecurityContextHolder.clearContext();
+
+        var e = org.junit.jupiter.api.Assertions.assertThrows(
+            org.springframework.security.oauth2.core.OAuth2AuthenticationException.class,
+            () -> service.loadUser(guestStarRequest(java.util.Set.of("channel:read:guest_star"))));
+
+        assertThat(e.getError().getErrorCode()).isEqualTo("unauthorized");
+    }
 }

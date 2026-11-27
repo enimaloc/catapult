@@ -42,8 +42,32 @@ public record UserSettingsDto(
         Boolean titleConditionsAvailable,
         // Whether the titles get the drops ({{DROP_NAME}}, {{DROP_END}}, DROP_ENABLED): the conditions and the
         // experiment drops; null: not offered
-        Boolean titleDropsAvailable
+        Boolean titleDropsAvailable,
+        // The Guest Star guests in the titles (experiment stream.title.guest_stars): null not offered, NEEDS_CONSENT
+        // (the Guest Star authorization is still to give) or READY
+        String titleGuestStars
 ) {
+    /** Settings without the Guest Star guests. */
+    public UserSettingsDto(boolean cclFeatureEnabled, Set<String> blockedCcls, String noGameTwitchGameId,
+                           String noGameTwitchGameName, Set<String> noGameCcls, boolean applyDefaultOnStreamStart,
+                           boolean applyDefaultOnNoGame, boolean applyDefaultOnStreamEnd,
+                           String incompleteFallbackTwitchGameId, String incompleteFallbackTwitchGameName,
+                           Set<String> incompleteFallbackCcls, List<CclDto> availableCcls, boolean twFeatureEnabled,
+                           Set<String> blockedTws, List<TwDto> availableTws, Integer raidRestoreGameMinutes,
+                           boolean raidRestoreGameAvailable, List<ExtensionSlotDto> noGameExtensions,
+                           List<ExtensionSlotDto> incompleteFallbackExtensions, Boolean titleFeatureEnabled,
+                           String titleTemplate, Boolean titleAvailable, String noGameTitle,
+                           String incompleteFallbackTitle, Boolean titlePreviewAvailable,
+                           Boolean titleConditionsAvailable, Boolean titleDropsAvailable) {
+        this(cclFeatureEnabled, blockedCcls, noGameTwitchGameId, noGameTwitchGameName, noGameCcls,
+                applyDefaultOnStreamStart, applyDefaultOnNoGame, applyDefaultOnStreamEnd,
+                incompleteFallbackTwitchGameId, incompleteFallbackTwitchGameName, incompleteFallbackCcls,
+                availableCcls, twFeatureEnabled, blockedTws, availableTws, raidRestoreGameMinutes,
+                raidRestoreGameAvailable, noGameExtensions, incompleteFallbackExtensions, titleFeatureEnabled,
+                titleTemplate, titleAvailable, noGameTitle, incompleteFallbackTitle, titlePreviewAvailable,
+                titleConditionsAvailable, titleDropsAvailable, null);
+    }
+
     /** Settings without the title's conditions nor drops. */
     public UserSettingsDto(boolean cclFeatureEnabled, Set<String> blockedCcls, String noGameTwitchGameId,
                            String noGameTwitchGameName, Set<String> noGameCcls, boolean applyDefaultOnStreamStart,

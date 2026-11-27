@@ -59,6 +59,19 @@ public class DryRunTwitchService implements TwitchService {
     }
 
     @Override
+    public ChannelUpdateOutcome updateTitle(UserAccount user, String expectedCurrent, String title) {
+        DryRunGate dryRun = gate.get();
+        if (dryRun.holdsUntilLoaded(user, "updateTitle")) {
+            return ChannelUpdateOutcome.FAILED;
+        }
+        if (!dryRun.holdsChannel(user)) {
+            return delegate.updateTitle(user, expectedCurrent, title);
+        }
+        dryRun.note(user, "updateTitle", changed(List.of("title \"" + title + "\"")));
+        return ChannelUpdateOutcome.DRY_RUN;
+    }
+
+    @Override
     public ChannelUpdateOutcome setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
         DryRunGate dryRun = gate.get();
         if (dryRun.holdsUntilLoaded(user, "setCategory")) {

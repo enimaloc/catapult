@@ -9,15 +9,16 @@ import java.util.UUID;
 
 /**
  * Which parts of the title's help an account is offered, as its title fields are: the conditions (experiment
- * stream.title.conditions), and the drops with them (experiment drops). Read-only: the settings page enrols.
+ * stream.title.conditions), and the drops with them (experiment drops), the Guest Star guests (experiment
+ * stream.title.guest_stars), their condition only with the conditions. Read-only: the settings page enrols.
  */
 @Service
 @RequiredArgsConstructor
 public class TitleHelpSections {
 
-    /** The help's parts offered; the drops never without the conditions, as the title reads them. */
-    public record Offered(boolean conditions, boolean drops) {
-        public static final Offered NONE = new Offered(false, false);
+    /** The help's parts offered; the drops and HAS_GUEST_STARS never without the conditions, as the title reads them. */
+    public record Offered(boolean conditions, boolean drops, boolean guestStars, boolean guestStarsCondition) {
+        public static final Offered NONE = new Offered(false, false, false, false);
     }
 
     private final UserAccountRepository accounts;
@@ -28,7 +29,9 @@ public class TitleHelpSections {
     public Offered forAccount(UUID accountId) {
         return accounts.findById(accountId).map(account -> {
             boolean conditions = streamTitleService.conditionsAvailableReadOnly(account);
-            return new Offered(conditions, conditions && dropsGate.isAvailableReadOnly(account));
+            boolean guestStars = streamTitleService.guestStarsAvailableReadOnly(account);
+            return new Offered(conditions, conditions && dropsGate.isAvailableReadOnly(account), guestStars,
+                    guestStars && conditions);
         }).orElse(Offered.NONE);
     }
 }

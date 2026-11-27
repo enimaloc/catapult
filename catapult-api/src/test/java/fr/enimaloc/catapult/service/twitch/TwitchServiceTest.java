@@ -1063,4 +1063,52 @@ class TwitchServiceTest {
         return meters.find(ExternalApiObservations.METRIC)
             .tags("api", "twitch", "operation", operation, "outcome", outcome).timer();
     }
+
+    private void twitchTitleIs(String title) {
+        doReturn(new TwitchServiceImpl.WrappedListResponse<>(List.of(new TwitchServiceImpl.ChannelInformation(title))))
+                .when(getResponseSpec).body(any(ParameterizedTypeReference.class));
+    }
+
+    @Test
+    void updateTitle_sendsOnlyTheTitle_whenTwitchStillHasTheExpectedOne() {
+        twitchTitleIs("X");
+
+        assertThat(twitchService.updateTitle(user, "X", "X | A")).isEqualTo(ChannelUpdateOutcome.APPLIED);
+
+        ArgumentCaptor<Map> bodyCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(bodySpec).body(bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue()).containsExactly(Map.entry("title", "X | A"));
+    }
+
+    @Test
+    void handEditedTitleNotOverwritten() {
+        twitchTitleIs("My own title");
+
+        assertThat(twitchService.updateTitle(user, "X", "X | A")).isEqualTo(ChannelUpdateOutcome.SKIPPED);
+        verify(restClient, never()).patch();
+    }
+
+    @Test
+    void updateTitle_anUnreadableTitle_sendsNothing() {
+        doThrow(new HttpServerErrorException(HttpStatus.BAD_GATEWAY)).when(getResponseSpec)
+                .body(any(ParameterizedTypeReference.class));
+
+        assertThat(twitchService.updateTitle(user, "X", "X | A")).isEqualTo(ChannelUpdateOutcome.SKIPPED);
+        verify(restClient, never()).patch();
+    }
+
+    @Test
+    void updateTitle_botDisabled_sendsNothing() {
+        user.setBotEnabled(false);
+        assertThat(twitchService.updateTitle(user, "X", "X | A")).isEqualTo(ChannelUpdateOutcome.SKIPPED);
+        verify(restClient, never()).patch();
+    }
+
+    @Test
+    void updateTitle_aRefusedPatch_isFailed() {
+        twitchTitleIs("X");
+        doThrow(new HttpServerErrorException(HttpStatus.BAD_GATEWAY)).when(responseSpec).toBodilessEntity();
+
+        assertThat(twitchService.updateTitle(user, "X", "X | A")).isEqualTo(ChannelUpdateOutcome.FAILED);
+    }
 }

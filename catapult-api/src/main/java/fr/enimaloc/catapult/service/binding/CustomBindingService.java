@@ -384,12 +384,11 @@ public class CustomBindingService {
         return name;
     }
 
-    /** Trimmed, null when blank (the channel-wide title); longer than a Twitch title is refused. */
+    /** Trimmed, null when blank (the channel-wide title); too long a title ({@link StreamTitleService#lengthProblem}) is refused. */
     private static String validTitle(String title) {
         String trimmed = title.strip();
-        if (trimmed.codePointCount(0, trimmed.length()) > StreamTitleService.MAX_LENGTH) {
-            throw new ApiProblem(ErrorCode.INVALID, "A title is at most " + StreamTitleService.MAX_LENGTH + " characters");
-        }
+        String problem = StreamTitleService.lengthProblem(trimmed);
+        if (problem != null) throw new ApiProblem(ErrorCode.INVALID, problem);
         return trimmed.isEmpty() ? null : trimmed;
     }
 
