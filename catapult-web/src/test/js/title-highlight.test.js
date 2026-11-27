@@ -97,6 +97,19 @@ describe("segments", () => {
     });
 });
 
+describe("the guest stars", () => {
+    it("colors {{GUEST_STARS}} and reads HAS_GUEST_STARS", () => {
+        expect(window.CatapultTitleHighlight.segments("{{HAS_GUEST_STARS ? [[avec {{GUEST_STARS}}]] : [[solo]]}}"))
+            .toEqual([
+                { text: "{{HAS_GUEST_STARS ? [[", variable: false, syntax: true },
+                { text: "avec ", variable: false },
+                { text: "{{GUEST_STARS}}", variable: true },
+                { text: "]] : [[", variable: false, syntax: true },
+                { text: "solo", variable: false },
+                { text: "]]}}", variable: false, syntax: true }]);
+    });
+});
+
 describe("the field's copy", () => {
     it("lays the text over the input, only its variables colored, once in place", async () => {
         const el = await field("Live {{GAME}} {{game}}");

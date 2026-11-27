@@ -1,6 +1,6 @@
 /**
  * Stream title fields (mdui-text-field[data-title-highlight]): the variables Catapult replaces, {{GAME}},
- * {{CATEGORY}}, {{TITLE}}, {{ORIGINAL_TITLE}}, {{DROP_NAME}} and {{DROP_END}} written exactly, shown in the primary
+ * {{CATEGORY}}, {{TITLE}}, {{ORIGINAL_TITLE}}, {{DROP_NAME}}, {{DROP_END}} and {{GUEST_STARS}} written exactly, shown in the primary
  * color, and a ternary's syntax ({{COND ? [[…]] : [[…]]}}) in the tertiary one; anything else, another way of writing
  * them included, as plain text, as it will be sent. A ternary is read as catapult-api's TitleTemplate reads it: known
  * conditions, !, && before ||, parentheses, a run of ] closing a branch on its last two, ternaries nested in a branch;
@@ -13,8 +13,9 @@
  * usual.
  */
 window.CatapultTitleHighlight = (function () {
-    const VARIABLES = ["GAME", "CATEGORY", "TITLE", "ORIGINAL_TITLE", "DROP_NAME", "DROP_END"];
-    const CONDITIONS = ["DROP_ENABLED", "HAS_GAME", "IS_CUSTOM", "IS_INCOMPLETE", "IS_NO_GAME", "HAS_TW", "IS_MATURE"];
+    const VARIABLES = ["GAME", "CATEGORY", "TITLE", "ORIGINAL_TITLE", "DROP_NAME", "DROP_END", "GUEST_STARS"];
+    const CONDITIONS = ["DROP_ENABLED", "HAS_GAME", "IS_CUSTOM", "IS_INCOMPLETE", "IS_NO_GAME", "HAS_TW", "IS_MATURE",
+        "HAS_GUEST_STARS"];
     const SELECTOR = "mdui-text-field[data-title-highlight]";
     // On the field itself: wired once, whichever copy of this script (a reloaded one) sees it
     const ATTACHED = Symbol.for("catapult.titleHighlight");
