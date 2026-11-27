@@ -194,7 +194,8 @@
         <h2>Guest Star</h2>
         <p class="mock-hint">
             Les invités à l'antenne, pour <code>{{GUEST_STARS}}</code> (une fois l'autorisation donnée et la chaîne en
-            live). Une arrivée ou un départ met à jour le titre ci-dessous, sauf s'il a été modifié à la main.
+            live). Coche les invités à l'antenne (dans l'ordre de leurs places) ; un changement met à jour le titre
+            ci-dessous, sauf s'il a été modifié à la main.
         </p>
         <form method="post" th:action="@{/mock/admin/guest-star/state}" class="mock-inline">
             <mdui-select variant="outlined" name="state" label="Autorisation" th:value="${guestStarsState}">
@@ -208,17 +209,13 @@
             <mdui-text-field variant="outlined" name="title" label="Modifier le titre à la main"></mdui-text-field>
             <mdui-button type="submit" variant="tonal">Modifier</mdui-button>
         </form>
-        <ul class="mock-guest-stars">
-            <li th:each="guest : ${guestStars}">
-                <span th:text="${guest}">Invité</span>
-                <form method="post" th:action="@{/mock/admin/guest-star/remove}" class="mock-inline">
-                    <input type="hidden" name="name" th:value="${guest}">
-                    <mdui-button type="submit" variant="text" icon="person_remove">Retirer</mdui-button>
-                </form>
-            </li>
-        </ul>
+        <form method="post" th:action="@{/mock/admin/guest-star/select}" class="mock-guest-stars">
+            <mdui-checkbox th:each="guest : ${guestStarPool}" name="names" th:value="${guest}"
+                           th:checked="${guestStars.contains(guest)}" th:text="${guest}">Invité</mdui-checkbox>
+            <mdui-button type="submit" variant="tonal" icon="groups">Mettre à l'antenne</mdui-button>
+        </form>
         <form method="post" th:action="@{/mock/admin/guest-star/add}" class="mock-inline">
-            <mdui-text-field variant="outlined" name="name" label="Invité qui arrive"></mdui-text-field>
+            <mdui-text-field variant="outlined" name="name" label="Nouvel invité (rejoint la liste, à l'antenne)"></mdui-text-field>
             <mdui-button type="submit" icon="person_add">Faire arriver</mdui-button>
         </form>
     </section>
