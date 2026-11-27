@@ -105,7 +105,7 @@ public class StreamTitleService {
 
     /**
      * Whether the titles sent for {@code user} show their guests now: in {@value #GUEST_STARS_KEY} and the consent
-     * still given (a later plain Twitch login takes it away, the subscriptions possibly still running).
+     * still in the token (a token from before the Twitch login asked it has none, the subscriptions not made).
      */
     private boolean followsGuestStars(UserAccount user) {
         return guestStarsAvailableReadOnly(user) && guestStarConsent.hasScope(user);

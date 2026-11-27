@@ -10,7 +10,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Whether the streamer gave Catapult their Guest Star consent: the login {@value #REGISTRATION_ID} asks the Twitch
- * scopes plus {@value #SCOPE}, its token replacing the Twitch one. A later plain Twitch login without it takes it away.
+ * scopes, {@value #SCOPE} among them, its token replacing the Twitch one. Every Twitch login asks it now: only a token
+ * from before lacks it, until its next login or this consent.
  */
 @Service
 @RequiredArgsConstructor

@@ -74,7 +74,9 @@ public class OAuth2ClientConfig {
         "user:edit:broadcast",                // GET/PUT /users/extensions, GET /users/extensions/list
         "user:read:chat", "user:write:chat",  // EventSub channel.chat.message, POST /chat/messages
         "channel:read:redemptions",           // EventSub channel.channel_points_custom_reward_redemption.add
-        "user:read:moderated_channels"        // GET /moderation/channels
+        "user:read:moderated_channels",       // GET /moderation/channels
+        // EventSub channel.guest_star_*, GET /guest_star/session: asked of everyone, used in stream.title.guest_stars
+        GuestStarConsent.SCOPE
     };
     static final String OSU_AUTHORIZE = "https://osu.ppy.sh/oauth/authorize";
     static final String OSU_TOKEN = "https://osu.ppy.sh/oauth/token";
@@ -95,13 +97,12 @@ public class OAuth2ClientConfig {
             .userNameAttributeName("id")
             .build());
 
-        // The Guest Star consent (experiment stream.title.guest_stars): a login of its own, so that the one above
-        // never changes; the same scopes plus Guest Star's, its token replacing the Twitch one (same account). Its
+        // The Guest Star consent (experiment stream.title.guest_stars), for a token from before the login above asked
+        // its scope: the same scopes, its token replacing the Twitch one (same account), back to the settings. Its
         // callback, <base>/login/oauth2/code/twitch-guest-star, must be declared on Twitch's console.
         registrations.add(authorizationCode(GuestStarConsent.REGISTRATION_ID, twitchClientId, twitchClientSecret)
             .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
-            .scope(java.util.stream.Stream.concat(java.util.Arrays.stream(TWITCH_SCOPES),
-                    java.util.stream.Stream.of(GuestStarConsent.SCOPE)).toArray(String[]::new))
+            .scope(TWITCH_SCOPES)
             .authorizationUri(TWITCH_AUTHORIZE)
             .tokenUri(TWITCH_TOKEN)
             .userInfoUri(TWITCH_USERS)
