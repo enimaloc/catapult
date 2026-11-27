@@ -52,7 +52,7 @@ public class GuestStarEventSub {
     public void onNotification(UserAccount user, String subscriptionType, JsonNode event) {
         if (GUEST_UPDATE.equals(subscriptionType)) {
             roster.onGuestUpdate(user, text(event, "slot_id"), text(event, "guest_user_id"),
-                    text(event, "guest_user_name"), text(event, "state"));
+                    text(event, "guest_user_login"), text(event, "guest_user_name"), text(event, "state"));
         } else if (handles(subscriptionType)) {
             roster.clear(user);
         }

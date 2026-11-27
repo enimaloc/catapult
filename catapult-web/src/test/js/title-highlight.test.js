@@ -112,6 +112,15 @@ describe("the guest stars", () => {
     });
 });
 
+describe("the guest star mentions", () => {
+    it("colors {{@GUEST_STARS}} and leaves it out of the length", () => {
+        expect(window.CatapultTitleHighlight.segments("Avec {{@GUEST_STARS}}")).toEqual([
+            { text: "Avec ", variable: false },
+            { text: "{{@GUEST_STARS}}", variable: true }]);
+        expect(window.CatapultTitleHighlight.literalLength("{{@GUEST_STARS}} ok")).toBe(3);
+    });
+});
+
 describe("literalLength", () => {
     const length = text => window.CatapultTitleHighlight.literalLength(text);
 

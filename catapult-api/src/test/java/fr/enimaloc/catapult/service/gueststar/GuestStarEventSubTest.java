@@ -61,12 +61,13 @@ class GuestStarEventSubTest {
     @Test
     void guestUpdateFeedsRoster() throws Exception {
         eventSub.onNotification(user, "channel.guest_star_guest.update", json.readTree("""
-                {"slot_id": "1", "guest_user_id": "10", "guest_user_name": "Alice", "state": "live"}"""));
-        verify(roster).onGuestUpdate(user, "1", "10", "Alice", "live");
+                {"slot_id": "1", "guest_user_id": "10", "guest_user_login": "alice", "guest_user_name": "Alice",
+                 "state": "live"}"""));
+        verify(roster).onGuestUpdate(user, "1", "10", "alice", "Alice", "live");
 
         eventSub.onNotification(user, "channel.guest_star_guest.update", json.readTree("""
                 {"slot_id": null, "guest_user_id": "10", "guest_user_name": "Alice", "state": "removed"}"""));
-        verify(roster).onGuestUpdate(user, null, "10", "Alice", "removed");
+        verify(roster).onGuestUpdate(user, null, "10", null, "Alice", "removed");
     }
 
     @Test

@@ -1092,7 +1092,7 @@ public class MockApiService implements ApiService {
 
     /** The variables catapult-api replaces in a title, written exactly. */
     private static final java.util.regex.Pattern TITLE_VARIABLE = java.util.regex.Pattern.compile(
-            "\\{\\{(GAME|CATEGORY|TITLE|ORIGINAL_TITLE|DROP_NAME|DROP_END|GUEST_STARS)}}");
+            "\\{\\{(GAME|CATEGORY|TITLE|ORIGINAL_TITLE|DROP_NAME|DROP_END|@?GUEST_STARS)}}");
 
     /**
      * A title or template catapult-api would take: at most 140 characters of its own, its variables left out, and 500

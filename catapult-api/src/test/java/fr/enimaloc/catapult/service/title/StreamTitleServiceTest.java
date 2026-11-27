@@ -348,6 +348,25 @@ class StreamTitleServiceTest {
     }
 
     @Test
+    void guestStarMentionsInTitle() {
+        when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
+        when(roster.names(user.getId())).thenReturn(Optional.of("Alice"));
+        when(roster.mentions(user.getId())).thenReturn(Optional.of("@Alice"));
+        assertThat(titleFor(binding("Hades", "{{GAME}} avec {{@GUEST_STARS}}"), current("x")))
+                .contains("Hades avec @Alice");
+    }
+
+    @Test
+    void refreshFollowsTheMentionsToo() {
+        when(roster.names(user.getId())).thenReturn(Optional.empty());
+        sentNormally("{{TITLE}} | {{@GUEST_STARS}}", "X");
+
+        when(roster.names(user.getId())).thenReturn(Optional.of("A"));
+        when(roster.mentions(user.getId())).thenReturn(Optional.of("@A"));
+        assertThat(service.guestStarsRefresh(user)).contains("X | @A");
+    }
+
+    @Test
     void hasGuestStarsWithTheConditions() {
         when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
         when(experimentService.isRolledOut(user, StreamTitleService.CONDITIONS_KEY)).thenReturn(true);

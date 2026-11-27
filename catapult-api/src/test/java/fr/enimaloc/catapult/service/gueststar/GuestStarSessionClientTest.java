@@ -61,11 +61,12 @@ class GuestStarSessionClientTest {
                           {"slot_id": "1", "user_id": "10", "is_live": false}]}]}""", MediaType.APPLICATION_JSON));
         helix.expect(requestTo("https://api.twitch.tv/helix/users?id=42&id=20"))
                 .andRespond(withSuccess("""
-                        {"data": [{"id": "42", "display_name": "Host"}, {"id": "20", "display_name": "Bob"}]}""",
+                        {"data": [{"id": "42", "login": "host", "display_name": "Host"},
+                                  {"id": "20", "login": "bob", "display_name": "Bob"}]}""",
                         MediaType.APPLICATION_JSON));
 
         assertThat(client.liveGuests(user)).containsExactly(
-                new GuestStarRoster.Guest("0", "42", "Host"), new GuestStarRoster.Guest("2", "20", "Bob"));
+                new GuestStarRoster.Guest("0", "42", "host", "Host"), new GuestStarRoster.Guest("2", "20", "bob", "Bob"));
         helix.verify();
     }
 

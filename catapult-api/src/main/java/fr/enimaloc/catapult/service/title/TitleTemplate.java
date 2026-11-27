@@ -13,7 +13,8 @@ import java.util.Set;
 public final class TitleTemplate {
 
     public static final Set<String> VARIABLES =
-            Set.of("GAME", "CATEGORY", "TITLE", "ORIGINAL_TITLE", "DROP_NAME", "DROP_END", "GUEST_STARS");
+            Set.of("GAME", "CATEGORY", "TITLE", "ORIGINAL_TITLE", "DROP_NAME", "DROP_END", "GUEST_STARS",
+                    "@GUEST_STARS");
     public static final Set<String> CONDITIONS =
             Set.of("DROP_ENABLED", "HAS_GAME", "IS_CUSTOM", "IS_INCOMPLETE", "IS_NO_GAME", "HAS_TW", "IS_MATURE",
                     "HAS_GUEST_STARS");
@@ -123,6 +124,7 @@ public final class TitleTemplate {
             case "DROP_NAME" -> orEmpty(context.dropName());
             case "DROP_END" -> orEmpty(context.dropEnd());
             case "GUEST_STARS" -> orEmpty(context.guestStars());
+            case "@GUEST_STARS" -> orEmpty(context.guestStarMentions());
             case "TITLE" -> context.title().get().orElseThrow(UnreadableTitle::new);
             default -> context.originalTitle().get().orElseThrow(UnreadableTitle::new);
         };

@@ -58,7 +58,7 @@ class SimulatedGuestStarTest {
                 List.of(new SimulatedData.SimulatedGuest("1", "sim-carol", "Carol"))));
 
         assertThat(sessions.liveGuests(fx.fictitious))
-                .containsExactly(new GuestStarRoster.Guest("1", "sim-carol", "Carol"));
+                .containsExactly(new GuestStarRoster.Guest("1", "sim-carol", "carol", "Carol"));
         assertThat(fx.journaledKeys()).containsExactly(SimulatedCalls.TWITCH_HELIX_GUEST_STAR_SESSION.id());
     }
 

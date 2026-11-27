@@ -1699,6 +1699,9 @@ class MockApiServiceTest {
         service.getData().setChannelLive(true);
         assertThat(service.previewTitle(username, request).title())
                 .isEqualTo(MockApiService.PREVIEW_GAME + " avec MockGuest1, MockGuest2");
+        assertThat(service.previewTitle(username, new fr.enimaloc.catapult.common.dto.channel.TitlePreviewRequest(
+                "Avec {{@GUEST_STARS}}", "TEMPLATE", null, null)).title()).isEqualTo("Avec @MockGuest1, @MockGuest2");
+        assertThat(service.saveTitleSettings(username, true, "x".repeat(130) + " {{@GUEST_STARS}}")).isEqualTo(204);
     }
 
     @Test

@@ -96,4 +96,19 @@ class GuestStarRosterTest {
                 new GuestStarRoster.Guest("1", "10", "Alice")));
         assertThat(roster.names(user.getId())).contains("Alice, Bob");
     }
+
+    @Test
+    void mentionsByLogin_theDisplayNameWhenItIsTheLogin() {
+        roster.onGuestUpdate(user, "1", "10", "alice", "Alice", "live");
+        roster.onGuestUpdate(user, "2", "20", "bob_99", "ボブ", "live");
+        roster.onGuestUpdate(user, "3", "30", null, "Carol", "live");
+
+        assertThat(roster.names(user.getId())).contains("Alice, ボブ, Carol");
+        assertThat(roster.mentions(user.getId())).contains("@Alice, @bob_99, @Carol");
+    }
+
+    @Test
+    void noMentionWithoutGuest() {
+        assertThat(roster.mentions(user.getId())).isEmpty();
+    }
 }

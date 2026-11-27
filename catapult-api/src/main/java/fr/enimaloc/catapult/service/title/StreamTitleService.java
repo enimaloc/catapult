@@ -175,10 +175,12 @@ public class StreamTitleService {
                 .filter(state -> current.equals(state.getLastSentTitle()) && state.getOriginalTitle() != null)
                 .map(StreamTitleState::getOriginalTitle)
                 .orElse(current));
-        String guestStars = followsGuestStars(user) ? guestStarRoster.names(user.getId()).orElse(null) : null;
+        boolean guests = followsGuestStars(user);
+        String guestStars = guests ? guestStarRoster.names(user.getId()).orElse(null) : null;
+        String mentions = guests ? guestStarRoster.mentions(user.getId()).orElse(null) : null;
         return new TitleContext(game, category, () -> before, () -> original, conditions,
                 drop == null ? null : drop.name(), drop == null ? null : DROP_END.format(drop.endAt()))
-                .withGuestStars(guestStars);
+                .withGuestStars(guestStars, mentions);
     }
 
     /**
@@ -226,7 +228,9 @@ public class StreamTitleService {
         LastRender last = lastRenders.get(user.getId());
         if (last == null || !isAvailableReadOnly(user) || !followsGuestStars(user)) return Optional.empty();
         String guests = guestStarRoster.names(user.getId()).orElse(null);
-        return TitleTemplate.render(last.template(), last.context().withGuestStars(guests), last.conditions());
+        String mentions = guestStarRoster.mentions(user.getId()).orElse(null);
+        return TitleTemplate.render(last.template(), last.context().withGuestStars(guests, mentions),
+                last.conditions());
     }
 
     /** The last title Catapult sent the channel, as remembered. */

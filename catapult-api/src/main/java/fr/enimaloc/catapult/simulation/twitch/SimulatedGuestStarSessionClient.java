@@ -46,7 +46,7 @@ public class SimulatedGuestStarSessionClient extends GuestStarSessionClient {
                     () -> super.liveGuests(user),
                     () -> registry.data(user.getId()).guestStars().stream()
                             .map(guest -> new GuestStarRoster.Guest(guest.slotId(), guest.userId(),
-                                    guest.displayName()))
+                                    guest.displayName().toLowerCase(java.util.Locale.ROOT), guest.displayName()))
                             .toList(),
                     SimulatedCallRunner::httpError);
         } catch (RuntimeException e) {

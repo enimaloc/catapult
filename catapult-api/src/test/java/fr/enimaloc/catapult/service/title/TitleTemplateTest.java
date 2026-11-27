@@ -214,4 +214,14 @@ class TitleTemplateTest {
         assertThat(TitleTemplate.literalLength(raw)).isEqualTo(raw.length());
         assertThat(TitleTemplate.literalLength("{{{GAME}}}")).isEqualTo(2);
     }
+
+    @Test
+    void guestStarMentions() {
+        TitleContext context = new TitleContext("Doom", "DOOM", UNREAD, UNREAD, Map.of(), null, null)
+                .withGuestStars("Alice, ボブ", "@Alice, @bob_99");
+        assertThat(TitleTemplate.render("{{GAME}} avec {{@GUEST_STARS}}", context, true))
+                .contains("Doom avec @Alice, @bob_99");
+        assertThat(TitleTemplate.render("{{GUEST_STARS}}", context, true)).contains("Alice, ボブ");
+        assertThat(TitleTemplate.literalLength("{{@GUEST_STARS}} ok")).isEqualTo(3);
+    }
 }

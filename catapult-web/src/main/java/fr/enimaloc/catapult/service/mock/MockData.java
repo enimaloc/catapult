@@ -956,6 +956,8 @@ public class MockData {
         String title = template.replace("{{GAME}}", MockApiService.PREVIEW_GAME)
                 .replace("{{CATEGORY}}", MockApiService.PREVIEW_GAME)
                 .replace("{{GUEST_STARS}}", guestStarNames().orElse(""))
+                // The mock's guests are named by their login: mentioned by their name
+                .replace("{{@GUEST_STARS}}", guestStarNames().map(names -> "@" + names.replace(", ", ", @")).orElse(""))
                 .strip();
         return title.codePointCount(0, title.length()) > MAX_TITLE_LENGTH
                 ? title.substring(0, title.offsetByCodePoints(0, MAX_TITLE_LENGTH)).strip() : title;

@@ -25,8 +25,22 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GuestStarRoster {
 
-    /** A guest on air: their slot, Twitch id and display name. */
-    public record Guest(String slotId, String userId, String displayName) {}
+    /** A guest on air: their slot, Twitch id, login (null when unknown) and display name. */
+    public record Guest(String slotId, String userId, String login, String displayName) {
+
+        /** Without their login: mentioned by their display name. */
+        public Guest(String slotId, String userId, String displayName) {
+            this(slotId, userId, null, displayName);
+        }
+
+        /**
+         * How a title mentions them: {@code @} and their display name when it is their login (Twitch resolves a
+         * mention by login, whatever its case), their login otherwise (a display name in another script).
+         */
+        public String mention() {
+            return "@" + (login == null || login.isBlank() || displayName.equalsIgnoreCase(login) ? displayName : login);
+        }
+    }
 
     static final String HOST_SLOT = "0";
     static final String SCREENSHARE_SLOT = "SCREENSHARE";
@@ -46,6 +60,12 @@ public class GuestStarRoster {
      */
     public void onGuestUpdate(UserAccount user, String slotId, String guestUserId, String guestDisplayName,
                               String state) {
+        onGuestUpdate(user, slotId, guestUserId, null, guestDisplayName, state);
+    }
+
+    /** {@link #onGuestUpdate(UserAccount, String, String, String, String)} with the guest's login, for mentions. */
+    public void onGuestUpdate(UserAccount user, String slotId, String guestUserId, String guestLogin,
+                              String guestDisplayName, String state) {
         change(user, guests -> {
             if (guestUserId != null) {
                 guests.values().removeIf(guest -> guestUserId.equals(guest.userId()));
@@ -53,7 +73,7 @@ public class GuestStarRoster {
                 guests.remove(slotId);
             }
             if (LIVE.equals(state) && guestUserId != null && counts(slotId)) {
-                guests.put(slotId, new Guest(slotId, guestUserId,
+                guests.put(slotId, new Guest(slotId, guestUserId, guestLogin,
                         guestDisplayName == null ? guestUserId : guestDisplayName));
             }
         });
@@ -81,20 +101,34 @@ public class GuestStarRoster {
         }
     }
 
+    /** How a title mentions the guests on air ({@link Guest#mention}), by slot, joined by {@code ", "}. */
+    public Optional<String> mentions(UUID userId) {
+        TreeMap<String, Guest> guests = rosters.get(userId);
+        if (guests == null) return Optional.empty();
+        synchronized (guests) {
+            return joined(guests, Guest::mention);
+        }
+    }
+
     private void change(UserAccount user, java.util.function.Consumer<TreeMap<String, Guest>> update) {
         TreeMap<String, Guest> guests = rosters.computeIfAbsent(user.getId(), id -> new TreeMap<>(BY_SLOT));
         boolean changed;
         synchronized (guests) {
-            Optional<String> before = names(guests);
+            List<Optional<String>> before = List.of(names(guests), joined(guests, Guest::mention));
             update.accept(guests);
-            changed = !Objects.equals(before, names(guests));
+            changed = !Objects.equals(before, List.of(names(guests), joined(guests, Guest::mention)));
         }
         if (changed) eventPublisher.publishEvent(new GuestStarsChangedEvent(this, user));
     }
 
     private static Optional<String> names(TreeMap<String, Guest> guests) {
+        return joined(guests, Guest::displayName);
+    }
+
+    private static Optional<String> joined(TreeMap<String, Guest> guests,
+                                           java.util.function.Function<Guest, String> part) {
         if (guests.isEmpty()) return Optional.empty();
-        return Optional.of(guests.values().stream().map(Guest::displayName).collect(Collectors.joining(", ")));
+        return Optional.of(guests.values().stream().map(part).collect(Collectors.joining(", ")));
     }
 
     private static boolean counts(String slotId) {

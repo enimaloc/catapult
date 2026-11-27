@@ -60,11 +60,16 @@ public class GuestStarSessionClient {
                 }
             });
             if (live.isEmpty()) return List.of();
-            Map<String, String> names = new HashMap<>();
+            Map<String, JsonNode> users = new HashMap<>();
             get(accessToken, HELIX + "/users?" + live.stream().map(g -> "id=" + g[1]).collect(Collectors.joining("&")))
-                    .path("data").forEach(u -> names.put(u.path("id").asText(), u.path("display_name").asText()));
+                    .path("data").forEach(u -> users.put(u.path("id").asText(), u));
             return live.stream()
-                    .map(g -> new GuestStarRoster.Guest(g[0], g[1], names.getOrDefault(g[1], g[1])))
+                    .map(g -> {
+                        JsonNode u = users.get(g[1]);
+                        return u == null ? new GuestStarRoster.Guest(g[0], g[1], g[1])
+                                : new GuestStarRoster.Guest(g[0], g[1], u.path("login").asText(null),
+                                        u.path("display_name").asText(g[1]));
+                    })
                     .toList();
         } catch (Exception e) {
             log.warn("Could not read the Guest Star session of user {}: {}", user.getId(), e.getMessage());
