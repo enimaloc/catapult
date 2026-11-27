@@ -141,7 +141,6 @@ public class MockAdminController {
         model.addAttribute("channel", data.getChannelDto());
         model.addAttribute("guestStarsState", data.getUserSettings().titleGuestStars());
         model.addAttribute("guestStars", data.getGuestStars());
-        model.addAttribute("guestStarPool", data.getGuestStarPool());
         model.addAttribute("streamTitle", data.getStreamTitle());
         model.addAttribute("botEnabled", data.isBotEnabled());
         model.addAttribute("admin", data.isAdmin());
@@ -347,12 +346,6 @@ public class MockAdminController {
                 ? "Rien envoyé : aucun payload actif pour cet événement."
                 : sent + " payload(s) envoyé(s) à Twitchat.");
         return REDIRECT_ADMIN;
-    }
-
-    /** The guests on air picked from the pool (none checked: none on air): the title follows, unless changed by hand. */
-    @PostMapping("/mock/admin/guest-star/select")
-    public String selectGuestStars(@RequestParam(name = "names", required = false) List<String> names) {
-        return withData(data -> data.selectGuestStars(names == null ? List.of() : names));
     }
 
     /** A Guest Star guest comes on air: the title follows, unless it was changed by hand. */

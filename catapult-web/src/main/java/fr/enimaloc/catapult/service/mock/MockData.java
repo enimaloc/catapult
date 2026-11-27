@@ -103,10 +103,7 @@ public class MockData {
     @Getter
     private List<BindingDto> binding;
     private UserSettingsDto userSettingsDto;
-    /** The guests the mock admin picks from, in their slot order; one added there joins them. */
-    private final List<String> guestStarPool = new ArrayList<>(List.of(
-            "MockGuest1", "MockGuest2", "MockGuest3", "MockGuest4", "MockGuest5", "MockGuest6"));
-    /** The Guest Star guests on air, in the pool's order (used once the consent is READY and the channel live). */
+    /** The Guest Star guests on air (used once the consent is READY and the channel live). */
     private final List<String> guestStars = new ArrayList<>(List.of("MockGuest1", "MockGuest2"));
     /** The stream's title on the mock "Twitch", and the last one the mock "Catapult" sent (equal: not changed by hand). */
     @Getter
@@ -925,28 +922,10 @@ public class MockData {
         }
     }
 
-    /** The guests the mock admin picks from. */
-    public List<String> getGuestStarPool() {
-        return List.copyOf(guestStarPool);
-    }
-
-    /** The guests on air become {@code names} (those of the pool, in its order): the title follows. */
-    public void selectGuestStars(java.util.Collection<String> names) {
-        List<String> selected = guestStarPool.stream().filter(names::contains).toList();
-        if (selected.equals(guestStars)) return;
-        guestStars.clear();
-        guestStars.addAll(selected);
-        followGuestStars();
-    }
-
-    /** A new guest joins the pool, on air. */
     public void addGuestStar(String name) {
         if (name == null || name.isBlank() || guestStars.contains(name.strip())) return;
-        String guest = name.strip();
-        if (!guestStarPool.contains(guest)) guestStarPool.add(guest);
-        List<String> onAir = new ArrayList<>(guestStars);
-        onAir.add(guest);
-        selectGuestStars(onAir);
+        guestStars.add(name.strip());
+        followGuestStars();
     }
 
     public void removeGuestStar(String name) {

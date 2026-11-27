@@ -483,28 +483,6 @@ class MockAdminControllerTest {
     }
 
     @Test
-    void mockGuestsSelectedFromThePool() throws Exception {
-        readyWithTemplate("Live {{GUEST_STARS}}");
-        assertThat(data.getGuestStarPool()).startsWith("MockGuest1", "MockGuest2", "MockGuest3");
-
-        // In the pool's order, whatever the order sent; a name off the pool ignored
-        mvc.perform(post("/mock/admin/guest-star/select").with(csrf())
-                        .param("names", "MockGuest4", "MockGuest2", "Nobody"))
-                .andExpect(status().is3xxRedirection());
-        assertThat(data.getGuestStars()).containsExactly("MockGuest2", "MockGuest4");
-        assertThat(data.getStreamTitle()).isEqualTo("Live MockGuest2, MockGuest4");
-
-        // Nothing checked: no guest on air any more
-        mvc.perform(post("/mock/admin/guest-star/select").with(csrf()));
-        assertThat(data.getGuestStars()).isEmpty();
-
-        // A new guest joins the pool, on air
-        mvc.perform(post("/mock/admin/guest-star/add").with(csrf()).param("name", "Alice"));
-        assertThat(data.getGuestStarPool()).endsWith("Alice");
-        assertThat(data.getGuestStars()).containsExactly("Alice");
-    }
-
-    @Test
     void mockGuestStarStateChangedFromTheAdmin() throws Exception {
         mvc.perform(post("/mock/admin/guest-star/state").with(csrf()).param("state", "READY"));
         assertThat(data.getUserSettings().titleGuestStars()).isEqualTo("READY");
@@ -521,6 +499,5 @@ class MockAdminControllerTest {
         String page = mvc.perform(get("/mock/admin")).andReturn().getResponse().getContentAsString();
 
         assertThat(page).contains("id=\"mock-guest-star-form\"", "Alice", "Live MockGuest1, MockGuest2, Alice");
-        assertThat(page).contains("/mock/admin/guest-star/select", "value=\"MockGuest5\"");
     }
 }
