@@ -2,6 +2,7 @@ package fr.enimaloc.catapult.service.mock;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.HashMap;
 import fr.enimaloc.catapult.common.dto.channel.DropDto;
 import fr.enimaloc.catapult.common.dto.channel.ChessData;
@@ -86,6 +87,9 @@ public class MockData {
     private static final String MOCK_BOT_EPIC_NAME = "CatapultBot";
     private static final String MOCK_BATTLE_TAG = "MockStreamer#1234";
     private static final String MOCK_BOT_BATTLE_TAG = "CatapultBot#4242";
+    static final Set<String> GUEST_STAR_STATES = Set.of("NEEDS_CONSENT", "READY");
+    /** Twitch refuses a longer title. */
+    private static final int MAX_TITLE_LENGTH = 140;
 
     /** A session's initial Steam state. */
     record SteamState(boolean connected, boolean personalToken, boolean tokenShared,
@@ -99,6 +103,12 @@ public class MockData {
     @Getter
     private List<BindingDto> binding;
     private UserSettingsDto userSettingsDto;
+    /** The Guest Star guests on air (used once the consent is READY and the channel live). */
+    private final List<String> guestStars = new ArrayList<>(List.of("MockGuest1", "MockGuest2"));
+    /** The stream's title on the mock "Twitch", and the last one the mock "Catapult" sent (equal: not changed by hand). */
+    @Getter
+    private String streamTitle;
+    private String lastSentTitle;
     /** The other channels the member moderates; {@link #getChannelList()} puts their own first. */
     @Getter
     private List<ChannelDto> moderatedChannels;
@@ -298,7 +308,9 @@ public class MockData {
                 null, null, Set.of(),
                 AVAILABLE_CCLS, config.settings.twFeatureEnabled, Set.copyOf(config.settings.blockedTws), AVAILABLE_TWS,
                 // raid.restore-game and stream.title: the mock has no experiments, the settings are offered
-                null, true, List.of(), List.of(), false, null, true, null, null, true, true, true);
+                null, true, List.of(), List.of(), false, null, true, null, null, true, true, true,
+                // stream.title.guest_stars: offered too, its consent as the config says
+                GUEST_STAR_STATES.contains(config.guestStars) ? config.guestStars : "NEEDS_CONSENT");
 
         MockConfig.Steam steam = config.steam;
         MockData data = new MockData(channel, List.of(binding), settings, List.of(),
@@ -888,6 +900,69 @@ public class MockData {
                 : new TwitchatWidgetConfig(obsData.host(), obsData.port(), obsPassword, twitchatBranch);
     }
 
+    // --- Guest Star ------------------------------------------------------------------------------
+
+    /** The guests on air, in their order. */
+    public List<String> getGuestStars() {
+        return List.copyOf(guestStars);
+    }
+
+    /** Their names as {@code {{GUEST_STARS}}} shows them: none until the consent is READY, or off stream. */
+    public Optional<String> guestStarNames() {
+        if (!"READY".equals(userSettingsDto.titleGuestStars()) || !channelDto.live() || guestStars.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(String.join(", ", guestStars));
+    }
+
+    /** The consent, NEEDS_CONSENT or READY; anything else is ignored. */
+    public void setGuestStarsState(String state) {
+        if (GUEST_STAR_STATES.contains(state)) {
+            userSettingsDto = SettingsCopy.of(userSettingsDto).guestStars(state).build();
+        }
+    }
+
+    public void addGuestStar(String name) {
+        if (name == null || name.isBlank() || guestStars.contains(name.strip())) return;
+        guestStars.add(name.strip());
+        followGuestStars();
+    }
+
+    public void removeGuestStar(String name) {
+        if (guestStars.remove(name)) followGuestStars();
+    }
+
+    /** The streamer edits their title by hand: the guests no longer change it. */
+    public void setStreamTitleByHand(String title) {
+        streamTitle = title == null || title.isBlank() ? null : title.strip();
+    }
+
+    /**
+     * The live update, as catapult-api does it: the channel-wide template rendered with the guests, sent only while
+     * the title is still the one last sent (never changed by hand).
+     */
+    private void followGuestStars() {
+        if (!Objects.equals(streamTitle, lastSentTitle)) return;
+        String template = userSettingsDto.titleTemplate();
+        if (template == null || template.isBlank()) return;
+        String title = renderTitle(template);
+        if (title.isEmpty()) return;
+        streamTitle = title;
+        lastSentTitle = title;
+    }
+
+    /** {@code template} with the mock's example game and its guests, trimmed and cut as Twitch would. */
+    String renderTitle(String template) {
+        String title = template.replace("{{GAME}}", MockApiService.PREVIEW_GAME)
+                .replace("{{CATEGORY}}", MockApiService.PREVIEW_GAME)
+                .replace("{{GUEST_STARS}}", guestStarNames().orElse(""))
+                // The mock's guests are named by their login: mentioned by their name
+                .replace("{{@GUEST_STARS}}", guestStarNames().map(names -> "@" + names.replace(", ", ", @")).orElse(""))
+                .strip();
+        return title.codePointCount(0, title.length()) > MAX_TITLE_LENGTH
+                ? title.substring(0, title.offsetByCodePoints(0, MAX_TITLE_LENGTH)).strip() : title;
+    }
+
     // --- admin-only mutators: no UI path reaches these, only the mock admin page ----------------
 
     public void setChannelLive(boolean live) {
@@ -1097,6 +1172,7 @@ public class MockData {
         private String titleTemplate;
         private String noGameTitle;
         private String incompleteFallbackTitle;
+        private String guestStars;
 
         private SettingsCopy(UserSettingsDto from) {
             this.from = from;
@@ -1120,6 +1196,12 @@ public class MockData {
             this.titleTemplate = from.titleTemplate();
             this.noGameTitle = from.noGameTitle();
             this.incompleteFallbackTitle = from.incompleteFallbackTitle();
+            this.guestStars = from.titleGuestStars();
+        }
+
+        SettingsCopy guestStars(String state) {
+            this.guestStars = state;
+            return this;
         }
 
         static SettingsCopy of(UserSettingsDto from) {
@@ -1193,7 +1275,8 @@ public class MockData {
                     from.availableCcls(), twEnabled, blockedTws, from.availableTws(),
                     raidMinutes, from.raidRestoreGameAvailable(), noGameExtensions, fallbackExtensions,
                     titleEnabled, titleTemplate, from.titleAvailable(), noGameTitle, incompleteFallbackTitle,
-                    from.titlePreviewAvailable(), from.titleConditionsAvailable(), from.titleDropsAvailable());
+                    from.titlePreviewAvailable(), from.titleConditionsAvailable(), from.titleDropsAvailable(),
+                    guestStars);
         }
     }
 }

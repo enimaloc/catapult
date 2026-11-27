@@ -70,6 +70,12 @@ public class ApiHelpController {
             if (offered.drops()) {
                 body += messageSource.getMessage("help.title-settings.body.drops", args, "", locale);
             }
+            if (offered.guestStars()) {
+                body += messageSource.getMessage("help.title-settings.body.guest_stars", args, "", locale);
+            }
+            if (offered.guestStarsCondition()) {
+                body += messageSource.getMessage("help.title-settings.body.guest_stars_condition", args, "", locale);
+            }
         }
         return new HelpContent(title, body);
     }

@@ -31,6 +31,8 @@ import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.ChatRequest;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.CallView;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.CreateAccount;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.DataUpdate;
+import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.GuestStarConsentRequest;
+import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.GuestStarsRequest;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.DetectedGameView;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.IdentityUpdate;
 import fr.enimaloc.catapult.simulation.panel.MockPanelDtos.LiveRequest;
@@ -99,6 +101,9 @@ import java.util.stream.Collectors;
 @DependsOn("mockGuard")
 @RequestMapping(MockPanelApiController.PATH)
 public class MockPanelApiController {
+
+    /** A Twitch login's length: a guest's name is one. */
+    private static final int MAX_GUEST_NAME = 25;
 
     static final String PATH = ApiPaths.INTERNAL + "/mock";
     static final String PANEL_HEADER = "X-Mock-Panel";
@@ -304,6 +309,32 @@ public class MockPanelApiController {
     }
 
     /** A closed period just before the running one; 400 when the account is not live. */
+    /** The Guest Star guests on air become these names: trimmed, blanks and repeats dropped. */
+    @PostMapping("/accounts/{id}/guest-stars")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void guestStars(@PathVariable UUID id, @RequestBody GuestStarsRequest body) {
+        UserAccount account = account(id);
+        List<String> names = body.names() == null ? List.of() : body.names().stream()
+                .filter(name -> name != null && !name.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (names.size() > SimulationActions.MAX_GUEST_STARS) {
+            throw new ApiProblem(ErrorCode.INVALID,
+                    "At most " + SimulationActions.MAX_GUEST_STARS + " guests are on air at once");
+        }
+        if (names.stream().anyMatch(name -> name.length() > MAX_GUEST_NAME)) {
+            throw new ApiProblem(ErrorCode.INVALID, "A guest's name is at most " + MAX_GUEST_NAME + " characters");
+        }
+        actions.setGuestStars(account, names);
+    }
+
+    @PostMapping("/accounts/{id}/guest-star-consent")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void guestStarConsent(@PathVariable UUID id, @RequestBody GuestStarConsentRequest body) {
+        actions.setGuestStarConsent(account(id), body.given());
+    }
+
     @PostMapping("/accounts/{id}/past-segment")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void pastSegment(@PathVariable UUID id, @RequestBody PastSegmentRequest body) {

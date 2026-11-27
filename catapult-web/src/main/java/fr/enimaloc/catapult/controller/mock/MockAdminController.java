@@ -139,6 +139,9 @@ public class MockAdminController {
         }
         LinkStateResponse minecraft = data.getMinecraftLink();
         model.addAttribute("channel", data.getChannelDto());
+        model.addAttribute("guestStarsState", data.getUserSettings().titleGuestStars());
+        model.addAttribute("guestStars", data.getGuestStars());
+        model.addAttribute("streamTitle", data.getStreamTitle());
         model.addAttribute("botEnabled", data.isBotEnabled());
         model.addAttribute("admin", data.isAdmin());
         model.addAttribute("premium", data.isPremium());
@@ -342,6 +345,42 @@ public class MockAdminController {
         redirect.addFlashAttribute("twitchatResult", sent == 0
                 ? "Rien envoyé : aucun payload actif pour cet événement."
                 : sent + " payload(s) envoyé(s) à Twitchat.");
+        return REDIRECT_ADMIN;
+    }
+
+    /** A Guest Star guest comes on air: the title follows, unless it was changed by hand. */
+    @PostMapping("/mock/admin/guest-star/add")
+    public String addGuestStar(@RequestParam(defaultValue = "") String name) {
+        return withData(data -> data.addGuestStar(name));
+    }
+
+    /** A Guest Star guest leaves: the title follows, unless it was changed by hand. */
+    @PostMapping("/mock/admin/guest-star/remove")
+    public String removeGuestStar(@RequestParam(defaultValue = "") String name) {
+        return withData(data -> data.removeGuestStar(name));
+    }
+
+    /** The Guest Star consent, NEEDS_CONSENT or READY. */
+    @PostMapping("/mock/admin/guest-star/state")
+    public String setGuestStarsState(@RequestParam(defaultValue = "") String state) {
+        return withData(data -> {
+            data.setGuestStarsState(state);
+            mockApiService.publishSettingsOf(data.getChannelDto().twitchUsername());
+        });
+    }
+
+    /** The streamer edits their title by hand on Twitch. */
+    @PostMapping("/mock/admin/guest-star/title")
+    public String setStreamTitleByHand(@RequestParam(defaultValue = "") String title) {
+        return withData(data -> data.setStreamTitleByHand(title));
+    }
+
+    private String withData(java.util.function.Consumer<MockData> change) {
+        MockData data = mockApiService.getData();
+        if (data == null) {
+            return REDIRECT_LOGIN;
+        }
+        change.accept(data);
         return REDIRECT_ADMIN;
     }
 

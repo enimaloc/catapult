@@ -155,4 +155,73 @@ class TitleTemplateTest {
     void aStrayDoubleBrace_afterAResolvedTernary_leavesTheRestRendered() {
         assertThat(render("{{HAS_GAME ? [[a]] : [[b]]}} {{ {{GAME}}", Map.of("HAS_GAME", true))).contains("a {{ Doom");
     }
+
+    private static TitleContext guests(String names) {
+        return new TitleContext("Doom", "DOOM", UNREAD, UNREAD, Map.of(), null, null, null).withGuestStars(names);
+    }
+
+    @Test
+    void guestStarsReplacedByTheirNames() {
+        assertThat(TitleTemplate.render("Live {{GUEST_STARS}}", guests("Alice, Bob"), false)).contains("Live Alice, Bob");
+    }
+
+    @Test
+    void guestStarsEmptyWhenNull() {
+        assertThat(TitleTemplate.render("Live {{GUEST_STARS}}", guests(null), false)).contains("Live");
+    }
+
+    @Test
+    void hasGuestStarsCondition() {
+        String template = "X{{HAS_GUEST_STARS ? [[ avec {{GUEST_STARS}}]] : [[]]}}";
+        assertThat(TitleTemplate.render(template, guests("Alice"), true)).contains("X avec Alice");
+        assertThat(TitleTemplate.render(template, guests(null), true)).contains("X");
+        assertThat(TitleTemplate.render(template, guests(" "), true)).as("blank is no guest").contains("X");
+    }
+
+    @Test
+    void hasGuestStarsIgnoredWithoutConditions() {
+        String template = "X{{HAS_GUEST_STARS ? [[ avec]] : [[]]}}";
+        assertThat(TitleTemplate.render(template, guests("Alice"), false)).contains(template);
+    }
+
+    @Test
+    void withGuestStars_keepsTheOtherConditions() {
+        TitleContext context = new TitleContext("Doom", "DOOM", UNREAD, UNREAD, Map.of("HAS_GAME", true), null, null,
+                null).withGuestStars("Alice");
+        assertThat(context.conditions()).containsEntry("HAS_GAME", true).containsEntry("HAS_GUEST_STARS", true);
+    }
+
+    @Test
+    void literalLength_leavesTheVariablesOut() {
+        assertThat(TitleTemplate.literalLength("{{GAME}} avec {{GUEST_STARS}}")).isEqualTo(6);
+        assertThat(TitleTemplate.literalLength("{{game}} ok")).isEqualTo(11);
+        assertThat(TitleTemplate.literalLength("🎮 {{TITLE}}")).isEqualTo(2);
+        assertThat(TitleTemplate.literalLength(null)).isZero();
+    }
+
+    @Test
+    void literalLength_countsATernaryByItsLongerBranch() {
+        assertThat(TitleTemplate.literalLength("{{HAS_GUEST_STARS ? [[avec {{GUEST_STARS}}]] : [[solo]]}} !"))
+                .isEqualTo(7);
+        assertThat(TitleTemplate.literalLength("{{HAS_GAME ? [[a]] : [[{{IS_MATURE ? [[bbb]] : [[]]}}]]}}"))
+                .isEqualTo(3);
+    }
+
+    @Test
+    void literalLength_countsWhatStaysAsTyped() {
+        // an unknown condition: the ternary is sent as typed
+        String raw = "{{NOPE ? [[a]] : [[b]]}}";
+        assertThat(TitleTemplate.literalLength(raw)).isEqualTo(raw.length());
+        assertThat(TitleTemplate.literalLength("{{{GAME}}}")).isEqualTo(2);
+    }
+
+    @Test
+    void guestStarMentions() {
+        TitleContext context = new TitleContext("Doom", "DOOM", UNREAD, UNREAD, Map.of(), null, null)
+                .withGuestStars("Alice, ボブ", "@Alice, @bob_99");
+        assertThat(TitleTemplate.render("{{GAME}} avec {{@GUEST_STARS}}", context, true))
+                .contains("Doom avec @Alice, @bob_99");
+        assertThat(TitleTemplate.render("{{GUEST_STARS}}", context, true)).contains("Alice, ボブ");
+        assertThat(TitleTemplate.literalLength("{{@GUEST_STARS}} ok")).isEqualTo(3);
+    }
 }

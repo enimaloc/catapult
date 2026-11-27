@@ -274,6 +274,19 @@ public class MockApiService implements ApiService {
         return token != null ? data.get(token) : null;
     }
 
+    /**
+     * The Guest Star consent given (catapult-api's twitch-guest-star login, without leaving): the settings follow.
+     * The member's username, null without a session.
+     */
+    public String guestStarConnect() {
+        MockData current = currentData();
+        if (current == null) return null;
+        current.setGuestStarsState("READY");
+        String username = current.getChannelDto().twitchUsername();
+        publishSettings(username);
+        return username;
+    }
+
     /** Exposes the calling session's live instance for {@link fr.enimaloc.catapult.controller.mock.MockAdminController} to read and mutate. */
     public MockData getData() {
         return currentData();
@@ -378,7 +391,7 @@ public class MockApiService implements ApiService {
         return NO_CONTENT;
     }
 
-    /** Checked like catapult-api: at most 140 characters, blank for the channel-wide title. */
+    /** Checked like catapult-api ({@link #validTitle}), blank for the channel-wide title. */
     @Override
     public int bindingTitle(String username, String bindingId, String title) {
         log.trace("bindingTitle({}, {}, {})", username, bindingId, title);
@@ -1001,6 +1014,11 @@ public class MockApiService implements ApiService {
     }
 
     /** The settings cards' whole state, as ChannelEventRedisBridge relays catapult-api's settings.updated. */
+    /** Tells the channel's pages its settings changed (the mock admin page changed them). */
+    public void publishSettingsOf(String username) {
+        publishSettings(username);
+    }
+
     private void publishSettings(String username) {
         UserSettingsDto s = currentData().getUserSettings();
         eventPublisher.publishEvent(new ChannelSettingsUpdatedEvent(username, ChannelState.settings(s)));
@@ -1046,17 +1064,22 @@ public class MockApiService implements ApiService {
     /** The game a title is previewed with in the mock. */
     static final String PREVIEW_GAME = "Hades II";
 
-    /** Only the game and category are replaced, by examples: the mock has no conditions to evaluate. */
+    /**
+     * Only the game and category are replaced, by examples, and the Guest Star guests by the mock's: the mock has no
+     * conditions to evaluate.
+     */
     @Override
     public fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto previewTitle(String username,
             fr.enimaloc.catapult.common.dto.channel.TitlePreviewRequest request) {
         log.trace("previewTitle({}, {})", username, request);
         String template = request.template() == null ? "" : request.template();
-        String title = template.replace("{{GAME}}", PREVIEW_GAME).replace("{{CATEGORY}}", PREVIEW_GAME).strip();
+        MockData data = currentData();
+        String title = data != null ? data.renderTitle(template)
+                : template.replace("{{GAME}}", PREVIEW_GAME).replace("{{CATEGORY}}", PREVIEW_GAME).strip();
         return new fr.enimaloc.catapult.common.dto.channel.TitlePreviewDto(title.isEmpty() ? null : title);
     }
 
-    /** Checked like catapult-api: a template of at most 140 characters, blank for none. */
+    /** Checked like catapult-api ({@link #validTitle}), blank for none. */
     @Override
     public int saveTitleSettings(String username, boolean enabled, String template) {
         log.trace("saveTitleSettings({}, {}, {})", username, enabled, template);
@@ -1067,9 +1090,18 @@ public class MockApiService implements ApiService {
         return NO_CONTENT;
     }
 
-    /** A title or template catapult-api would take: at most 140 characters. */
-    private static boolean validTitle(String title) {
-        return title == null || title.codePointCount(0, title.length()) <= 140;
+    /** The variables catapult-api replaces in a title, written exactly. */
+    private static final java.util.regex.Pattern TITLE_VARIABLE = java.util.regex.Pattern.compile(
+            "\\{\\{(GAME|CATEGORY|TITLE|ORIGINAL_TITLE|DROP_NAME|DROP_END|@?GUEST_STARS)}}");
+
+    /**
+     * A title or template catapult-api would take: at most 140 characters of its own, its variables left out, and 500
+     * as typed. Simpler than catapult-api: a ternary's syntax is counted.
+     */
+    static boolean validTitle(String title) {
+        if (title == null) return true;
+        String own = TITLE_VARIABLE.matcher(title).replaceAll("");
+        return title.codePointCount(0, title.length()) <= 500 && own.codePointCount(0, own.length()) <= 140;
     }
 
     /** Validated like catapult-api: 1..120 minutes, null or 0 for off, else 400. */

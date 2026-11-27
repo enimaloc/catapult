@@ -34,4 +34,11 @@ public interface TwitchService {
      * thrown as is.
      */
     TwitchExtensionPlacement setActiveExtensions(UserAccount user, TwitchExtensionPlacement placement);
+
+    /**
+     * Sets the channel's title alone, only while Twitch still has {@code expectedCurrent} (the last title Catapult
+     * sent: a title changed by hand is left alone) and it differs from {@code title}. Skipped when it is not sent
+     * (bot disabled, account inactive, changed by hand, unreadable), failed when Twitch refused it.
+     */
+    ChannelUpdateOutcome updateTitle(UserAccount user, String expectedCurrent, String title);
 }

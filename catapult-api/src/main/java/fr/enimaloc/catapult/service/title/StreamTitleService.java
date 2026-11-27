@@ -11,6 +11,8 @@ import fr.enimaloc.catapult.service.drops.DropCampaign;
 import fr.enimaloc.catapult.service.drops.DropsCatalog;
 import fr.enimaloc.catapult.service.drops.DropsGate;
 import fr.enimaloc.catapult.service.experiment.ExperimentService;
+import fr.enimaloc.catapult.service.gueststar.GuestStarConsent;
+import fr.enimaloc.catapult.service.gueststar.GuestStarRoster;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -20,6 +22,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -27,7 +31,8 @@ import java.util.function.Supplier;
  * game's, a custom binding's, a fallback's), else the channel-wide template. A template's variables are written
  * {@code {{NAME}}} exactly: {@code {{GAME}}} the game detected (a custom binding's name, nothing without a game),
  * {@code {{CATEGORY}}} the Twitch category's name, {@code {{TITLE}}} the title the stream has just before the change,
- * {@code {{ORIGINAL_TITLE}}} the one the streamer set themselves, before Catapult changed it; anything else (another
+ * {@code {{ORIGINAL_TITLE}}} the one the streamer set themselves, before Catapult changed it, {@code {{GUEST_STARS}}} the
+ * Guest Star guests on air (experiment {@value #GUEST_STARS_KEY}); anything else (another
  * case, spaces, another name) stays as typed. Nothing while the streamer hasn't turned it on, so their title is left alone.
  */
 @Slf4j
@@ -40,6 +45,8 @@ public class StreamTitleService {
     public static final String CONDITIONS_KEY = "stream.title.conditions";
     /** The title's preview under its fields, within {@value #EXPERIMENT_KEY}. */
     public static final String PREVIEW_KEY = "stream.title.preview";
+    /** The Guest Star guests ({@code {{GUEST_STARS}}}, {@code HAS_GUEST_STARS}) in the titles, within {@value #EXPERIMENT_KEY}. */
+    public static final String GUEST_STARS_KEY = "stream.title.guest_stars";
     /** Twitch refuses a longer title. */
     public static final int MAX_LENGTH = TitleTemplate.MAX_LENGTH;
 
@@ -51,12 +58,25 @@ public class StreamTitleService {
     private final StreamTitleStateRepository stateRepository;
     private final DropsGate dropsGate;
     private final DropsCatalog dropsCatalog;
+    private final GuestStarRoster guestStarRoster;
+    private final GuestStarConsent guestStarConsent;
 
     /**
      * A title to send, with the one the stream had before ({@code before}, empty when it couldn't be read), what
      * {@link #sent} remembers once Twitch took it.
      */
     public record PlannedTitle(String title, Optional<String> before) {}
+
+    /**
+     * A title as rendered: what it was rendered from, frozen ({@code {{TITLE}}} included), so that the guests can be
+     * swapped in it alone. In memory: a restart forgets it, the next title sent remembers it again.
+     */
+    private record LastRender(String title, String template, TitleContext context, boolean conditions) {}
+
+    /** The title each channel is about to send, until {@link #sent} tells Twitch took it. */
+    private final Map<UUID, LastRender> plannedRenders = new ConcurrentHashMap<>();
+    /** The last title each channel sent normally (a category change), what {@link #guestStarsRefresh} re-renders. */
+    private final Map<UUID, LastRender> lastRenders = new ConcurrentHashMap<>();
 
     /** User-facing paths (settings page and save): may assign the channel to the experiment. */
     public boolean isAvailableFor(UserAccount user) {
@@ -76,6 +96,24 @@ public class StreamTitleService {
     /** Whether the titles {@code user} writes read their conditions, asked by the settings page: may assign the channel. */
     public boolean conditionsAvailableFor(UserAccount user) {
         return experimentService.evaluateGate(user, CONDITIONS_KEY);
+    }
+
+    /** Whether the titles sent for {@code user} show their Guest Star guests; read-only, never assigns. */
+    public boolean guestStarsAvailableReadOnly(UserAccount user) {
+        return experimentService.isRolledOut(user, GUEST_STARS_KEY);
+    }
+
+    /**
+     * Whether the titles sent for {@code user} show their guests now: in {@value #GUEST_STARS_KEY} and the consent
+     * still in the token (a token from before the Twitch login asked it has none, the subscriptions not made).
+     */
+    private boolean followsGuestStars(UserAccount user) {
+        return guestStarsAvailableReadOnly(user) && guestStarConsent.hasScope(user);
+    }
+
+    /** Whether the settings page offers {@code user} the Guest Star guests in the titles: may assign the channel. */
+    public boolean guestStarsAvailableFor(UserAccount user) {
+        return experimentService.evaluateGate(user, GUEST_STARS_KEY);
     }
 
     /** Whether the settings page offers {@code user} the title's preview: may assign the channel. */
@@ -106,7 +144,8 @@ public class StreamTitleService {
     /**
      * What a title is rendered with for {@code binding} ({@code noGame}: the "no game" reset, without a binding):
      * its game and category, the title {@code before} it and the streamer's own, and its conditions — the drops ones
-     * only while the channel is in both {@value DropsGate#EXPERIMENT_KEY} and {@value #CONDITIONS_KEY}.
+     * only while the channel is in both {@value DropsGate#EXPERIMENT_KEY} and {@value #CONDITIONS_KEY}, its Guest Star
+     * guests only in {@value #GUEST_STARS_KEY}.
      */
     TitleContext context(UserAccount user, UserSettings settings, GameBinding binding, boolean noGame,
                          boolean labelSent, Optional<String> before) {
@@ -136,8 +175,12 @@ public class StreamTitleService {
                 .filter(state -> current.equals(state.getLastSentTitle()) && state.getOriginalTitle() != null)
                 .map(StreamTitleState::getOriginalTitle)
                 .orElse(current));
+        boolean guests = followsGuestStars(user);
+        String guestStars = guests ? guestStarRoster.names(user.getId()).orElse(null) : null;
+        String mentions = guests ? guestStarRoster.mentions(user.getId()).orElse(null) : null;
         return new TitleContext(game, category, () -> before, () -> original, conditions,
-                drop == null ? null : drop.name(), drop == null ? null : DROP_END.format(drop.endAt()));
+                drop == null ? null : drop.name(), drop == null ? null : DROP_END.format(drop.endAt()))
+                .withGuestStars(guestStars, mentions);
     }
 
     /**
@@ -145,6 +188,10 @@ public class StreamTitleService {
      * last one Catapult sent, the streamer's own. A failure here is only logged: the title is on Twitch already.
      */
     public void sent(UserAccount user, PlannedTitle planned) {
+        LastRender render = plannedRenders.remove(user.getId());
+        if (render != null && render.title().equals(planned.title())) {
+            lastRenders.put(user.getId(), render);
+        }
         try {
             StreamTitleState state = stateRepository.findById(user.getId())
                     .orElseGet(() -> new StreamTitleState(user.getId()));
@@ -163,8 +210,47 @@ public class StreamTitleService {
                                         Supplier<Optional<String>> currentTitle) {
         if (!hasText(template)) return Optional.empty();
         Optional<String> before = currentTitle.get();
-        return TitleTemplate.render(template, context.apply(before), conditionsAvailableReadOnly(user))
-                .map(title -> new PlannedTitle(title, before));
+        TitleContext rendered = context.apply(before);
+        boolean conditions = conditionsAvailableReadOnly(user);
+        Optional<String> title = TitleTemplate.render(template, rendered, conditions);
+        title.ifPresentOrElse(
+                t -> plannedRenders.put(user.getId(), new LastRender(t, template, rendered, conditions)),
+                () -> plannedRenders.remove(user.getId()));
+        return title.map(t -> new PlannedTitle(t, before));
+    }
+
+    /**
+     * The last title sent normally rendered again with the guests on air now, nothing else changed (its
+     * {@code {{TITLE}}}, drops and category as they were); empty without such a title (never sent since the start) or
+     * outside {@value #GUEST_STARS_KEY}.
+     */
+    public Optional<String> guestStarsRefresh(UserAccount user) {
+        LastRender last = lastRenders.get(user.getId());
+        if (last == null || !isAvailableReadOnly(user) || !followsGuestStars(user)) return Optional.empty();
+        String guests = guestStarRoster.names(user.getId()).orElse(null);
+        String mentions = guestStarRoster.mentions(user.getId()).orElse(null);
+        return TitleTemplate.render(last.template(), last.context().withGuestStars(guests, mentions),
+                last.conditions());
+    }
+
+    /** The last title Catapult sent the channel, as remembered. */
+    public Optional<String> lastSentTitle(UserAccount user) {
+        return stateRepository.findById(user.getId()).map(StreamTitleState::getLastSentTitle);
+    }
+
+    /**
+     * Twitch took {@code title}, the guests' refresh: it is the last title Catapult sent; the streamer's own is left as
+     * it was. A failure here is only logged: the title is on Twitch already.
+     */
+    public void sentRefresh(UserAccount user, String title) {
+        try {
+            StreamTitleState state = stateRepository.findById(user.getId())
+                    .orElseGet(() -> new StreamTitleState(user.getId()));
+            state.setLastSentTitle(title);
+            stateRepository.save(state);
+        } catch (RuntimeException e) {
+            log.warn("Could not remember the title sent for user {}: {}", user.getId(), e.getMessage());
+        }
     }
 
     /**
@@ -178,16 +264,29 @@ public class StreamTitleService {
     }
 
     /**
-     * A title or template as typed: trimmed, null when blank; longer than {@value #MAX_LENGTH} characters is a
-     * 400, since it would never fit in a title.
+     * A title or template as typed: trimmed, null when blank; a 400 when {@link #lengthProblem} finds one.
      */
     public static String cleaned(String typed) {
         if (!hasText(typed)) return null;
         String title = typed.strip();
-        if (title.codePointCount(0, title.length()) > MAX_LENGTH) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A title is at most " + MAX_LENGTH + " characters");
-        }
+        String problem = lengthProblem(title);
+        if (problem != null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, problem);
         return title;
+    }
+
+    /**
+     * Why a trimmed title or template can't be kept, or null: more than {@value #MAX_LENGTH} characters of its own
+     * (its variables left out, {@link TitleTemplate#literalLength}), or more than
+     * {@value TitleTemplate#MAX_TEMPLATE_LENGTH} as typed.
+     */
+    public static String lengthProblem(String title) {
+        if (title.codePointCount(0, title.length()) > TitleTemplate.MAX_TEMPLATE_LENGTH) {
+            return "A title is at most " + TitleTemplate.MAX_TEMPLATE_LENGTH + " characters as typed";
+        }
+        if (TitleTemplate.literalLength(title) > MAX_LENGTH) {
+            return "A title is at most " + MAX_LENGTH + " characters, its variables left out";
+        }
+        return null;
     }
 
     private boolean sendsTitles(UserAccount user, UserSettings settings) {

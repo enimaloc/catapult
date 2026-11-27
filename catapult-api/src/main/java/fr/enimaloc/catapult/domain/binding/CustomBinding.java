@@ -45,7 +45,7 @@ public class CustomBinding {
     private boolean uninterruptible = false;
 
     /** Its own stream title, winning over the channel-wide one; null: the channel-wide one. */
-    @Column(length = 140)
+    @Column(length = 500)
     private String title;
 
     // a channel's bindings read their CCLs in one query, not one per binding

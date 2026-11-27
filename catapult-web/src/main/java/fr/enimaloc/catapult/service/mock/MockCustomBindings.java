@@ -206,7 +206,7 @@ class MockCustomBindings {
         if (name.isEmpty() || name.length() > NAME_MAX || blank(request.twitchGameId()) || blank(request.twitchGameName())) {
             return new CustomBindingSave<>(400, null, ErrorCode.INVALID);
         }
-        if (request.title() != null && request.title().strip().codePointCount(0, request.title().strip().length()) > 140) {
+        if (request.title() != null && !MockApiService.validTitle(request.title().strip())) {
             return new CustomBindingSave<>(400, null, ErrorCode.INVALID);
         }
         boolean taken = bindings.stream().anyMatch(b -> !b.id().equals(self) && b.name().toLowerCase(Locale.ROOT).equals(name.toLowerCase(Locale.ROOT)));

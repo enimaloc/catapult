@@ -104,6 +104,23 @@ public class SimulatedTwitchService implements TwitchService {
         }));
     }
 
+    /** Like the category PATCHes; the simulated data keeps no title, so a simulated one is only applied. */
+    @Override
+    public ChannelUpdateOutcome updateTitle(UserAccount user, String expectedCurrent, String title) {
+        if (!canActOnTwitch(user)) {
+            return ChannelUpdateOutcome.SKIPPED;
+        }
+        return unwrapped(() -> {
+            try {
+                return patch(user, SimulatedCalls.TWITCH_HELIX_UPDATE_CHANNEL, "PATCH /channels title=" + title,
+                        () -> real().updateTitle(user, expectedCurrent, title), () -> ChannelUpdateOutcome.APPLIED);
+            } catch (RestClientException e) {
+                log.warn("Twitch title update failed for user {}: {}", user.getId(), e.getMessage());
+                return ChannelUpdateOutcome.FAILED;
+            }
+        });
+    }
+
     @Override
     public ChannelUpdateOutcome setCategory(UserAccount user, String twitchGameId, String twitchGameName) {
         if (!canActOnTwitch(user)) {

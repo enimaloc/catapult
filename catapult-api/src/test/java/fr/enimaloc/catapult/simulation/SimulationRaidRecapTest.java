@@ -113,7 +113,7 @@ class SimulationRaidRecapTest {
         TwitchEventSubService eventSub = new TwitchEventSubService(tokens, accounts, mock(TwitchTokenService.class),
                 streamState, publisher, RestClient.create(), new ObjectMapper(), twitchat, selfChanges,
                 DebugRecording.OFF, beans.getBeanProvider(SimulationGate.class), active, sessions,
-                mock(StreamCatchUp.class));
+                mock(StreamCatchUp.class), null);
         beans.addBean("twitchEventSubService", eventSub);
         timelineListener[0] = new SessionTimelineListener(timeline, eventSub, gameState, active);
         // As the connection does: the channel's category is known before it goes live, so no Helix read runs aside.

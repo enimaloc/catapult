@@ -1,5 +1,8 @@
 package fr.enimaloc.catapult.security;
 
+import fr.enimaloc.catapult.domain.account.OAuthScopes;
+import fr.enimaloc.catapult.event.GuestStarConsentGrantedEvent;
+import fr.enimaloc.catapult.service.gueststar.GuestStarConsent;
 import fr.enimaloc.catapult.domain.account.OAuthToken;
 import fr.enimaloc.catapult.event.TwitchLoginEvent;
 import fr.enimaloc.catapult.repository.account.OAuthTokenRepository;
@@ -137,6 +140,20 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                     response.sendRedirect(channelIntegrationsUrl(catUser));
                     return;
                 }
+            } else if (GuestStarConsent.REGISTRATION_ID.equals(registrationId)) {
+                // The Guest Star consent: its token replaced the Twitch one (CatapultOAuth2UserService), its refresh
+                // token and scopes go with it; Spring's copy is forgotten, the channel subscribes again, and the
+                // member goes back to the settings, where they asked for it.
+                saveRefreshToken(request, authentication, catUser, GuestStarConsent.REGISTRATION_ID,
+                        OAuthToken.Provider.TWITCH);
+                authorizedClientRepository.removeAuthorizedClient(GuestStarConsent.REGISTRATION_ID, authentication,
+                        request, response);
+                eventPublisher.publishEvent(new GuestStarConsentGrantedEvent(this, catUser.getUserAccount()));
+                if (webUrl != null && !webUrl.isBlank()) {
+                    response.sendRedirect(UriComponentsBuilder.fromUriString(channelTabUrl(catUser, "settings"))
+                            .replaceQueryParam("guest_star", "ok").toUriString());
+                    return;
+                }
             } else if ("xbox".equals(registrationId)) {
                 // Xbox is a secondary link: the user is already authenticated via Twitch.
                 // Only the refresh token needs saving — no login event, no JWT re-issuance.
@@ -242,7 +259,7 @@ public class TwitchLoginSuccessHandler implements AuthenticationSuccessHandler {
                     if (client.getAccessToken().getExpiresAt() != null) {
                         token.setExpiresAt(client.getAccessToken().getExpiresAt());
                     }
-                    token.setGrantedScopes(String.join(" ", client.getAccessToken().getScopes()));
+                    token.setGrantedScopes(OAuthScopes.join(client.getAccessToken().getScopes()));
                     oAuthTokenRepository.save(token);
                     log.debug("Saved {} refresh token for user {}", provider, catUser.getUserAccount().getId());
                 });

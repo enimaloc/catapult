@@ -20,4 +20,10 @@ class MockPresetsTest {
             assertThat(tws).as(binding.sourceName()).containsAll(binding.tws());
         }
     }
+
+    /** The quick logins start from these settings: Guest Star is offered there too, its consent still to give. */
+    @Test
+    void defaultSettings_offerGuestStars() {
+        assertThat(MockPresets.DEFAULT_SETTINGS.titleGuestStars()).isEqualTo("NEEDS_CONSENT");
+    }
 }

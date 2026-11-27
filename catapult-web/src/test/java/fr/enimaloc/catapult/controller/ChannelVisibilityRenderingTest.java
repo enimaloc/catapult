@@ -430,7 +430,7 @@ class ChannelVisibilityRenderingTest {
         assertThat(offered).contains("id=\"channel-title-settings-form\"", "id=\"title-settings-save-btn\"",
                 "data-help=\"title-settings\"", "class=\"binding-title-panel\"");
         assertThat(openingTagForId(offered, "title-enabled-checkbox")).contains("checked");
-        assertThat(openingTagForId(offered, "title-template-input")).contains("value=\"Playing {{GAME}}\"", "maxlength=\"140\"")
+        assertThat(openingTagForId(offered, "title-template-input")).contains("value=\"Playing {{GAME}}\"", "maxlength=\"500\"", "data-title-too-long=")
                 .doesNotContain("disabled");
         assertThat(offered).contains("data-title-preview", "data-preview-kind=\"TEMPLATE\"",
                 "data-preview-kind=\"BINDING\"", "data-preview-kind=\"NO_GAME\"", "data-preview-kind=\"INCOMPLETE\"");
@@ -480,6 +480,55 @@ class ChannelVisibilityRenderingTest {
         }
         assertThat(both).contains("IS_INCOMPLETE, HAS_TW");
         assertThat(neither).doesNotContain("IS_INCOMPLETE, HAS_TW", "{{DROP_END}}");
+    }
+
+    private static UserSettingsDto guestStarSettings(Boolean conditions, String guestStars) {
+        return new UserSettingsDto(
+                false, Set.of(), null, null, Set.of(), false, false, false,
+                null, null, Set.of(), List.of(), false, Set.of(), List.of(), null, false, List.of(), List.of(),
+                true, "Playing {{GAME}}", true, null, null, false, conditions, false, guestStars);
+    }
+
+    private String settingsPage(UserSettingsDto settings) throws Exception {
+        when(apiService.channelPage(any(), anyInt(), any(), any())).thenReturn(new ChannelPageData(
+                new ChannelUserDto("id-1", "twitch-1", "enimaloc", "https://example.test/avatar.png"),
+                "enimaloc", false, true, true, null,
+                new PagedBindings(0, 1, 0, List.of()),
+                List.of(), Set.of(), List.of(), Set.of(),
+                null, null, null, null, null, null, null, null));
+        when(apiService.channelSettings(any())).thenReturn(settings);
+        return mvc.perform(get("/spa/channel/enimaloc").locale(java.util.Locale.FRENCH)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    @Test
+    void guestStarsBoxHiddenWhenNotOffered() throws Exception {
+        assertThat(settingsPage(guestStarSettings(true, null)))
+                .contains("id=\"channel-title-settings-form\"")
+                .doesNotContain("guest-stars-consent", "GUEST_STARS");
+    }
+
+    @Test
+    void authorizeButtonWhenNeedsConsent() throws Exception {
+        String page = settingsPage(guestStarSettings(false, "NEEDS_CONSENT"));
+        assertThat(page).contains("id=\"guest-stars-consent\"", "id=\"guest-stars-authorize-btn\"",
+                "Autoriser Guest Star").doesNotContain("guest-stars-ready");
+    }
+
+    @Test
+    void authorizedWhenReady() throws Exception {
+        String page = settingsPage(guestStarSettings(false, "READY"));
+        assertThat(page).contains("id=\"guest-stars-consent\"", "class=\"guest-stars-ready\"")
+                .doesNotContain("guest-stars-authorize-btn");
+    }
+
+    @Test
+    void helperMentionsGuestStars() throws Exception {
+        String withConditions = settingsPage(guestStarSettings(true, "READY"));
+        String without = settingsPage(guestStarSettings(false, "READY"));
+        assertThat(openingTagForId(withConditions, "title-template-input")).contains("{{GUEST_STARS}}", "HAS_GUEST_STARS");
+        assertThat(openingTagForId(without, "title-template-input")).contains("{{GUEST_STARS}}")
+                .doesNotContain("HAS_GUEST_STARS");
     }
 
     private static UserSettingsDto titleSettings(Boolean conditions, Boolean drops) {

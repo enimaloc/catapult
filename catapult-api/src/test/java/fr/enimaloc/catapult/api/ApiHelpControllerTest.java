@@ -56,6 +56,10 @@ class ApiHelpControllerTest {
                 .thenReturn("<p>titre</p>");
         when(messageSource.getMessage(eq("help.title-settings.body.conditions"), any(), any(), eq(locale)))
                 .thenReturn("<p>conditions</p>");
+        when(messageSource.getMessage(eq("help.title-settings.body.guest_stars"), any(), any(), eq(locale)))
+                .thenReturn("<p>guests</p>");
+        when(messageSource.getMessage(eq("help.title-settings.body.guest_stars_condition"), any(), any(), eq(locale)))
+                .thenReturn("<p>has guests</p>");
         when(messageSource.getMessage(eq("help.title-settings.body.drops"), any(), any(), eq(locale)))
                 .thenReturn("<p>drops</p>");
     }
@@ -136,7 +140,7 @@ class ApiHelpControllerTest {
 
     @Test
     void titleSettings_conditionsAndDrops_appendsBothSections() {
-        when(titleHelpSections.forAccount(userId)).thenReturn(new TitleHelpSections.Offered(true, true));
+        when(titleHelpSections.forAccount(userId)).thenReturn(new TitleHelpSections.Offered(true, true, false, false));
 
         var content = controller.help("title-settings", locale, jwt);
 
@@ -145,7 +149,7 @@ class ApiHelpControllerTest {
 
     @Test
     void titleSettings_conditionsWithoutDrops_appendsConditionsOnly() {
-        when(titleHelpSections.forAccount(userId)).thenReturn(new TitleHelpSections.Offered(true, false));
+        when(titleHelpSections.forAccount(userId)).thenReturn(new TitleHelpSections.Offered(true, false, false, false));
 
         var content = controller.help("title-settings", locale, jwt);
 
@@ -204,5 +208,15 @@ class ApiHelpControllerTest {
 
         assertThat(content.body()).doesNotContain("chat");
         org.mockito.Mockito.verifyNoInteractions(systemAccount);
+    }
+
+    @Test
+    void titleSettings_guestStars_appendsItsSections() {
+        when(titleHelpSections.forAccount(userId)).thenReturn(new TitleHelpSections.Offered(false, false, true, false));
+        assertThat(controller.help("title-settings", locale, jwt).body()).isEqualTo("<p>titre</p><p>guests</p>");
+
+        when(titleHelpSections.forAccount(userId)).thenReturn(new TitleHelpSections.Offered(true, false, true, true));
+        assertThat(controller.help("title-settings", locale, jwt).body())
+                .isEqualTo("<p>titre</p><p>conditions</p><p>guests</p><p>has guests</p>");
     }
 }

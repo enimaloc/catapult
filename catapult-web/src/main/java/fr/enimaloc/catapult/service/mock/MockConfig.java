@@ -21,6 +21,8 @@ public class MockConfig {
     public Minecraft minecraft = new Minecraft();
     public Binding binding = new Binding();
     public Settings settings = new Settings();
+    /** The Guest Star consent the session starts with: NEEDS_CONSENT or READY. */
+    public String guestStars = "NEEDS_CONSENT";
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Steam {

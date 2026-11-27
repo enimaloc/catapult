@@ -286,6 +286,28 @@ class MockPanelApiControllerTest {
     }
 
     @Test
+    void guestStarsEndpointsGoToSimulationActions() throws Exception {
+        mvc.perform(write(post(API + "/accounts/{id}/guest-stars", alice.getId()),
+                        "{\"names\":[\" Carol \",\"\",\"Dave\",\"Carol\"]}"))
+                .andExpect(status().isNoContent());
+        mvc.perform(write(post(API + "/accounts/{id}/guest-star-consent", alice.getId()), "{\"given\":true}"))
+                .andExpect(status().isNoContent());
+
+        verify(actions).setGuestStars(alice, java.util.List.of("Carol", "Dave"));
+        verify(actions).setGuestStarConsent(alice, true);
+    }
+
+    @Test
+    void guestStarsEndpointRefusesMoreThanTwitchAllows() throws Exception {
+        mvc.perform(write(post(API + "/accounts/{id}/guest-stars", alice.getId()),
+                        "{\"names\":[\"a\",\"b\",\"c\",\"d\",\"e\",\"f\",\"g\"]}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(write(post(API + "/accounts/{id}/guest-stars", alice.getId()),
+                        "{\"names\":[\"" + "x".repeat(26) + "\"]}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void pastSegmentEndpointValidates() throws Exception {
         String path = API + "/accounts/{id}/past-segment";
         mvc.perform(write(post(path, alice.getId()),
