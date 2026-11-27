@@ -428,8 +428,16 @@ public class TwitchEventSubService implements EventSubService {
         new Subscription("channel.raid", "1", "from_broadcaster_user_id", SimulatedCalls.TWITCH_EVENTSUB_CHANNEL_RAID)
     );
 
+    /** Guest Star's types, each with the simulation key that keeps its real events out. */
+    private static final Map<String, CallKey> GUEST_STAR_KEYS = Map.of(
+        "channel.guest_star_session.begin", SimulatedCalls.TWITCH_EVENTSUB_GUEST_STAR_SESSION,
+        "channel.guest_star_session.end", SimulatedCalls.TWITCH_EVENTSUB_GUEST_STAR_SESSION,
+        "channel.guest_star_guest.update", SimulatedCalls.TWITCH_EVENTSUB_GUEST_STAR_GUEST);
+
     /** Whether the simulation is on and keeps the real events of {@code subscriptionType} out for the user. */
     private boolean simulated(UserAccount user, String subscriptionType) {
+        CallKey guestStarKey = GUEST_STAR_KEYS.get(subscriptionType);
+        if (guestStarKey != null) return SimulationGate.blocks(simulationGate, user.getId(), guestStarKey);
         return SUBSCRIPTIONS.stream()
             .filter(sub -> sub.type().equals(subscriptionType))
             .anyMatch(sub -> SimulationGate.blocks(simulationGate, user.getId(), sub.simulationKey()));
@@ -661,6 +669,8 @@ public class TwitchEventSubService implements EventSubService {
     private void subscribeGuestStars(UserAccount user, String accessToken, String sessionId) {
         if (guestStars == null) return;
         for (GuestStarEventSub.Spec spec : guestStars.subscriptionsFor(user)) {
+            // Kept out by the simulation: its events are injected instead
+            if (simulated(user, spec.type())) continue;
             try {
                 postSubscription(accessToken, spec.type(), spec.version(), spec.condition(), sessionId);
                 log.debug("Subscribed to {} for user {}", spec.type(), user.getId());

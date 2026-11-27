@@ -193,6 +193,92 @@ public class SimulationActions {
         timeline.addPast(user, categoryId, categoryName, gameName, duration);
     }
 
+    /** The most guests a Guest Star session has on air at once. */
+    public static final int MAX_GUEST_STARS = 6;
+
+    /**
+     * The Guest Star guests on air become {@code names}, in the real notifications' order: a session begins when the
+     * first guest comes ({@code channel.guest_star_session.begin}), each one leaving or coming is a
+     * {@code channel.guest_star_guest.update} ({@code removed} or {@code live}), and the session ends when none is
+     * left. A guest staying keeps their slot, a new one takes the lowest free one. A name that is a Catapult account's
+     * login carries its Twitch id. The notifications are injected whatever the consent, as Twitch sends them to any
+     * subscription: whether the titles show the guests is the real handling's call.
+     *
+     * @throws IllegalStateException when Guest Star's events are {@code REAL} for the account
+     */
+    public void setGuestStars(UserAccount user, List<String> names) {
+        InjectedEvents.requireSimulated(registry, user, SimulatedCalls.TWITCH_EVENTSUB_GUEST_STAR_SESSION);
+        InjectedEvents.requireSimulated(registry, user, SimulatedCalls.TWITCH_EVENTSUB_GUEST_STAR_GUEST);
+        List<SimulatedData.SimulatedGuest> before = registry.data(user.getId()).guestStars();
+        List<SimulatedData.SimulatedGuest> after = guestsAfter(before, names);
+        registry.update(user.getId(), data -> data.withGuestStars(after));
+
+        if (before.isEmpty() && !after.isEmpty()) {
+            injectGuestStarSession(user, "channel.guest_star_session.begin", "started_at");
+        }
+        if (after.isEmpty()) {
+            if (!before.isEmpty()) injectGuestStarSession(user, "channel.guest_star_session.end", "ended_at");
+            return;
+        }
+        List<String> staying = after.stream().map(SimulatedData.SimulatedGuest::userId).toList();
+        before.stream().filter(guest -> !staying.contains(guest.userId()))
+                .forEach(guest -> injectGuestUpdate(user, guest, "removed"));
+        List<String> there = before.stream().map(SimulatedData.SimulatedGuest::userId).toList();
+        after.stream().filter(guest -> !there.contains(guest.userId()))
+                .forEach(guest -> injectGuestUpdate(user, guest, "live"));
+    }
+
+    /** Whether the account gave its Guest Star consent: a fictitious account has no token to carry the scope. */
+    public void setGuestStarConsent(UserAccount user, boolean given) {
+        registry.update(user.getId(), data -> data.withGuestStarConsent(given));
+    }
+
+    /** {@code names} on air: those already there keep their slot, the others take the lowest free ones. */
+    private List<SimulatedData.SimulatedGuest> guestsAfter(List<SimulatedData.SimulatedGuest> before,
+                                                           List<String> names) {
+        List<SimulatedData.SimulatedGuest> after = new java.util.ArrayList<>(
+                before.stream().filter(guest -> names.contains(guest.displayName())).toList());
+        for (String name : names) {
+            if (after.stream().anyMatch(guest -> guest.displayName().equals(name))) continue;
+            int slot = 1;
+            while (hasSlot(after, String.valueOf(slot))) slot++;
+            after.add(new SimulatedData.SimulatedGuest(String.valueOf(slot), guestId(name), name));
+        }
+        after.sort(java.util.Comparator.comparingInt(guest -> Integer.parseInt(guest.slotId())));
+        return after;
+    }
+
+    private static boolean hasSlot(List<SimulatedData.SimulatedGuest> guests, String slot) {
+        return guests.stream().anyMatch(guest -> guest.slotId().equals(slot));
+    }
+
+    /** The Twitch id of the Catapult account with that login, else one made up from the name. */
+    private String guestId(String name) {
+        return accounts.findFirstByTwitchUsernameIgnoreCase(name)
+                .map(UserAccount::getTwitchId)
+                .orElse("sim-guest-" + name.toLowerCase(Locale.ROOT));
+    }
+
+    private void injectGuestStarSession(UserAccount user, String type, String at) {
+        ObjectNode event = broadcasterEvent(user)
+                .put("session_id", "sim-session-" + user.getId())
+                .put(at, Instant.now().toString());
+        inject(user, type, SimulatedCalls.TWITCH_EVENTSUB_GUEST_STAR_SESSION, event, type);
+    }
+
+    private void injectGuestUpdate(UserAccount user, SimulatedData.SimulatedGuest guest, String state) {
+        ObjectNode event = broadcasterEvent(user)
+                .put("session_id", "sim-session-" + user.getId())
+                .put("moderator_user_id", user.getTwitchId())
+                .put("guest_user_id", guest.userId())
+                .put("guest_user_login", guest.displayName().toLowerCase(Locale.ROOT))
+                .put("guest_user_name", guest.displayName())
+                .put("slot_id", guest.slotId())
+                .put("state", state);
+        inject(user, "channel.guest_star_guest.update", SimulatedCalls.TWITCH_EVENTSUB_GUEST_STAR_GUEST, event,
+                guest.displayName() + " " + state);
+    }
+
     /** The periods of the account's current (or last) session, oldest first. */
     public List<StreamCategorySegment> sessionTimeline(UserAccount user) {
         return timeline.currentSession(user);

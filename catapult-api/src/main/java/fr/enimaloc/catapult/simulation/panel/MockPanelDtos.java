@@ -65,6 +65,11 @@ public final class MockPanelDtos {
 
     public record RaidRequest(@Nullable String toLogin) {}
 
+    /** The Guest Star guests to have on air, by name, in the order they come. */
+    public record GuestStarsRequest(@Nullable List<String> names) {}
+
+    public record GuestStarConsentRequest(boolean given) {}
+
     /** A closed period to add just before the running one; {@code gameName} is optional. */
     public record PastSegmentRequest(@Nullable String categoryId, @Nullable String categoryName,
                                      @Nullable String gameName, @Nullable Integer minutes) {}
