@@ -103,7 +103,7 @@ public class GameBinding {
     private Set<String> tws = new HashSet<>();
 
     /** This game's own stream title, winning over the channel-wide one; null: the channel-wide one. */
-    @Column(length = 140)
+    @Column(length = 500)
     private String title;
 
     /**

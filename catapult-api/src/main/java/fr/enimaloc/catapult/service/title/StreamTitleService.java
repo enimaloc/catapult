@@ -260,16 +260,29 @@ public class StreamTitleService {
     }
 
     /**
-     * A title or template as typed: trimmed, null when blank; longer than {@value #MAX_LENGTH} characters is a
-     * 400, since it would never fit in a title.
+     * A title or template as typed: trimmed, null when blank; a 400 when {@link #lengthProblem} finds one.
      */
     public static String cleaned(String typed) {
         if (!hasText(typed)) return null;
         String title = typed.strip();
-        if (title.codePointCount(0, title.length()) > MAX_LENGTH) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A title is at most " + MAX_LENGTH + " characters");
-        }
+        String problem = lengthProblem(title);
+        if (problem != null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, problem);
         return title;
+    }
+
+    /**
+     * Why a trimmed title or template can't be kept, or null: more than {@value #MAX_LENGTH} characters of its own
+     * (its variables left out, {@link TitleTemplate#literalLength}), or more than
+     * {@value TitleTemplate#MAX_TEMPLATE_LENGTH} as typed.
+     */
+    public static String lengthProblem(String title) {
+        if (title.codePointCount(0, title.length()) > TitleTemplate.MAX_TEMPLATE_LENGTH) {
+            return "A title is at most " + TitleTemplate.MAX_TEMPLATE_LENGTH + " characters as typed";
+        }
+        if (TitleTemplate.literalLength(title) > MAX_LENGTH) {
+            return "A title is at most " + MAX_LENGTH + " characters, its variables left out";
+        }
+        return null;
     }
 
     private boolean sendsTitles(UserAccount user, UserSettings settings) {

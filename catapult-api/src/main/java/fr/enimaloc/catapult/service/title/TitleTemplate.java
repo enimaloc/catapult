@@ -1,5 +1,6 @@
 package fr.enimaloc.catapult.service.title;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -18,6 +19,8 @@ public final class TitleTemplate {
                     "HAS_GUEST_STARS");
     /** Twitch refuses a longer title. */
     public static final int MAX_LENGTH = 140;
+    /** The most a template may hold as typed, its variables and ternaries included. */
+    public static final int MAX_TEMPLATE_LENGTH = 500;
 
     private TitleTemplate() {
     }
@@ -41,6 +44,45 @@ public final class TitleTemplate {
         return result.isEmpty() ? Optional.empty() : Optional.of(result);
     }
 
+    /**
+     * The characters {@code template} puts in a title by itself, what {@link #MAX_LENGTH} limits: its variables and a
+     * ternary's syntax left out, a ternary counted by its longer branch; what stays as typed is counted as typed.
+     * Ternaries are counted as read with conditions on.
+     */
+    public static int literalLength(String template) {
+        return template == null ? 0 : literalLength(template, 0, template.length());
+    }
+
+    private static int literalLength(String text, int from, int to) {
+        int length = 0;
+        int i = from;
+        while (i < to) {
+            int open = text.indexOf("{{", i);
+            if (open < 0 || open >= to) {
+                length += text.codePointCount(i, to);
+                break;
+            }
+            length += text.codePointCount(i, open);
+            int close = text.indexOf("}}", open + 2);
+            Ternary ternary;
+            int failed;
+            if (close >= 0 && close + 2 <= to && VARIABLES.contains(text.substring(open + 2, close))) {
+                i = close + 2;
+            } else if ((ternary = Ternary.read(text, open)) != null && ternary.end() <= to) {
+                length += Math.max(literalLength(text, ternary.whenTrue()[0], ternary.whenTrue()[1] - 2),
+                        literalLength(text, ternary.whenFalse()[0], ternary.whenFalse()[1] - 2));
+                i = ternary.end();
+            } else if ((failed = failedTernaryEnd(text, open)) > 0 && failed <= to) {
+                length += text.codePointCount(open, failed);
+                i = failed;
+            } else {
+                length++;
+                i = open + 1;
+            }
+        }
+        return length;
+    }
+
     private static String expand(String text, TitleContext context, boolean conditions) {
         StringBuilder out = new StringBuilder();
         int i = 0;
@@ -58,8 +100,8 @@ public final class TitleTemplate {
             if (name != null && VARIABLES.contains(name)) {
                 out.append(value(name, context));
                 i = close + 2;
-            } else if (conditions && (ternary = Ternary.read(text, open, context)) != null) {
-                out.append(expand(ternary.chosen(), context, true));
+            } else if (conditions && (ternary = Ternary.read(text, open)) != null) {
+                out.append(expand(ternary.chosen(text, context), context, true));
                 i = ternary.end();
             } else if (conditions && (failed = failedTernaryEnd(text, open)) > 0) {
                 // A ternary that doesn't read through stays as typed, the rest of the title still rendered
@@ -127,14 +169,17 @@ public final class TitleTemplate {
         }
     }
 
-    /** {@code {{COND ? [[a]] : [[b]]}}} read from {@code open}: the chosen branch's raw text and where it ends. */
-    private record Ternary(String chosen, int end) {
+    /**
+     * {@code {{COND ? [[a]] : [[b]]}}} read from {@code open}, its condition one that reads through: the condition,
+     * each branch's {start of its text, end after its {@code ]]}}, and where it ends.
+     */
+    private record Ternary(String condition, int[] whenTrue, int[] whenFalse, int end) {
 
-        static Ternary read(String text, int open, TitleContext context) {
+        static Ternary read(String text, int open) {
             int question = text.indexOf('?', open + 2);
             if (question < 0) return null;
-            Boolean condition = new Condition(text.substring(open + 2, question), context).parse();
-            if (condition == null) return null;
+            String condition = text.substring(open + 2, question);
+            if (new Condition(condition, Map.of()).parse() == null) return null;
             int[] whenTrue = branch(text, skipSpaces(text, question + 1));
             if (whenTrue == null) return null;
             int colon = skipSpaces(text, whenTrue[1]);
@@ -143,8 +188,14 @@ public final class TitleTemplate {
             if (whenFalse == null) return null;
             int close = skipSpaces(text, whenFalse[1]);
             if (!text.startsWith("}}", close)) return null;
-            int[] chosen = condition ? whenTrue : whenFalse;
-            return new Ternary(text.substring(chosen[0], chosen[1] - 2), close + 2);
+            return new Ternary(condition, whenTrue, whenFalse, close + 2);
+        }
+
+        /** The raw text of the branch {@code context} chooses. */
+        String chosen(String text, TitleContext context) {
+            int[] chosen = Boolean.TRUE.equals(new Condition(condition, context.conditions()).parse())
+                    ? whenTrue : whenFalse;
+            return text.substring(chosen[0], chosen[1] - 2);
         }
 
         /**
@@ -183,12 +234,12 @@ public final class TitleTemplate {
     /** A condition: {@code or := and ("||" and)*}, {@code and := not ("&&" not)*}, {@code not := "!" not | atom}. */
     private static final class Condition {
         private final String text;
-        private final TitleContext context;
+        private final Map<String, Boolean> conditions;
         private int at;
 
-        Condition(String text, TitleContext context) {
+        Condition(String text, Map<String, Boolean> conditions) {
             this.text = text;
-            this.context = context;
+            this.conditions = conditions;
         }
 
         /** Its value; null when it doesn't read through or names an unknown condition. */
@@ -230,7 +281,7 @@ public final class TitleTemplate {
             while (at < text.length() && (Character.isUpperCase(text.charAt(at)) || text.charAt(at) == '_')) at++;
             String name = text.substring(start, at);
             if (!CONDITIONS.contains(name)) return null;
-            return Boolean.TRUE.equals(context.conditions().get(name));
+            return Boolean.TRUE.equals(conditions.get(name));
         }
 
         private boolean take(String token) {

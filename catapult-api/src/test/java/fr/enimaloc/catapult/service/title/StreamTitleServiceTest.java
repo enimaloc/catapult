@@ -333,6 +333,14 @@ class StreamTitleServiceTest {
     }
 
     @Test
+    void cleaned_leavesTheVariablesOutOfTheLimit() {
+        String template = "x".repeat(130) + " {{GAME}} {{GUEST_STARS}} {{CATEGORY}}";
+        assertThat(StreamTitleService.cleaned(template)).isEqualTo(template);
+        assertThatThrownBy(() -> StreamTitleService.cleaned("{{GAME}}".repeat(63)))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("500");
+    }
+
+    @Test
     void guestStarsInTitleWhenRolledOut() {
         when(experimentService.isRolledOut(user, StreamTitleService.GUEST_STARS_KEY)).thenReturn(true);
         when(roster.names(user.getId())).thenReturn(Optional.of("Alice"));

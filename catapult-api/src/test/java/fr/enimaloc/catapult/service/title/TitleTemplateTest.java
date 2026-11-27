@@ -190,4 +190,28 @@ class TitleTemplateTest {
                 null).withGuestStars("Alice");
         assertThat(context.conditions()).containsEntry("HAS_GAME", true).containsEntry("HAS_GUEST_STARS", true);
     }
+
+    @Test
+    void literalLength_leavesTheVariablesOut() {
+        assertThat(TitleTemplate.literalLength("{{GAME}} avec {{GUEST_STARS}}")).isEqualTo(6);
+        assertThat(TitleTemplate.literalLength("{{game}} ok")).isEqualTo(11);
+        assertThat(TitleTemplate.literalLength("🎮 {{TITLE}}")).isEqualTo(2);
+        assertThat(TitleTemplate.literalLength(null)).isZero();
+    }
+
+    @Test
+    void literalLength_countsATernaryByItsLongerBranch() {
+        assertThat(TitleTemplate.literalLength("{{HAS_GUEST_STARS ? [[avec {{GUEST_STARS}}]] : [[solo]]}} !"))
+                .isEqualTo(7);
+        assertThat(TitleTemplate.literalLength("{{HAS_GAME ? [[a]] : [[{{IS_MATURE ? [[bbb]] : [[]]}}]]}}"))
+                .isEqualTo(3);
+    }
+
+    @Test
+    void literalLength_countsWhatStaysAsTyped() {
+        // an unknown condition: the ternary is sent as typed
+        String raw = "{{NOPE ? [[a]] : [[b]]}}";
+        assertThat(TitleTemplate.literalLength(raw)).isEqualTo(raw.length());
+        assertThat(TitleTemplate.literalLength("{{{GAME}}}")).isEqualTo(2);
+    }
 }
